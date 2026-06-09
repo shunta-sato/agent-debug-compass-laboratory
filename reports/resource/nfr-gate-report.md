@@ -16,6 +16,10 @@ Gate decision: experimental-only
 - PR7 operating-point coverage is hardware-free verified for read-only
   observational runs and PR6 bounded matrices; it is claim-boundary evidence,
   not new target physical measurement.
+- PR8 capability cost model is hardware-free verified as controller-side
+  architecture evidence classification; it is not accelerator, storage,
+  network, battery, wakeup, flash, latency/jitter, sustained thermal, or
+  production cost evidence.
 - Production physical-footprint claims remain blocked until wakeup, battery/power, flash/storage, jitter, sustained thermal, degraded, and recovery evidence exists.
 - `make command-smoke` verifies command wiring only and explicitly reports `resource_metrics_collected=false`; it is not resource evidence.
 
@@ -42,6 +46,7 @@ Gate decision: experimental-only
 | CPU load | experimental-only burst | worker loop plus 100ms safety monitor | command duration, max 300s | no | measured for target55 short smoke; operator abort contract tested |
 | experiment matrix runner | experimental-only burst | listed trial sequence | warmup <=60s, cooldown <=60s, repetitions <=10, expanded trials <=64 | no | PR6 local real-run and blocked-factor tests passed |
 | operating-point coverage report | controller-side report | none on target | command lifetime | no | PR7 coverage classification tests passed |
+| capability-cost model report | controller-side report | none on target | command lifetime | no | PR8 capability evidence packet tests passed |
 | target runner | command-triggered | none while idle | process lifetime | no | target55 smoke passed |
 
 ## Artifact Check
@@ -68,6 +73,7 @@ Gate decision: experimental-only
 | CPU load operator abort produces structured aborted result | `crates/adc-lab/tests/cli.rs` | hardware-free CLI test and `lab.load_result.v1` schema | allowed contract/runtime claim |
 | PR6 matrix runner completes supported `cpu_load_workers` trials and blocks unsupported governor factor | `crates/adc-lab/tests/cli.rs` | hardware-free CLI tests and `lab.experiment_run.v1` schema | allowed contract/runtime claim |
 | PR7 operating-point coverage separates observed variation from controlled subset evidence | `crates/adc-lab/tests/cli.rs` | hardware-free CLI tests and `lab.operating_point_coverage.v1` schema | allowed contract/report claim |
+| PR8 capability cost model blocks offload and production architecture claims without cost evidence | `crates/adc-lab-core/src/report.rs` | hardware-free core/CLI tests and `lab.capability_cost_model.v1` schema | allowed contract/report claim |
 | low overhead | none | short smoke insufficient | blocked if introduced |
 | battery safe | none | none | blocked if introduced |
 | production ready target runtime | none | none | blocked if introduced |
@@ -84,6 +90,9 @@ Gate decision: experimental-only
 - Operating-point coverage can report `controlled_subset` for bounded
   `cpu_load_workers` evidence, but fixed-frequency and governor coverage remain
   blocked until privileged control is wired into trials.
+- Capability-cost reports classify existing artifacts only. GPU/NPU/DSP,
+  storage/network-heavy, and production physical-footprint architecture
+  recommendations remain blocked without qualified cost evidence.
 
 ## Handoff To Quality Gate
 

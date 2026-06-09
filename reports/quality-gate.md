@@ -7,17 +7,15 @@ Findings: 0
 ## Checks Run
 
 - `cargo fmt --all` - pass.
-- `cargo test -p adc-lab-core operating_point -- --nocapture` - pass.
+- `cargo test -p adc-lab-core capability_cost -- --nocapture` - pass.
 - `cargo test -p adc-lab --test cli report_operating_point -- --nocapture` -
   pass.
 - `make contract` - pass.
-- `cargo test -p adc-lab --tests -- --nocapture` - pass.
-- `cargo clippy --workspace --all-targets -- -D warnings` - pass.
-- `cargo test --workspace` - pass.
 - `make verify` - pass.
-- Secret/PII/security scan over PR diff and changed files - pass. No API keys,
-  passwords, IP addresses, email addresses, personal names, or security
-  incident details were found in the PR changes.
+- `git diff --check` - pass.
+- High-confidence secret/PII/security scan over PR diff and untracked PR8
+  ExecPlan - pass. No API keys, passwords, IP addresses, email addresses,
+  personal names, or security incident details were found in the PR changes.
 
 ## Live Discovery
 
@@ -25,21 +23,19 @@ Findings: 0
   check, clippy, tests, contract validation, docs smoke, and command smoke.
 - Repo command wrapper: `Makefile` remains the canonical command surface.
 - Schema/config paths:
-  `schemas/lab.operating_point_coverage.v1.schema.json`,
-  `tests/golden/lab.operating_point_coverage.v1.valid.json`, and
-  `examples/experiments/bounded_load_observe_smoke.yaml`.
+  `schemas/lab.capability_cost_model.v1.schema.json` and
+  `tests/golden/lab.capability_cost_model.v1.valid.json`.
 - Target connection state: no hardware target required for default
-  verification. PR7 tests use local hardware-free read/report paths and the
-  existing bounded matrix test path.
-- Artifact/log paths expected from PR7 workflow:
-  `reports/operating_point_coverage.json`,
-  `reports/capability_cost_model.json`, and `audit.jsonl` operation
-  `report.operating_point`.
+  verification. PR8 tests use local hardware-free report paths and existing run
+  artifact fixtures.
+- Artifact/log paths expected from PR8 workflow:
+  `reports/capability_cost_model.json` and `audit.jsonl` operation
+  `report.capability_cost`.
 
 ## Triggered Branch Evidence
 
 - ExecPlan - present:
-  `plans/20260609-pr7-controlled-operating-point-coverage.md`.
+  `plans/20260609-pr8-capability-cost-model-evidence-packet.md`.
 - Function boundary review - present:
   `reports/architecture/function-boundary-review.md`.
 - Error handling - present:
@@ -57,24 +53,27 @@ Findings: 0
 
 ## Exit Criteria Review
 
-- `lab.operating_point_coverage.v1` now records explicit coverage statuses:
-  `observational_only`, `controlled_subset`, `controlled_full`,
-  `not_controllable`, and `blocked_unsafe`.
-- Read-only observation runs produce `observational_only` coverage, with fixed
-  CPU frequency sweep claims blocked.
-- Completed PR6 `cpu_load_workers` trials produce `controlled_subset` coverage
-  for bounded workload levels only.
-- Blocked/failed trials become `blocked_points` with reason and next evidence.
-- `report operating-point` emits `report.operating_point` audit.
-- Claim boundaries keep passive observed frequency movement separate from
-  controlled fixed-frequency or governor evidence.
+- `lab.capability_cost_model.v1` now records structured capability evidence,
+  cost dimensions, architecture options, blocked claims, limitations, and
+  logical evidence refs.
+- Target inventory artifacts produce observed CPU, memory, thermal, and cpufreq
+  capability entries.
+- Bounded load result artifacts produce partial lab evidence for
+  `bounded_cpu_load_response`.
+- GPU/NPU/DSP/storage/network and production physical-footprint architecture
+  claims remain blocked without qualified cost evidence.
+- Legacy string-only `capabilities` output is rejected by strict minimal
+  contract validation.
+- `report operating-point` writes `reports/capability_cost_model.json` and
+  emits `report.capability_cost` audit.
 - Default verification remains hardware-free.
-- PR7 adds no privileged control, sudo helper behavior, cpufreq write,
-  fixed-frequency sweep, load generation, target-local runtime, destructive
-  experiment, or production physical-footprint claim.
+- PR8 adds no target probes, privileged control, sudo helper behavior, cpufreq
+  write, load generation, accelerator adapter, target-local runtime,
+  destructive experiment, benchmark ranking, or production physical-footprint
+  claim.
 
 ## Gate Decision
 
-Submit. The change is report/contract-only for operating-point evidence
+Submit. The change is report/contract-only for architecture evidence
 classification. It improves claim boundaries without adding target-local
 runtime or broadening production physical-footprint claims.

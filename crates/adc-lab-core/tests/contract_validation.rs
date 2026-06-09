@@ -106,6 +106,22 @@ fn contract_validation_operating_point_coverage_rejects_legacy_provisional_statu
     );
 }
 
+#[test]
+fn contract_validation_capability_cost_model_rejects_legacy_string_capabilities() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.capability_cost_model.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.capability_cost_model.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["capabilities"] = serde_json::json!(["cpu", "gpu"]);
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "capability cost model must use structured capability evidence entries"
+    );
+}
+
 fn validate_schema(
     root: &serde_json::Value,
     schema: &serde_json::Value,

@@ -28,6 +28,7 @@
 | `experiment.trial` | explain one matrix trial outcome and per-trial evidence | trial start to trial artifact refs |
 | `experiment.run` | explain matrix planning/execution summary | CLI start to experiment artifacts |
 | `report.operating_point` | explain observed vs controlled operating-point coverage | CLI start to coverage artifact |
+| `report.capability_cost` | explain architecture evidence sufficiency and blocked cost claims | CLI start to capability-cost artifact |
 | `tool.qualify` | explain whether a tool can be evidence | CLI start to qualification report |
 
 ## Correlation Identifiers
@@ -135,6 +136,20 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
   `cpu_load_workers` does not prove fixed-frequency or governor behavior.
 - Artifact path:
   `artifact://lab/runs/<run_id>/reports/operating_point_coverage.json`.
+
+- Signal: capability cost model report.
+- Decision supported: whether observed capabilities are sufficient for lab-only
+  architecture claims and which offload/production claims remain blocked.
+- Action owner: lab operator or agent reviewing architecture options.
+- Expected action when degraded: inspect `limitations`, `blocked_claims`, and
+  `next_evidence_needed`; collect qualified target-specific cost evidence before
+  recommending GPU/NPU/DSP/storage/network-heavy designs.
+- Counter-metric: `blocked_claims` prevent hardware presence or bounded load
+  completion from becoming production or offload claims.
+- Failure mode / misleading interpretation: capability presence is not an
+  architecture recommendation.
+- Artifact path:
+  `artifact://lab/runs/<run_id>/reports/capability_cost_model.json`.
 
 - Signal: read-only run manifest.
 - Decision supported: whether read-only target familiarization has inventory, toolchain, observation, audit, and claim trace artifacts.

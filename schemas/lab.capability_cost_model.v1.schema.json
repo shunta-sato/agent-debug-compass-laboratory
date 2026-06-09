@@ -3,14 +3,87 @@
   "$id": "lab.capability_cost_model.v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "run_id", "target_id", "capabilities", "cost_model_status", "limitations", "time_unix_ms"],
+  "required": ["schema_version", "run_id", "target_id", "model_status", "capabilities", "architecture_options", "blocked_claims", "limitations", "evidence_refs", "time_unix_ms"],
   "properties": {
     "schema_version": { "const": "lab.capability_cost_model.v1" },
     "run_id": { "type": "string", "minLength": 1 },
     "target_id": { "type": "string", "minLength": 1 },
-    "capabilities": { "type": "array", "items": { "type": "string" } },
-    "cost_model_status": { "type": "string" },
+    "model_status": { "$ref": "#/$defs/model_status" },
+    "capabilities": { "type": "array", "items": { "$ref": "#/$defs/capability" } },
+    "architecture_options": { "type": "array", "items": { "$ref": "#/$defs/architecture_option" } },
+    "blocked_claims": { "type": "array", "items": { "$ref": "#/$defs/claim_boundary" } },
     "limitations": { "type": "array", "items": { "type": "string" } },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
     "time_unix_ms": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "model_status": {
+      "enum": ["insufficient_evidence", "host_fallback_only", "target_evidence_partial", "cost_model_ready_for_lab_claims"]
+    },
+    "capability_class": {
+      "enum": ["cpu", "memory", "thermal", "frequency_control", "load", "gpu", "npu", "dsp", "storage", "network"]
+    },
+    "capability_status": {
+      "enum": ["observed", "missing_evidence", "needs_probe", "provisional", "blocked"]
+    },
+    "cost_dimension": {
+      "enum": ["cpu", "memory", "thermal", "wakeups", "storage_writes", "flash_wear", "battery", "latency_jitter", "network", "observer_overhead"]
+    },
+    "cost_status": {
+      "enum": ["measured_partial", "missing_evidence", "not_measured", "provisional"]
+    },
+    "claim_decision": {
+      "enum": ["supported", "blocked", "provisional"]
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability_id", "capability_class", "status", "summary", "evidence_refs", "cost_dimensions", "claim_boundary"],
+      "properties": {
+        "capability_id": { "type": "string", "minLength": 1 },
+        "capability_class": { "$ref": "#/$defs/capability_class" },
+        "status": { "$ref": "#/$defs/capability_status" },
+        "summary": { "type": "string", "minLength": 1 },
+        "evidence_refs": { "type": "array", "items": { "type": "string" } },
+        "cost_dimensions": { "type": "array", "items": { "$ref": "#/$defs/cost_dimension_entry" } },
+        "claim_boundary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "cost_dimension_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimension", "status", "summary", "evidence_refs", "limitation"],
+      "properties": {
+        "dimension": { "$ref": "#/$defs/cost_dimension" },
+        "status": { "$ref": "#/$defs/cost_status" },
+        "summary": { "type": "string", "minLength": 1 },
+        "evidence_refs": { "type": "array", "items": { "type": "string" } },
+        "limitation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "architecture_option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["option_id", "summary", "decision", "rationale", "evidence_refs", "next_evidence_needed"],
+      "properties": {
+        "option_id": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "decision": { "$ref": "#/$defs/claim_decision" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "evidence_refs": { "type": "array", "items": { "type": "string" } },
+        "next_evidence_needed": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim", "decision", "evidence_refs", "next_evidence_needed"],
+      "properties": {
+        "claim": { "type": "string", "minLength": 1 },
+        "decision": { "$ref": "#/$defs/claim_decision" },
+        "evidence_refs": { "type": "array", "items": { "type": "string" } },
+        "next_evidence_needed": { "type": "array", "items": { "type": "string" } }
+      }
+    }
   }
 }

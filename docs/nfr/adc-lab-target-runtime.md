@@ -18,6 +18,9 @@
   classifies existing observation/experiment artifacts as `observational_only`,
   `controlled_subset`, `controlled_full`, `not_controllable`, or
   `blocked_unsafe`; it does not add target-local runtime.
+- PR8 capability cost model: controller-side report generation only. It
+  classifies existing capability/cost evidence and blocked architecture claims;
+  it does not probe target accelerators or add target-local runtime.
 - Measurement surfaces available in the demo: target55 procfs CPU/memory, sysfs thermal, sysfs cpufreq read surface. Demo artifacts live under `examples/demos/target55/`.
 - Measurement surfaces unavailable: wakeups, storage writes, battery/power, latency/jitter, sustained thermal recovery.
 
@@ -46,6 +49,7 @@
 | `adc-lab load cpu` | experimental-only burst | worker loop plus 100ms safety monitor | command duration, max 300s | no | demo target55 thermal/load smoke captured; PR5 operator-abort path hardware-free verified |
 | `adc-lab experiment run` | experimental-only burst | listed trial sequence | warmup <=60s, cooldown <=60s, repetitions <=10, expanded trials <=64 | no | PR6 hardware-free real-run/blocked tests |
 | `adc-lab report operating-point` | controller-side report | none on target | command lifetime | no | PR7 hardware-free coverage classification tests |
+| capability-cost model in `adc-lab report operating-point` | controller-side report | none on target | command lifetime | no | PR8 hardware-free capability-cost model tests |
 | `adc-lab-target` | command-triggered | none while idle | process lifetime | no daemon | demo target55 smoke passed |
 
 ## Degraded-Mode Policy
@@ -71,6 +75,10 @@
 - PR7 operating-point coverage verification is hardware-free in core/CLI tests.
   It proves claim-boundary classification only; it does not add physical
   measurement evidence.
+- PR8 capability cost verification is hardware-free in core/CLI tests. It
+  proves architecture claim-boundary classification only; it does not measure
+  accelerator, storage, network, battery, wakeup, flash, latency/jitter, or
+  sustained thermal cost.
 - Demo evidence pack: `examples/demos/target55/`.
 - Demo baseline: `examples/demos/target55/baselines/resource/`.
 - Demo report path: `examples/demos/target55/reports/operating-envelope/`, `examples/demos/target55/reports/target-characterization.json`.

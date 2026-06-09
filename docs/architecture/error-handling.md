@@ -22,6 +22,7 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
 | CPU load worker execution | worker thread panic or unreadable operator abort marker | CLI error; load result is not trusted as evidence |
 | Experiment matrix execution | unsupported controlled factor, randomized order, failed load, failed observation, or safety-aborted load | trial `status=blocked` or `status=failed`; only successful supported trials become `completed` |
 | Operating point coverage report | missing observation/experiment artifacts, blocked trial, failed trial, unsupported factor, or unsafe factor | structured coverage with `observational_only`, `controlled_subset`, `not_controllable`, or `blocked_unsafe`; malformed JSON artifacts are CLI errors |
+| Capability cost model report | missing optional inventory/toolchain/coverage/load artifacts, malformed JSON, or absent accelerator/storage/network evidence | missing optional artifacts become `missing_evidence`/blocked claims; malformed JSON artifacts are CLI errors because evidence cannot be trusted |
 
 ## Caller Contract
 
@@ -61,4 +62,10 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
   artifacts fail the command because evidence cannot be trusted.
 - Observed frequency variation is always kept separate from fixed-frequency
   control coverage.
+- Capability cost model generation is generated from existing run artifacts.
+  Missing optional evidence blocks or limits architecture claims; malformed
+  artifacts fail the command.
+- Capability presence is not an architecture recommendation. Offload and
+  production physical-footprint claims require qualified, target-specific cost
+  evidence.
 - If target physical evidence is unavailable, reports mark claims provisional or blocked.
