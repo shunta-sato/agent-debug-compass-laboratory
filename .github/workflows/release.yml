@@ -162,15 +162,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="${{ steps.release.outputs.tag }}"
-          notes='Binary release for adc-lab toolchain distribution.
+          cat > release-notes.md <<'EOF'
+          Binary release for adc-lab toolchain distribution.
 
-This release proves build, checksum, and package integrity only. It does not make target resource, NFR, Pi4/Pi5 comparison, or production-readiness claims.
+          This release proves build, checksum, and package integrity only. It does not make target resource, NFR, Pi4/Pi5 comparison, or production-readiness claims.
 
-Verify downloaded assets with:
+          Verify downloaded assets with:
 
-```sh
-sha256sum -c SHA256SUMS
-```'
+          ```sh
+          sha256sum -c SHA256SUMS
+          ```
+          EOF
 
           assets=(dist-assets/*.tar.gz dist-assets/SHA256SUMS)
           if gh release view "$tag" >/dev/null 2>&1; then
@@ -179,5 +181,5 @@ sha256sum -c SHA256SUMS
             gh release create "$tag" "${assets[@]}" \
               --target "$GITHUB_SHA" \
               --title "$tag" \
-              --notes "$notes"
+              --notes-file release-notes.md
           fi
