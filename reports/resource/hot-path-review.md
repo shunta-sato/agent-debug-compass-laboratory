@@ -2,7 +2,8 @@
 
 ## Hot Path
 
-- Entry point: `adc-lab observe`, `adc-lab-target observe`, `adc-lab load cpu`, `adc-lab experiment run`.
+- Entry point: `adc-lab observe`, `adc-lab-target observe`, `adc-lab load cpu`,
+  `adc-lab experiment run`, `adc-lab report operating-point`.
 - Cadence or trigger: command-triggered; observation default interval is 1s; CPU load loop is bounded by duration; CPU load safety monitor runs at 100ms only during explicit load; experiment runner sequences bounded trials.
 - Default mode: no always-on target-local loop.
 - Burst mode: explicit command.
@@ -39,6 +40,8 @@
   each bounded trial; it does not add an always-on target-local loop.
 - [EHP-003] PR7 operating-point coverage reads controller-side artifacts only;
   it adds no target-local hot path.
+- [EHP-004] PR8 capability cost model reads controller-side run artifacts only;
+  it adds no target-local hot path and does not probe accelerators.
 
 ## Handoff
 

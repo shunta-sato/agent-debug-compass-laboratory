@@ -2,7 +2,8 @@
 
 ## Observer
 
-- Component: procfs/sysfs observation, CPU load safety monitor, experiment trial observer, and run artifact writer.
+- Component: procfs/sysfs observation, CPU load safety monitor, experiment trial
+  observer, controller-side report builders, and run artifact writer.
 - Cadence: 1s default during explicit observation command; 100ms safety monitor during explicit CPU load; per-trial observation during explicit matrix runs.
 - Data captured: CPU ticks, memory availability, cpufreq, thermal readings.
 - Storage path: controller run artifacts; target runner writes only stdout in MVP.
@@ -45,6 +46,8 @@
   supported bounded steps; this is accepted for experimental burst mode but not
   calibrated observer-overhead evidence.
 - [EOE-004] PR7 operating-point coverage is controller-side artifact
+  interpretation and adds no target observer effect.
+- [EOE-005] PR8 capability cost model is controller-side artifact
   interpretation and adds no target observer effect.
 
 ## Handoff

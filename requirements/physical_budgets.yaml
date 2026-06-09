@@ -43,6 +43,8 @@ target_classes:
         - controlled_full
         - not_controllable
         - blocked_unsafe
+      capability_cost_report_target_runtime: none
+      capability_cost_blocks_architecture_recommendations_without_cost_evidence: true
 
 degraded_modes:
   battery_low: experimental-only until target policy is characterized

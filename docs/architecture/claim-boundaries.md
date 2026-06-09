@@ -42,3 +42,37 @@ In PR7, `cpu_load_workers` can become `controlled_subset` evidence because the
 workload level is bounded and audited. CPU governor and fixed frequency remain
 blocked until plan/apply/restore is wired into matrix execution. Production
 quality claims require target characterization and controlled physical evidence.
+
+## Capability Cost Model
+
+`adc-lab report operating-point` also creates
+`lab.capability_cost_model.v1`. This is an architecture evidence packet, not a
+benchmark ranking.
+
+Allowed PR8 claims:
+
+```text
+- CPU, memory, thermal, cpufreq, and bounded-load surfaces were observed when
+  matching artifacts exist.
+- CPU can be used as a lab baseline when target inventory exists.
+- Bounded load results are partial lab evidence only.
+```
+
+Blocked PR8 claims:
+
+```text
+- GPU presence means GPU offload is better.
+- NPU/DSP offload is supported by this run.
+- Bounded CPU load proves production readiness.
+- Observed dynamic CPU frequency range is a fixed-frequency sweep.
+```
+
+Next evidence needed:
+
+```text
+- qualified GPU/NPU/DSP adapters and output schemas
+- workload-specific CPU-vs-accelerator cost comparison
+- storage/write/flash, wakeup, battery, latency/jitter, and sustained thermal
+  evidence
+- controlled operating-point matrix for frequency-dependent architecture claims
+```

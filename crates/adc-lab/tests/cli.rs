@@ -743,10 +743,31 @@ fn report_operating_point_marks_read_only_run_observational_only() {
                 .as_str()
                 .unwrap()
                 .contains("fixed CPU frequencies")));
+    let cost_model = &value["cost_model"];
+    assert_eq!(cost_model["model_status"], "host_fallback_only");
+    assert!(cost_model["capabilities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|capability| capability["capability_id"] == "cpu_topology"
+            && capability["status"] == "observed"));
+    assert!(cost_model["architecture_options"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|option| option["option_id"] == "gpu_offload" && option["decision"] == "blocked"));
+    assert!(cost_model["blocked_claims"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|claim| claim["decision"] == "blocked"
+            && claim["claim"].as_str().unwrap().contains("GPU presence")));
 
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"report.operating_point\""));
     assert!(audit.contains("\"result\":\"observational_only\""));
+    assert!(audit.contains("\"operation\":\"report.capability_cost\""));
+    assert!(audit.contains("\"result\":\"host_fallback_only\""));
 }
 
 #[test]
@@ -819,10 +840,36 @@ fn report_operating_point_marks_bounded_matrix_controlled_subset() {
                 .as_str()
                 .unwrap()
                 .contains("fixed CPU frequencies")));
+    let cost_model = &value["cost_model"];
+    assert_eq!(cost_model["model_status"], "host_fallback_only");
+    assert!(cost_model["capabilities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(
+            |capability| capability["capability_id"] == "bounded_cpu_load_response"
+                && capability["status"] == "observed"
+                && capability["evidence_refs"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|artifact| artifact.as_str().unwrap().ends_with("/load_result.json"))
+        ));
+    assert!(cost_model["blocked_claims"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|claim| claim["decision"] == "blocked"
+            && claim["claim"]
+                .as_str()
+                .unwrap()
+                .contains("bounded CPU load proves production readiness")));
 
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"report.operating_point\""));
     assert!(audit.contains("\"result\":\"controlled_subset\""));
+    assert!(audit.contains("\"operation\":\"report.capability_cost\""));
+    assert!(audit.contains("\"result\":\"host_fallback_only\""));
 }
 
 #[test]

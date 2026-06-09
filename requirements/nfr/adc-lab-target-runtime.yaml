@@ -51,6 +51,13 @@ modes:
       - controlled_full
       - not_controllable
       - blocked_unsafe
+    capability_cost_report_target_runtime: none
+    capability_cost_model_statuses:
+      - insufficient_evidence
+      - host_fallback_only
+      - target_evidence_partial
+      - cost_model_ready_for_lab_claims
+    capability_cost_blocks_architecture_recommendations_without_cost_evidence: true
     cpu_percent_max: null
     wakeups_per_second_added_max: null
     disk_write_bytes_total_max: null
@@ -73,6 +80,7 @@ measurement:
   pr5_operator_abort_contract_verified_by: cargo test -p adc-lab --test cli load_cpu_operator_abort_records_safety_monitor_without_abort_path
   pr6_matrix_runner_contract_verified_by: cargo test -p adc-lab --test cli experiment_real_run -- --nocapture
   pr7_operating_point_coverage_verified_by: cargo test -p adc-lab --test cli report_operating_point -- --nocapture
+  pr8_capability_cost_model_verified_by: cargo test -p adc-lab-core capability_cost -- --nocapture
   baseline_path: examples/demos/target55/baselines/resource/idle.json
   report_path: examples/demos/target55/reports/target-characterization.json
   missing_evidence:

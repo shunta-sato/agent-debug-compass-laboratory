@@ -609,10 +609,113 @@ pub struct CapabilityCostModel {
     pub schema_version: String,
     pub run_id: String,
     pub target_id: String,
-    pub capabilities: Vec<String>,
-    pub cost_model_status: String,
+    pub model_status: CapabilityCostModelStatus,
+    pub capabilities: Vec<CapabilityEvidence>,
+    pub architecture_options: Vec<ArchitectureOptionEvidence>,
+    pub blocked_claims: Vec<CapabilityClaimBoundary>,
     pub limitations: Vec<String>,
+    pub evidence_refs: Vec<String>,
     pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CapabilityCostModelStatus {
+    InsufficientEvidence,
+    HostFallbackOnly,
+    TargetEvidencePartial,
+    CostModelReadyForLabClaims,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CapabilityClass {
+    Cpu,
+    Memory,
+    Thermal,
+    FrequencyControl,
+    Load,
+    Gpu,
+    Npu,
+    Dsp,
+    Storage,
+    Network,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CapabilityEvidenceStatus {
+    Observed,
+    MissingEvidence,
+    NeedsProbe,
+    Provisional,
+    Blocked,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CostDimensionKind {
+    Cpu,
+    Memory,
+    Thermal,
+    Wakeups,
+    StorageWrites,
+    FlashWear,
+    Battery,
+    LatencyJitter,
+    Network,
+    ObserverOverhead,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CostEvidenceStatus {
+    MeasuredPartial,
+    MissingEvidence,
+    NotMeasured,
+    Provisional,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct CapabilityEvidence {
+    pub capability_id: String,
+    pub capability_class: CapabilityClass,
+    pub status: CapabilityEvidenceStatus,
+    pub summary: String,
+    pub evidence_refs: Vec<String>,
+    pub cost_dimensions: Vec<CapabilityCostDimension>,
+    pub claim_boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct CapabilityCostDimension {
+    pub dimension: CostDimensionKind,
+    pub status: CostEvidenceStatus,
+    pub summary: String,
+    pub evidence_refs: Vec<String>,
+    pub limitation: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ArchitectureOptionEvidence {
+    pub option_id: String,
+    pub summary: String,
+    pub decision: ClaimDecision,
+    pub rationale: String,
+    pub evidence_refs: Vec<String>,
+    pub next_evidence_needed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct CapabilityClaimBoundary {
+    pub claim: String,
+    pub decision: ClaimDecision,
+    pub evidence_refs: Vec<String>,
+    pub next_evidence_needed: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

@@ -70,6 +70,12 @@ Unsupported controlled factors are recorded as `blocked`, not completed.
 `not_controllable`, or `blocked_unsafe`. Passive frequency variation remains
 observational evidence; it is not a fixed-frequency sweep.
 
+The same report command also writes `lab.capability_cost_model.v1` as an
+architecture evidence packet. It records observed CPU/memory/thermal/cpufreq
+and bounded-load evidence, but keeps GPU/NPU/DSP/storage/network and production
+physical-footprint claims blocked until qualified, target-specific cost
+evidence exists. Capability presence is not an architecture recommendation.
+
 ## Verification
 
 Use the repository command wrapper:
