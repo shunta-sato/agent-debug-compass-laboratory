@@ -28,8 +28,9 @@ adc-lab toolchain discover --target ssh://pi4
 adc-lab observe --target ssh://pi4 --duration 30s --signals cpu,freq,thermal,memory
 ```
 
-Run the PR2 read-only familiarization pack smoke. This performs no privileged
-control, no cpufreq writes, and no load generation:
+Run the read-only familiarization pack smoke. This performs no privileged
+control, no cpufreq writes, no load generation, and only qualifies discovered
+tools through inventory policy:
 
 ```sh
 TARGET=ssh://pi4 scripts/targets/pi5-to-pi4-readonly-familiarization.sh
@@ -38,6 +39,7 @@ TARGET=ssh://pi4 scripts/targets/pi5-to-pi4-readonly-familiarization.sh
 The smoke writes one run directory containing `run_manifest.json`,
 `reports/familiarization_pack.json`, `reports/claim_evidence_trace.json`,
 `inventory/target_inventory.json`, `toolchain/toolchain_inventory.json`,
-`observations/observe.json`, and `audit.jsonl`.
+`tools/tool_qualification_summary.json`, `observations/observe.json`, and
+`audit.jsonl`.
 
 Privileged control requires an approval artifact and uses the helper. In this MVP, privileged apply/restore is local-target only; remote privileged apply is deferred until a target-local helper transport is implemented. Do not grant an agent a root shell.

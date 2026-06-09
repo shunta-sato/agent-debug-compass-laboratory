@@ -18,6 +18,7 @@
 | `report.claim_trace` | explain claim-boundary artifact generation | CLI start to claim trace artifact |
 | `run_manifest.write` | explain run manifest generation | CLI start to manifest artifact |
 | `report.pack` | explain familiarization pack generation | CLI start to pack artifact |
+| `tool.qualify_inventory` | explain discovered tool evidence acceptance/rejection | CLI start to qualification summary artifact |
 | `control.plan` | explain planned state change | CLI start to plan artifact |
 | `control.apply` | explain privileged apply result, refusal, or restore-after-failure outcome | CLI start to helper/core result |
 | `restore` | explain restore result | CLI start to helper/core result |
@@ -83,3 +84,11 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
 - Counter-metric: familiarization pack `blocked_claims` and claim trace blocked entries.
 - Failure mode / misleading interpretation: a complete read-only pack is still not controlled operating-point, load, battery, flash, or production evidence.
 - Artifact path: `artifact://lab/runs/<run_id>/run_manifest.json`.
+
+- Signal: tool qualification summary.
+- Decision supported: which discovered tools may be used as evidence sources in the current run.
+- Action owner: lab operator or agent reviewing evidence.
+- Expected action when degraded: reject claims that depend on unqualified, missing, privileged, external, or load tools and run the later qualification/control/load workflow.
+- Counter-metric: `evidence_rejected_tool_ids` and `missing_tool_ids`.
+- Failure mode / misleading interpretation: `builtin` means accepted by PR3 read-only policy, not that tool overhead, control behavior, or load safety has been calibrated.
+- Artifact path: `artifact://lab/runs/<run_id>/tools/tool_qualification_summary.json`.
