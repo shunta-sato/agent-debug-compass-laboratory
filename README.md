@@ -23,7 +23,10 @@ The project is separate from Agent Debug Compass Flight Recorder. Flight Recorde
 - Audit log in every evidence-producing run
 - Privileged apply/restore is local-target only in this MVP. Remote read-only inventory, observe, and non-root load are supported; remote privileged helper transport is deferred.
 - Privileged helper invocation uses the fixed `/usr/local/libexec/adc-lab-priv-helper` path; there is no public `--helper` override in the controller CLI.
-- Experiment matrix execution is dry-run/planning only in this MVP. Non-dry runs are recorded as `not_implemented` and cannot support claims until real control/load/observe execution is wired.
+- Experiment matrix execution supports a narrow real-run subset: listed-order
+  matrices with the non-privileged `cpu_load_workers` controlled factor. Other
+  controlled factors, including `governor` and fixed frequency, are blocked
+  until explicit control/apply/restore wiring is added.
 - Contract validation is a strict minimal MVP validator for required fields, enums, bounds, and `additionalProperties:false`; it is not claimed to be full Draft 2020-12 coverage.
 
 Target-specific live-run artifacts that are useful as examples live under `examples/demos/`, not under canonical product docs. For example, `examples/demos/target55/` shows a short-smoke Raspberry Pi 4 evidence pack shape.
@@ -44,6 +47,7 @@ adc-lab restore --lease lab/runs/LAB-RUN-.../leases/LEASE-....json --dry-run
 
 adc-lab load cpu --target local --workers 2 --duration 5s --abort-temp-c 75 --operator-abort-file <target-abort-file>
 adc-lab experiment run --target local --matrix examples/experiments/pi4_cpu_governor_smoke.yaml --dry-run
+adc-lab experiment run --target local --matrix examples/experiments/bounded_load_observe_smoke.yaml --trial-load-duration 1s --trial-observe-duration 0s
 adc-lab report pack --run lab/runs/LAB-RUN-...
 adc-lab health-check --target local
 ```
@@ -55,6 +59,10 @@ For SSH targets, `adc-lab` uses fixed `adc-lab-target` subcommands over SSH. It 
 available parallelism, supports optional thermal abort and operator abort, and
 records safety monitor evidence in `lab.load_result.v1`. The operator abort
 file path is runtime input only and is not serialized into run artifacts.
+
+`adc-lab experiment run` only marks a trial `completed` when supported
+non-privileged steps actually produced per-trial artifacts and audit events.
+Unsupported controlled factors are recorded as `blocked`, not completed.
 
 ## Verification
 

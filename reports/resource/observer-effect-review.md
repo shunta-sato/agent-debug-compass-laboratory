@@ -2,8 +2,8 @@
 
 ## Observer
 
-- Component: procfs/sysfs observation, CPU load safety monitor, and run artifact writer.
-- Cadence: 1s default during explicit observation command; 100ms safety monitor during explicit CPU load.
+- Component: procfs/sysfs observation, CPU load safety monitor, experiment trial observer, and run artifact writer.
+- Cadence: 1s default during explicit observation command; 100ms safety monitor during explicit CPU load; per-trial observation during explicit matrix runs.
 - Data captured: CPU ticks, memory availability, cpufreq, thermal readings.
 - Storage path: controller run artifacts; target runner writes only stdout in MVP.
 - Transmission path: local stdout or fixed SSH command stdout.
@@ -13,7 +13,7 @@
 
 | Vector | Risk | Evidence | Mitigation | Status |
 | --- | --- | --- | --- | --- |
-| Scheduler / wakeups | added wakeups during observation and load safety monitor | target55 short smoke; wakeups unavailable; PR5 hardware-free operator-abort tests | bounded duration, 1s observe default, 100ms load monitor only during explicit load | partial |
+| Scheduler / wakeups | added wakeups during observation, load safety monitor, and per-trial matrix observation | target55 short smoke; wakeups unavailable; PR5/PR6 hardware-free tests | bounded duration, 1s observe default, 100ms load monitor only during explicit load, trial count capped | partial |
 | CPU / allocation | per-sample reads and output allocation | target55 observer-on/off load iterations | no always-on mode | partial |
 | Storage writes / flash wear | controller writes artifacts; target load checks optional abort marker metadata | code review and PR5 CLI test | no target continuous writes; abort file path is not serialized into artifacts | provisional |
 | Network/radio use | SSH output when remote | target55 SSH smoke | fixed command, bounded output expectation | partial |
@@ -41,6 +41,9 @@
 - [EOE-002] PR5 load safety monitor adds a 100ms check during explicit CPU
   load; this is accepted for experimental burst mode but is not production
   overhead evidence.
+- [EOE-003] PR6 matrix runner records per-trial observation artifacts after
+  supported bounded steps; this is accepted for experimental burst mode but not
+  calibrated observer-overhead evidence.
 
 ## Handoff
 

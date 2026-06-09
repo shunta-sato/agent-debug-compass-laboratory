@@ -413,6 +413,10 @@ pub struct ExperimentTrial {
     pub trial_id: String,
     pub factors: BTreeMap<String, String>,
     pub status: String,
+    pub artifact_refs: Vec<String>,
+    pub failure: Option<String>,
+    pub started_at_unix_ms: Option<u64>,
+    pub ended_at_unix_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

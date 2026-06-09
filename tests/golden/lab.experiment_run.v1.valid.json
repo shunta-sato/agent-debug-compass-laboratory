@@ -10,7 +10,11 @@
       "factors": {
         "governor": "performance"
       },
-      "status": "planned"
+      "status": "planned",
+      "artifact_refs": [],
+      "failure": null,
+      "started_at_unix_ms": null,
+      "ended_at_unix_ms": null
     }
   ],
   "time_unix_ms": 1780000000000

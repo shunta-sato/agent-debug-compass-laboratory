@@ -15,11 +15,15 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["trial_id", "factors", "status"],
+        "required": ["trial_id", "factors", "status", "artifact_refs", "failure", "started_at_unix_ms", "ended_at_unix_ms"],
         "properties": {
           "trial_id": { "type": "string", "minLength": 1 },
           "factors": { "type": "object", "additionalProperties": { "type": "string" } },
-          "status": { "enum": ["planned", "completed", "failed", "blocked", "not_implemented"] }
+          "status": { "enum": ["planned", "completed", "failed", "blocked", "not_implemented"] },
+          "artifact_refs": { "type": "array", "items": { "type": "string" } },
+          "failure": { "type": ["string", "null"] },
+          "started_at_unix_ms": { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+          "ended_at_unix_ms": { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] }
         }
       }
     },

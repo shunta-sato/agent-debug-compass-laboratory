@@ -21,6 +21,8 @@ ADC_LAB_TARGET_RUNNER=/home/demo/.local/bin/adc-lab-target scripts/resource/run-
 - bounded burst
 - bounded burst with operator abort marker
 - bounded burst with thermal surface unavailable or explicitly recorded
+- listed-order experiment matrix with `cpu_load_workers=0` and `1`
+- unsupported controlled factor matrix blocked without producing completed evidence
 - degraded battery_low
 - degraded storage_pressure
 - observer-on vs observer-off when instrumentation is target-local
@@ -38,5 +40,8 @@ ADC_LAB_TARGET_RUNNER=/home/demo/.local/bin/adc-lab-target scripts/resource/run-
 - Command smoke reports `resource_metrics_collected=false` and `resource_claims_supported=false`.
 - PR5 hardware-free tests verify operator-abort contract behavior; they do not
   measure target thermal, wakeup, power, flash, or latency impact.
+- PR6 hardware-free tests verify only the narrow real-run experiment subset:
+  listed order, `cpu_load_workers`, bounded load result refs, passive observe
+  refs, and per-trial audit. They do not measure production physical footprint.
 - Target55 smoke proves only the short bounded target scenarios captured here.
 - Manual measurement is required before production physical-footprint claims.

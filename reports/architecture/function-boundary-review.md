@@ -1,4 +1,4 @@
-# Function Boundary Review: PR #1 Safety Fixes
+# Function Boundary Review: PR6 Real Experiment Matrix Runner
 
 ## Scope
 
@@ -10,9 +10,11 @@ Changed functions/helpers:
 - `collect_artifact_refs`, `collect_files` in `crates/adc-lab-core/src/report.rs`.
 - `ssh_runner_program`, `validate_ssh_runner_program`, `is_safe_ssh_endpoint` in `crates/adc-lab-core/src/target.rs`.
 - `run_experiment_matrix` in `crates/adc-lab-core/src/experiment.rs`.
+- `expand_factors`, `validate_experiment_matrix_bounds` in `crates/adc-lab-core/src/experiment.rs`.
 - `qualify_tool` in `crates/adc-lab-core/src/qualification.rs`.
 - `new_cpu_load_plan` in `crates/adc-lab-core/src/load.rs`.
 - `command_control_apply`, `command_restore`, `persist_control_result`, `persist_approval_record`, `safe_artifact_id`, `invoke_helper_apply`, `invoke_helper_restore`, `observe_ssh`, `load_cpu_ssh` in `crates/adc-lab/src/main.rs`.
+- `execute_experiment_matrix`, `execute_supported_experiment_trial`, `blocked_trial_reason`, `real_experiment_claim_trace`, `experiment_run_result` in `crates/adc-lab/src/main.rs`.
 
 ## Semantic Neighbors
 
@@ -25,7 +27,12 @@ Changed functions/helpers:
 | `artifact_uri_for_run` / `collect_artifact_refs` | same artifact-ref domain; one owns URI normalization, one owns run traversal | split responsibilities |
 | `ssh_runner_program` / `validate_ssh_runner_program` | same target transport domain | split validation from environment lookup |
 | `is_safe_ssh_endpoint` | target transport input grammar | keep local to target parsing; no generic URL parser |
-| `run_experiment_matrix` | matrix planning and claim trace domain | keep planning-only behavior here; do not fake execution |
+| `run_experiment_matrix` | matrix planning and claim trace domain | keep dry-run and unsupported non-dry planning semantics in core |
+| `expand_factors` / `validate_experiment_matrix_bounds` | shared matrix policy domain | keep in core so CLI and contract tests use the same bounds |
+| `execute_experiment_matrix` | controller-side real execution boundary | keep in CLI until supported trial execution outgrows the controller command surface |
+| `execute_supported_experiment_trial` | per-trial bounded load/observe orchestration | split from matrix expansion so completion depends on real artifacts and audit |
+| `blocked_trial_reason` | trial policy classification | keep explicit instead of folding unsupported factors into execution errors |
+| `real_experiment_claim_trace` | claim boundary for executed matrix subset | keep separate from dry-run trace so supported claims require completed trial artifacts |
 | `qualify_tool` | tool qualification contract | keep manifest-only path unqualified until evidence workflow exists |
 | `new_cpu_load_plan` | same bounded load policy domain | keep policy in plan constructor |
 | CLI apply/restore guards | call-site side-effect boundary before sudo | keep guard at controller boundary plus core/helper guard |
@@ -37,12 +44,14 @@ Changed functions/helpers:
 - Ledger update not required: no abstraction replacement, intentional duplication, or staged adapter was introduced.
 - Public helper override is removed from the controller CLI. Helper path validation remains in core as a guard on the fixed controller-internal helper path without moving `sudo` side effects into core.
 - Restore lease validation is split into small invariant checks rather than a broad generic validator because each refusal message is an operator-facing safety boundary.
-- Experiment matrix remains a planner until execution is actually wired; claim state is blocked/provisional instead of supported.
+- Experiment matrix core remains a planner. Real execution lives in the CLI
+  orchestration boundary and supports only listed-order `cpu_load_workers`
+  trials with bounded load and passive observe artifacts.
+- Unsupported controlled factors, randomized order, and failed trial steps
+  become blocked or failed trial outcomes. They do not become supported claims.
 
 ## Verification
 
-- `cargo test --workspace`: pass after public helper override removal.
-- `make verify`: pass after public helper override removal.
-- `make build-release`: pass after public helper override removal.
-- `make resource-smoke`: pass after public helper override removal.
-- Target command smoke for `ssh://target55`: not rerun for this second-review update; code changes are local/controller contract hardening.
+- `cargo test -p adc-lab --test cli experiment_real_run -- --nocapture`: pass
+  after adding the real matrix runner subset tests.
+- Full workspace verification is recorded in `reports/quality-gate.md`.

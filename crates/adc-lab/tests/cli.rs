@@ -543,6 +543,145 @@ fn experiment_dry_run_and_report_pack_work() {
 }
 
 #[test]
+fn experiment_real_run_executes_supported_bounded_matrix() {
+    let temp = tempfile::tempdir().unwrap();
+    let matrix = workspace_root().join("examples/experiments/bounded_load_observe_smoke.yaml");
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "experiment",
+            "run",
+            "--target",
+            "local",
+            "--matrix",
+            matrix.to_str().unwrap(),
+            "--trial-load-duration",
+            "1s",
+            "--trial-observe-duration",
+            "0s",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("experiment_run.json"));
+
+    let run: serde_json::Value = serde_json::from_slice(
+        &fs::read(temp.path().join("experiments/experiment_run.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(run["dry_run"], false);
+    let trials = run["trials"].as_array().unwrap();
+    assert_eq!(trials.len(), 2);
+    assert!(trials.iter().all(|trial| trial["status"] == "completed"));
+    assert!(trials.iter().all(
+        |trial| trial["artifact_refs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|artifact| artifact
+                .as_str()
+                .unwrap()
+                .starts_with("artifact://lab/runs/"))
+    ));
+    assert!(trials.iter().any(|trial| trial["artifact_refs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|artifact| artifact.as_str().unwrap().ends_with("/load_result.json"))));
+
+    let trace: serde_json::Value = serde_json::from_slice(
+        &fs::read(temp.path().join("reports/claim_evidence_trace.json")).unwrap(),
+    )
+    .unwrap();
+    assert!(trace["claims"].as_array().unwrap().iter().any(|claim| {
+        claim["decision"] == "supported"
+            && claim["claim"]
+                .as_str()
+                .unwrap()
+                .contains("Bounded non-privileged experiment matrix executed")
+    }));
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert_eq!(
+        audit.matches("\"operation\":\"experiment.trial\"").count(),
+        2
+    );
+    assert!(audit.contains("\"operation\":\"experiment.run\""));
+    assert!(audit.contains("\"result\":\"completed\""));
+}
+
+#[test]
+fn experiment_real_run_blocks_unsupported_controlled_factor() {
+    let temp = tempfile::tempdir().unwrap();
+    let matrix_path = temp.path().join("unsupported-governor.yaml");
+    fs::write(
+        &matrix_path,
+        r#"schema_version: lab.experiment_matrix.v1
+matrix_id: MATRIX-UNSUPPORTED-GOVERNOR
+description: Unsupported governor factor remains blocked by PR6 runner.
+factors:
+  - name: governor
+    kind: controlled_factor
+    levels:
+      - performance
+warmup_seconds: 0
+cooldown_seconds: 0
+repetitions: 1
+order: listed
+"#,
+    )
+    .unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "experiment",
+            "run",
+            "--target",
+            "local",
+            "--matrix",
+            matrix_path.to_str().unwrap(),
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("experiment_run.json"));
+
+    let run: serde_json::Value = serde_json::from_slice(
+        &fs::read(temp.path().join("experiments/experiment_run.json")).unwrap(),
+    )
+    .unwrap();
+    let trial = &run["trials"].as_array().unwrap()[0];
+    assert_eq!(trial["status"], "blocked");
+    assert!(trial["failure"]
+        .as_str()
+        .unwrap()
+        .contains("controlled factor 'governor' is not supported"));
+    assert!(trial["artifact_refs"].as_array().unwrap().is_empty());
+
+    let trace: serde_json::Value = serde_json::from_slice(
+        &fs::read(temp.path().join("reports/claim_evidence_trace.json")).unwrap(),
+    )
+    .unwrap();
+    assert!(trace["claims"].as_array().unwrap().iter().any(|claim| {
+        claim["decision"] == "blocked"
+            && claim["claim"]
+                .as_str()
+                .unwrap()
+                .contains("Bounded non-privileged experiment matrix")
+    }));
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"experiment.trial\""));
+    assert!(audit.contains("\"operation\":\"experiment.run\""));
+    assert!(audit.contains("\"result\":\"blocked\""));
+}
+
+#[test]
 fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
     let temp = tempfile::tempdir().unwrap();
     let output = Command::cargo_bin("adc-lab")
