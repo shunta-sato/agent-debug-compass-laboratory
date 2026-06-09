@@ -431,6 +431,83 @@ pub struct LoadResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub enum WorkloadClass {
+    IdleObserve,
+    SyntheticCpu,
+    ApplicationWorkload,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkloadClaimBoundary {
+    ExploratoryOnly,
+    SyntheticShortSmokeOnly,
+    NotSelectionEvidence,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadRequirements {
+    pub thermal_celsius_max: Option<f64>,
+    pub max_abort_count: Option<u64>,
+    pub memory_mb_max: Option<u64>,
+    pub latency_p95_ms_max: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadProfile {
+    pub schema_version: String,
+    pub workload_id: String,
+    pub description: String,
+    pub workload_class: WorkloadClass,
+    pub duration_seconds: u64,
+    pub requirements: WorkloadRequirements,
+    pub measurement_requirements: Vec<String>,
+    pub claim_boundary: WorkloadClaimBoundary,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TargetCapabilityStatus {
+    NoEvidence,
+    ExploratoryPartial,
+    MeasuredShortSmoke,
+    InsufficientForSelection,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ObservedCapabilityResults {
+    pub max_temp_c: Option<f64>,
+    pub abort_count: u64,
+    pub cpu_frequency_range_khz: Option<Vec<u64>>,
+    pub memory_available_kb_min: Option<u64>,
+    pub max_load_duration_ms: u64,
+    pub max_observation_duration_ms: u64,
+    pub load_result_count: u64,
+    pub observation_sample_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct TargetCapabilityProfile {
+    pub schema_version: String,
+    pub target_id: String,
+    pub workload_id: String,
+    pub evidence_pack_ref: Option<String>,
+    pub capability_status: TargetCapabilityStatus,
+    pub selection_ready: bool,
+    pub observed_results: ObservedCapabilityResults,
+    pub supported_claims: Vec<String>,
+    pub blocked_claims: Vec<String>,
+    pub next_evidence_needed: Vec<String>,
+    pub evidence_refs: Vec<String>,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum FactorKind {
     ControlledFactor,
     ObservedCovariate,

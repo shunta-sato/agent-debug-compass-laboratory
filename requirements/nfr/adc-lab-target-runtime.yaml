@@ -66,6 +66,9 @@ modes:
     option_b_privilege_provider_default_enabled: false
     option_b_systemd_unit_installed_by_pr10: false
     option_b_socket_listener_started_by_pr10: false
+    target_capability_profile_report_target_runtime: none
+    target_capability_profile_selection_ready_by_default: false
+    target_capability_profile_blocks_target_selection_claims: true
     cpu_percent_max: null
     wakeups_per_second_added_max: null
     disk_write_bytes_total_max: null
@@ -91,6 +94,7 @@ measurement:
   pr8_capability_cost_model_verified_by: cargo test -p adc-lab-core capability_cost -- --nocapture
   pr9_agent_adapter_qualification_verified_by: cargo test -p adc-lab --test cli tool_qualification -- --nocapture
   pr10_privilege_provider_status_verified_by: cargo test -p adc-lab --test cli privilege_provider -- --nocapture
+  pr11_target_capability_profile_verified_by: cargo test -p adc-lab --test cli report_capability_profile -- --nocapture
   baseline_path: examples/demos/target55/baselines/resource/idle.json
   report_path: examples/demos/target55/reports/target-characterization.json
   missing_evidence:

@@ -23,6 +23,7 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
 | Experiment matrix execution | unsupported controlled factor, randomized order, failed load, failed observation, or safety-aborted load | trial `status=blocked` or `status=failed`; only successful supported trials become `completed` |
 | Operating point coverage report | missing observation/experiment artifacts, blocked trial, failed trial, unsupported factor, or unsafe factor | structured coverage with `observational_only`, `controlled_subset`, `not_controllable`, or `blocked_unsafe`; malformed JSON artifacts are CLI errors |
 | Capability cost model report | missing optional inventory/toolchain/coverage/load artifacts, malformed JSON, or absent accelerator/storage/network evidence | missing optional artifacts become `missing_evidence`/blocked claims; malformed JSON artifacts are CLI errors because evidence cannot be trusted |
+| Target capability profile report | missing optional run/load/observation artifacts, malformed workload profile, or malformed run artifact | missing optional artifacts become `no_evidence`/`exploratory_partial` with `selection_ready=false`; malformed workload or evidence JSON is a CLI validation error |
 | Agent-created adapter qualification | missing evidence flag, unreadable file, malformed JSON, oversized output, invalid sha256, unsafe adapter scope | CLI validation error before evidence acceptance, or `agent_created_unqualified` report when scope is outside PR9 allowlist |
 | Privilege provider status | invalid target, artifact write failure, or audit write failure | CLI error with context; planned-disabled Option B is report data, not a failure |
 
@@ -70,6 +71,13 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
 - Capability presence is not an architecture recommendation. Offload and
   production physical-footprint claims require qualified, target-specific cost
   evidence.
+- Target capability profile generation reads existing run artifacts for a
+  supplied workload profile. Missing artifacts become explicit evidence gaps;
+  malformed artifacts fail the command because target-selection profiles must
+  not be built from corrupted evidence.
+- PR11 target capability profiles keep `selection_ready=false`; Pi4/Pi5
+  comparison and suitability claims remain blocked even when short-smoke
+  artifacts exist.
 - Agent-created adapter qualification does not execute adapter commands.
   Provided evidence files are validated and copied into run artifacts. Reports
   store artifact refs, not raw local input paths.

@@ -29,6 +29,7 @@
 | `experiment.run` | explain matrix planning/execution summary | CLI start to experiment artifacts |
 | `report.operating_point` | explain observed vs controlled operating-point coverage | CLI start to coverage artifact |
 | `report.capability_cost` | explain architecture evidence sufficiency and blocked cost claims | CLI start to capability-cost artifact |
+| `report.target_capability_profile` | explain workload-to-target evidence profile generation | CLI start to target capability profile artifact |
 | `tool.qualify` | explain whether an agent-created tool can be evidence | CLI start to evidence artifact copy and qualification report |
 | `privilege.provider_status` | explain which privilege provider is active or disabled | CLI start to provider status artifact |
 
@@ -151,6 +152,23 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
   architecture recommendation.
 - Artifact path:
   `artifact://lab/runs/<run_id>/reports/capability_cost_model.json`.
+
+- Signal: target capability profile report.
+- Decision supported: whether a target has exploratory/short-smoke evidence for
+  a specific workload profile, and which target-selection claims remain
+  blocked.
+- Action owner: lab operator or agent preparing later target comparison.
+- Expected action when degraded: inspect `observed_results`,
+  `next_evidence_needed`, and `blocked_claims`; collect missing same-suite
+  evidence before creating target comparison or suitability decisions.
+- Counter-metric: `selection_ready=false` and blocked target-selection claims
+  prevent short-smoke artifacts from becoming "Pi4 sufficient" or "Pi5
+  required" decisions.
+- Failure mode / misleading interpretation: a measured short-smoke capability
+  profile is not a Pi4/Pi5 comparison, sustained thermal proof, or production
+  suitability decision.
+- Artifact path:
+  `artifact://lab/runs/<run_id>/reports/target_capability_profile.<workload_id>.json`.
 
 - Signal: read-only run manifest.
 - Decision supported: whether read-only target familiarization has inventory, toolchain, observation, audit, and claim trace artifacts.

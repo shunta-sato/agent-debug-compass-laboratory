@@ -924,6 +924,114 @@ fn report_operating_point_marks_bounded_matrix_controlled_subset() {
 }
 
 #[test]
+fn report_capability_profile_links_workload_to_run_evidence_without_selection_claim() {
+    let temp = tempfile::tempdir().unwrap();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "familiarize",
+            "read-only",
+            "--target",
+            "local",
+            "--duration",
+            "0s",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "load",
+            "cpu",
+            "--target",
+            "local",
+            "--workers",
+            "1",
+            "--duration",
+            "1s",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    let workload = workspace_root().join("examples/workloads/bounded_cpu_load_2_workers_60s.json");
+    let output = Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "capability-profile",
+            "--run",
+            temp.path().to_str().unwrap(),
+            "--target-id",
+            "local-target",
+            "--workload",
+            workload.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains(
+            "target_capability_profile.bounded_cpu_load_2_workers_60s.json",
+        ))
+        .stdout(contains("\"selection_ready\": false"))
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let artifact_ref = value["target_capability_profile_ref"].as_str().unwrap();
+    assert!(artifact_ref.starts_with("artifact://lab/runs/"));
+    assert!(!artifact_ref.contains(temp.path().to_str().unwrap()));
+    let profile = &value["profile"];
+    assert_eq!(
+        profile["schema_version"],
+        "lab.target_capability_profile.v1"
+    );
+    assert_eq!(profile["workload_id"], "bounded_cpu_load_2_workers_60s");
+    assert_eq!(profile["selection_ready"], false);
+    assert_eq!(profile["observed_results"]["load_result_count"], 1);
+    assert!(
+        profile["observed_results"]["observation_sample_count"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+    assert!(profile["evidence_refs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|artifact| artifact
+            .as_str()
+            .unwrap()
+            .starts_with("artifact://lab/runs/")));
+    let profile_text = serde_json::to_string(profile).unwrap();
+    assert!(!profile_text.contains(temp.path().to_str().unwrap()));
+    assert!(profile["blocked_claims"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|claim| claim == "Pi4 is sufficient for this workload"));
+    assert!(profile["blocked_claims"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|claim| claim == "Pi5 is required for this workload"));
+    assert!(temp
+        .path()
+        .join("reports/target_capability_profile.bounded_cpu_load_2_workers_60s.json")
+        .exists());
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"report.target_capability_profile\""));
+    assert!(audit.contains("\"operation_id\":\"bounded_cpu_load_2_workers_60s\""));
+}
+
+#[test]
 fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
     let temp = tempfile::tempdir().unwrap();
     let output = Command::cargo_bin("adc-lab")

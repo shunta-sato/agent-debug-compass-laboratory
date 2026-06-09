@@ -1,0 +1,20 @@
+{
+  "schema_version": "lab.workload_profile.v1",
+  "workload_id": "bounded_cpu_load_2_workers_60s",
+  "description": "Bounded CPU load with 2 workers for 60 seconds",
+  "workload_class": "synthetic_cpu",
+  "duration_seconds": 60,
+  "requirements": {
+    "thermal_celsius_max": 75.0,
+    "max_abort_count": 0,
+    "memory_mb_max": null,
+    "latency_p95_ms_max": null
+  },
+  "measurement_requirements": [
+    "cpu_busy_percent",
+    "temperature_celsius",
+    "frequency_khz",
+    "memory_available_kb"
+  ],
+  "claim_boundary": "synthetic_short_smoke_only"
+}

@@ -1,4 +1,5 @@
 pub mod audit;
+pub mod capability_profile;
 pub mod contracts;
 pub mod control;
 pub mod error;
@@ -16,6 +17,7 @@ pub mod target;
 pub mod toolchain;
 
 pub use audit::*;
+pub use capability_profile::*;
 pub use contracts::*;
 pub use control::*;
 pub use error::*;

@@ -28,6 +28,9 @@
   records Option A as active and Option B as planned-disabled; it does not
   install a systemd unit, create a Unix socket, start a daemon, or contact a
   privileged provider.
+- PR11 target capability profile: controller-side report generation only. It
+  normalizes existing run artifacts against a workload profile; it does not run
+  target commands, helper apply, load, observe, or destructive experiments.
 - Measurement surfaces available in the demo: target55 procfs CPU/memory, sysfs thermal, sysfs cpufreq read surface. Demo artifacts live under `examples/demos/target55/`.
 - Measurement surfaces unavailable: wakeups, storage writes, battery/power, latency/jitter, sustained thermal recovery.
 
@@ -59,6 +62,7 @@
 | capability-cost model in `adc-lab report operating-point` | controller-side report | none on target | command lifetime | no | PR8 hardware-free capability-cost model tests |
 | `adc-lab tool qualify --manifest ...` with evidence files | controller-side qualification report | none on target | command lifetime | no | PR9 hardware-free adapter qualification tests |
 | `adc-lab privilege provider-status` | controller-side report | none on target | command lifetime | no | PR10 hardware-free provider status tests |
+| `adc-lab report capability-profile` | controller-side report | none on target | command lifetime | no | PR11 hardware-free profile generation tests |
 | `adc-lab-target` | command-triggered | none while idle | process lifetime | no daemon | demo target55 smoke passed |
 
 ## Degraded-Mode Policy
@@ -94,9 +98,15 @@
 - PR10 privilege provider status verification is hardware-free in core/CLI
   tests. It proves provider posture reporting only; it does not install or run
   a target-local root provider.
+- PR11 target capability profile verification is hardware-free in core/CLI
+  tests. It proves workload/profile artifact generation and conservative claim
+  blocking only; it does not prove Pi4/Pi5 suitability or production physical
+  footprint.
 - Demo evidence pack: `examples/demos/target55/`.
 - Demo baseline: `examples/demos/target55/baselines/resource/`.
 - Demo report path: `examples/demos/target55/reports/operating-envelope/`, `examples/demos/target55/reports/target-characterization.json`.
+- Workload/profile examples: `examples/workloads/`,
+  `examples/demos/pi4/`, and `examples/demos/pi5/`.
 - Missing evidence: wakeups, battery/power, storage writes, flash wear, latency/jitter, sustained thermal/recovery/degraded envelope.
 
 ## No-Measurement-No-Claim List

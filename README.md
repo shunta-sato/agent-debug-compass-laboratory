@@ -30,6 +30,9 @@ The project is separate from Agent Debug Compass Flight Recorder. Flight Recorde
   controlled factors, including `governor` and fixed frequency, are blocked
   until explicit control/apply/restore wiring is added.
 - Contract validation is a strict minimal MVP validator for required fields, enums, bounds, and `additionalProperties:false`; it is not claimed to be full Draft 2020-12 coverage.
+- Workload profiles and target capability profiles define the same measuring
+  stick for Pi4/Pi5-style target evidence. They are exploratory/short-smoke
+  evidence packets only; they are not target-selection decisions.
 
 Target-specific live-run artifacts that are useful as examples live under `examples/demos/`, not under canonical product docs. For example, `examples/demos/target55/` shows a short-smoke Raspberry Pi 4 evidence pack shape.
 
@@ -54,6 +57,7 @@ adc-lab experiment run --target local --matrix examples/experiments/pi4_cpu_gove
 adc-lab experiment run --target local --matrix examples/experiments/bounded_load_observe_smoke.yaml --trial-load-duration 1s --trial-observe-duration 0s
 adc-lab report pack --run lab/runs/LAB-RUN-...
 adc-lab report operating-point --run lab/runs/LAB-RUN-... --target-id local-target
+adc-lab report capability-profile --run lab/runs/LAB-RUN-... --target-id local-target --workload examples/workloads/bounded_cpu_load_2_workers_60s.json
 adc-lab health-check --target local
 ```
 
@@ -79,6 +83,13 @@ architecture evidence packet. It records observed CPU/memory/thermal/cpufreq
 and bounded-load evidence, but keeps GPU/NPU/DSP/storage/network and production
 physical-footprint claims blocked until qualified, target-specific cost
 evidence exists. Capability presence is not an architecture recommendation.
+
+`adc-lab report capability-profile` writes
+`lab.target_capability_profile.v1` for a specific `lab.workload_profile.v1`.
+It reads existing run artifacts only and keeps `selection_ready=false` in
+PR11. The profile can say a target produced short-smoke artifacts for a
+workload; it cannot say "Pi4 is sufficient", "Pi5 is required", or that a
+target is production-ready. See `docs/architecture/workload-and-capability-profiles.md`.
 
 ## Verification
 
