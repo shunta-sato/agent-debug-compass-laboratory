@@ -14,30 +14,31 @@ Findings: 0
 - `make verify` - pass.
 - Secret/PII/security scan over PR diff and changed files - pass. No API keys,
   passwords, IP addresses, email addresses, personal names, or security
-  incident details were found in the PR changes. The only PII-pattern review
-  note was existing `target55` demo target label references retained in
-  example-evidence docs.
+  incident details were found in the PR changes.
 
 ## Live Discovery
 
 - Rust toolchain: verified through `make verify` with workspace build, fmt
   check, clippy, tests, contract validation, docs smoke, and command smoke.
 - Repo command wrapper: `Makefile` remains the canonical command surface.
-- Schema/config paths: `schemas/lab.load_plan.v1.schema.json`,
-  `schemas/lab.load_result.v1.schema.json`,
-  `tests/golden/lab.load_plan.v1.valid.json`, and
-  `tests/golden/lab.load_result.v1.valid.json`.
+- Schema/config paths: `schemas/lab.experiment_matrix.v1.schema.json`,
+  `schemas/lab.experiment_run.v1.schema.json`,
+  `tests/golden/lab.experiment_run.v1.valid.json`, and
+  `examples/experiments/bounded_load_observe_smoke.yaml`.
 - Target connection state: no hardware target required for default
-  verification. PR5 tests run local hardware-free operator-abort and contract
-  paths.
-- Artifact/log paths expected from PR5 workflow: `loads/*.plan.json`,
-  `loads/*.result.json`, `tools/tool_qualification_summary.json`, individual
-  `tools/*.qualification.json`, and `audit.jsonl` operation `load.cpu`.
+  verification. PR6 tests run local hardware-free experiment matrix paths.
+- Artifact/log paths expected from PR6 workflow:
+  `experiments/experiment_run.json`,
+  `experiments/trials/<trial_id>/load_plan.json`,
+  `experiments/trials/<trial_id>/load_result.json`,
+  `experiments/trials/<trial_id>/observation.json`,
+  `reports/claim_evidence_trace.json`, and `audit.jsonl` operations
+  `experiment.trial` and `experiment.run`.
 
 ## Triggered Branch Evidence
 
 - ExecPlan - present:
-  `plans/20260609-pr5-bounded-load-safety-monitor.md`.
+  `plans/20260609-pr6-real-experiment-matrix-runner.md`.
 - Embedded NFR design/gate - present:
   `docs/nfr/adc-lab-target-runtime.md`,
   `requirements/nfr/adc-lab-target-runtime.yaml`,
@@ -58,25 +59,24 @@ Findings: 0
 
 ## Exit Criteria Review
 
-- `lab.load_plan.v1` records `safety_monitor` metadata for CPU load plans:
-  monitor interval, thermal abort setting, operator abort enablement, and
-  restore-on-abort policy.
-- `lab.load_result.v1` records `safety_monitor` evidence for CPU load results:
-  sample count, thermal surface availability, operator abort observation, and
-  restore-on-abort status.
-- Operator abort stops CPU load with `status=aborted` and
-  `abort_reason=operator_abort`.
-- Operator abort file paths are runtime-only and are not serialized into
-  `lab.load_plan.v1` or `lab.load_result.v1` artifacts.
-- SSH target runner accepts the same operator abort option and enforces it on
-  the target side through fixed `adc-lab-target load cpu` subcommand wiring.
-- Built-in CPU load qualification is accepted only for bounded load plan/result
-  evidence. It does not support production, battery, flash, latency,
-  low-overhead, sustained thermal, or thermally-safe claims.
+- `lab.experiment_run.v1` records per-trial artifact refs, failure reason, and
+  start/end timestamps.
+- Real `adc-lab experiment run` execution is limited to listed-order
+  `cpu_load_workers` matrices.
+- Supported trials produce bounded load and/or passive observation artifacts
+  before they can become `completed`.
+- Unsupported controlled factors, randomized order, failed loads, and failed
+  observations become `blocked` or `failed`, not supported claims.
+- Each trial emits an `experiment.trial` audit event. The run emits an
+  `experiment.run` audit summary.
+- Claim trace supports only completed bounded non-privileged matrix execution
+  and keeps fixed-frequency, privileged-control, and production physical
+  footprint claims blocked.
 - Default verification remains hardware-free.
-- PR5 adds no privileged control, sudo helper behavior, cpufreq write,
+- PR6 adds no privileged control, sudo helper behavior, cpufreq write,
   fixed-frequency sweep, memory pressure, I/O stress, thermal stress, GPU/NPU
-  load, destructive experiment, or production physical-footprint claim.
+  load, destructive experiment, randomized execution, concurrent
+  observe-while-load, or production physical-footprint claim.
 
 ## Gate Decision
 

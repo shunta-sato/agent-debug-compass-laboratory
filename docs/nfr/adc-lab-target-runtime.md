@@ -11,6 +11,9 @@
 - PR5 CPU load safety monitor: 100ms monitor loop during explicit CPU load
   only; records thermal surface availability, operator abort observation,
   sample count, and restore-on-abort status.
+- PR6 experiment matrix runner: listed-order, command-triggered burst that can
+  execute only the non-privileged `cpu_load_workers` factor plus passive
+  observation. Unsupported controlled factors are blocked.
 - Measurement surfaces available in the demo: target55 procfs CPU/memory, sysfs thermal, sysfs cpufreq read surface. Demo artifacts live under `examples/demos/target55/`.
 - Measurement surfaces unavailable: wakeups, storage writes, battery/power, latency/jitter, sustained thermal recovery.
 
@@ -19,7 +22,7 @@
 | NFR | Default budget | Burst budget | Measurement | Merge rule | Status |
 | --- | ---: | ---: | --- | --- | --- |
 | Polling / sampling cadence | no always-on default | bounded by command duration | demo target55 1s observe smoke | sub-100ms default blocks submit | demo-measured for short smoke |
-| CPU | no always-on default | bounded by worker count, duration, and operator abort | demo target55 idle/load smoke; PR5 hardware-free operator-abort tests | default over budget blocks submit | demo-partial |
+| CPU | no always-on default | bounded by worker count, duration, operator abort, and matrix trial count | demo target55 idle/load smoke; PR5/PR6 hardware-free tests | default over budget blocks submit | demo-partial |
 | Wakeups | no always-on default | bounded by sample interval or 100ms load safety monitor during explicit load | not measured | unbounded wakeups block submit | unknown |
 | RSS / heap | unknown | unknown | not measured directly | unbounded growth blocks submit | unknown |
 | Hot-path allocation | no default hot path | load loop avoids shared allocation | code review | per-sample allocation needs evidence | provisional |
@@ -37,6 +40,7 @@
 | --- | --- | ---: | ---: | --- | --- |
 | `adc-lab observe` sampling | burst | >= 1s default | command duration | no | demo target55 observer-effect smoke captured |
 | `adc-lab load cpu` | experimental-only burst | worker loop plus 100ms safety monitor | command duration, max 300s | no | demo target55 thermal/load smoke captured; PR5 operator-abort path hardware-free verified |
+| `adc-lab experiment run` | experimental-only burst | listed trial sequence | warmup <=60s, cooldown <=60s, repetitions <=10, expanded trials <=64 | no | PR6 hardware-free real-run/blocked tests |
 | `adc-lab-target` | command-triggered | none while idle | process lifetime | no daemon | demo target55 smoke passed |
 
 ## Degraded-Mode Policy
@@ -56,6 +60,9 @@
 - Command smoke does not collect resource metrics; resource/NFR claims require separate observe/load artifacts.
 - PR5 safety monitor verification is hardware-free in unit/CLI tests. It proves
   contract and operator-abort behavior, not target thermal safety.
+- PR6 matrix runner verification is hardware-free in CLI tests. It proves
+  per-trial artifacts/audit and blocked unsupported factors, not target
+  physical safety.
 - Demo evidence pack: `examples/demos/target55/`.
 - Demo baseline: `examples/demos/target55/baselines/resource/`.
 - Demo report path: `examples/demos/target55/reports/operating-envelope/`, `examples/demos/target55/reports/target-characterization.json`.

@@ -38,6 +38,16 @@ Runtime duration and thermal-abort enforcement belong to the load or experiment
 execution phase; standalone cpufreq apply is not treated as a long-running
 timer.
 
+Experiment matrix boundary:
+
+- PR6 real experiment execution supports only non-privileged listed-order
+  `cpu_load_workers` trials.
+- Controlled factors that require privileged apply, such as governor or fixed
+  CPU frequency, remain blocked until the matrix runner is explicitly wired to
+  plan, approve, apply, restore, and verify those operations per trial.
+- A matrix trial cannot become `completed` evidence unless the supported
+  load/observe steps actually run and emit per-trial artifacts plus audit.
+
 Helper path boundary:
 
 - controller CLI invokes only `/usr/local/libexec/adc-lab-priv-helper`

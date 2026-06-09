@@ -2,8 +2,8 @@
 
 ## Hot Path
 
-- Entry point: `adc-lab observe`, `adc-lab-target observe`, `adc-lab load cpu`.
-- Cadence or trigger: command-triggered; observation default interval is 1s; CPU load loop is bounded by duration; CPU load safety monitor runs at 100ms only during explicit load.
+- Entry point: `adc-lab observe`, `adc-lab-target observe`, `adc-lab load cpu`, `adc-lab experiment run`.
+- Cadence or trigger: command-triggered; observation default interval is 1s; CPU load loop is bounded by duration; CPU load safety monitor runs at 100ms only during explicit load; experiment runner sequences bounded trials.
 - Default mode: no always-on target-local loop.
 - Burst mode: explicit command.
 - Target class: Raspberry Pi 4 initial target, generic embedded Linux future.
@@ -19,12 +19,12 @@
 | Network/radio use | SSH fixed commands only with runner path allowlist | 0 hidden background use unless budgeted | code review and CLI test | acceptable | no background radio |
 | Blocking syscall | procfs/sysfs reads | 0 in sub-100ms loop unless justified | code review | acceptable at 1s default | no sub-100ms default |
 | Lock/queue operation | none | bounded wait and bounded queue | code review | low | none |
-| O(n) data-structure operation | factor expansion in cold path | 0 per high-frequency iteration unless bounded | tests | low | none |
+| O(n) data-structure operation | factor expansion in cold path | 0 per high-frequency iteration unless bounded | tests | low | expanded trials capped at 64 |
 
 ## Cadence Decision
 
 - Default cadence: no always-on cadence; observation default 1s when explicitly run.
-- Burst cadence: 1s default for observation, user-bounded duration; CPU load duration is capped at 300s by default policy, worker count cannot exceed available parallelism, and safety monitor cadence is 100ms only during explicit CPU load.
+- Burst cadence: 1s default for observation, user-bounded duration; CPU load duration is capped at 300s by default policy, worker count cannot exceed available parallelism, safety monitor cadence is 100ms only during explicit CPU load, and experiment matrices are capped by warmup/cooldown/repetition/trial policy.
 - Why this cadence is needed: enough for coarse CPU/frequency/thermal smoke.
 - Event-driven or coalesced alternative: future adapters can cache surfaces if needed.
 - Measurement required: yes, before overhead claims.
@@ -35,6 +35,8 @@
 - [EHP-001] CPU load intentionally burns CPU in worker threads, but only as an
   explicit experimental burst with duration, worker, thermal, and operator abort
   bounds.
+- [EHP-002] PR6 experiment runner sequences trials and writes artifacts after
+  each bounded trial; it does not add an always-on target-local loop.
 
 ## Handoff
 

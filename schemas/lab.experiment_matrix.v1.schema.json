@@ -21,9 +21,9 @@
         }
       }
     },
-    "warmup_seconds": { "type": "integer", "minimum": 0 },
-    "cooldown_seconds": { "type": "integer", "minimum": 0 },
-    "repetitions": { "type": "integer", "minimum": 1 },
+    "warmup_seconds": { "type": "integer", "minimum": 0, "maximum": 60 },
+    "cooldown_seconds": { "type": "integer", "minimum": 0, "maximum": 60 },
+    "repetitions": { "type": "integer", "minimum": 1, "maximum": 10 },
     "order": { "enum": ["listed", "randomized"] }
   }
 }

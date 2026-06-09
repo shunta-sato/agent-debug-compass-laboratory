@@ -1,0 +1,25 @@
+schema_version: lab.experiment_matrix.v1
+matrix_id: MATRIX-BOUNDED-LOAD-OBSERVE-SMOKE
+description: Bounded non-privileged CPU load and passive observe smoke matrix.
+factors:
+  - name: cpu_load_workers
+    kind: controlled_factor
+    levels:
+      - "0"
+      - "1"
+  - name: cpu_frequency
+    kind: observed_covariate
+    levels:
+      - observed
+  - name: temperature
+    kind: observed_covariate
+    levels:
+      - observed
+  - name: ambient_conditions
+    kind: uncontrolled_confounder
+    levels:
+      - not_controlled
+warmup_seconds: 0
+cooldown_seconds: 0
+repetitions: 1
+order: listed

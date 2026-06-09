@@ -29,6 +29,13 @@ target_classes:
       burst_requires_trigger_or_marker: true
       operator_abort_supported_for_cpu_load: true
       cpu_load_restore_on_abort_status: not_required
+      experiment_runner_supported_order: listed
+      experiment_runner_supported_controlled_factors:
+        - cpu_load_workers
+      experiment_runner_warmup_seconds_max: 60
+      experiment_runner_cooldown_seconds_max: 60
+      experiment_runner_repetitions_max: 10
+      experiment_runner_expanded_trials_max: 64
 
 degraded_modes:
   battery_low: experimental-only until target policy is characterized

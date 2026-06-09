@@ -37,6 +37,13 @@ modes:
     burst_requires_trigger_or_marker: true
     operator_abort_supported_for_cpu_load: true
     cpu_load_restore_on_abort_status: not_required
+    experiment_runner_supported_order: listed
+    experiment_runner_supported_controlled_factors:
+      - cpu_load_workers
+    experiment_runner_warmup_seconds_max: 60
+    experiment_runner_cooldown_seconds_max: 60
+    experiment_runner_repetitions_max: 10
+    experiment_runner_expanded_trials_max: 64
     cpu_percent_max: null
     wakeups_per_second_added_max: null
     disk_write_bytes_total_max: null
@@ -57,6 +64,7 @@ measurement:
   host_fallback_command_smoke: scripts/resource/run-resource-smoke.sh --host-fallback
   command_smoke_resource_metrics_collected: false
   pr5_operator_abort_contract_verified_by: cargo test -p adc-lab --test cli load_cpu_operator_abort_records_safety_monitor_without_abort_path
+  pr6_matrix_runner_contract_verified_by: cargo test -p adc-lab --test cli experiment_real_run -- --nocapture
   baseline_path: examples/demos/target55/baselines/resource/idle.json
   report_path: examples/demos/target55/reports/target-characterization.json
   missing_evidence:

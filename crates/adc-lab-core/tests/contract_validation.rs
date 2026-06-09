@@ -77,7 +77,11 @@ fn contract_validation_experiment_run_accepts_not_implemented_status() {
                 "factors": {
                     "governor": "performance"
                 },
-                "status": "not_implemented"
+                "status": "not_implemented",
+                "artifact_refs": [],
+                "failure": "experiment execution is not implemented",
+                "started_at_unix_ms": null,
+                "ended_at_unix_ms": null
             }
         ],
         "time_unix_ms": 1780000000000u64

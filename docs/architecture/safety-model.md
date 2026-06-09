@@ -19,11 +19,20 @@ MVP behavior:
   observation, and restore-on-abort status.
 - Tier 1 CPU load does not mutate target state in this MVP, so
   restore-on-abort status is `not_required`.
+- Tier 1 experiment matrix execution is limited to listed-order trials over
+  the allowlisted `cpu_load_workers` controlled factor. Each completed trial
+  must produce per-trial artifact refs and an `experiment.trial` audit event.
+- Tier 1 experiment matrix execution blocks unsupported controlled factors,
+  randomized order, trial explosion beyond policy, or failed load/observe
+  steps instead of treating the trial as completed evidence.
 - Tier 2 cpufreq governor control uses the privileged helper and restore lease, but apply/restore is local-target only in this MVP.
 - Tier 2 approval artifacts are generated from a validated control plan and are local-target only in this MVP.
 - Tier 2 approvals are bound to plan id, plan digest, exact operation, and bounds.
 - Tier 2 control plan bounds are authorization/experiment bounds. The helper
   enforces approval coverage and restore verification; load and future matrix
   execution enforce runtime duration and thermal abort behavior.
+- Tier 2 controlled factors such as governor or fixed frequency remain blocked
+  in experiment matrices until privileged plan/apply/restore is wired into
+  trial execution.
 - Tier 3 is documentation-only in this MVP.
 - Tier 4 is prohibited by normal `adc-lab` approval.

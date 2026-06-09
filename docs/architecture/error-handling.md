@@ -20,7 +20,7 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
 | CPU load policy | zero duration, duration above 300s, zero workers, or workers above available parallelism | `LabError::Validation` or `LabError::Policy` before load starts |
 | CPU load safety monitor | operator abort marker observed or thermal threshold reached | structured `LoadResult.status=aborted` with `abort_reason` |
 | CPU load worker execution | worker thread panic or unreadable operator abort marker | CLI error; load result is not trusted as evidence |
-| Experiment matrix execution | non-dry execution requested before runner wiring exists | trial `status=not_implemented` and blocked/provisional claims |
+| Experiment matrix execution | unsupported controlled factor, randomized order, failed load, failed observation, or safety-aborted load | trial `status=blocked` or `status=failed`; only successful supported trials become `completed` |
 
 ## Caller Contract
 
@@ -48,5 +48,11 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
   path is runtime input only and is not serialized into load artifacts.
 - CPU load restore-on-abort status is `not_required` in PR5 because the load
   command does not mutate target state.
-- Non-dry experiment matrix output cannot become supported evidence until execution is implemented.
+- Non-dry experiment matrix output can support claims only for completed trials
+  that executed the PR6 allowlist: listed order and optional bounded CPU load
+  through `cpu_load_workers`.
+- Unsupported controlled factors such as `governor` and fixed frequency are
+  recorded as `blocked`, not `completed`.
+- Failed or safety-aborted trial steps remain diagnostic evidence and cannot
+  support behavior claims.
 - If target physical evidence is unavailable, reports mark claims provisional or blocked.

@@ -25,13 +25,14 @@
 | `restore` | explain restore result | CLI start to helper/core result |
 | `health-check.restore` | explain read-only post-restore target health | restored result to health artifact |
 | `load.cpu` | explain bounded load outcome, abort reason, and safety monitor result | CLI start to load result |
-| `experiment.run` | explain matrix trial planning/execution | CLI start to experiment artifacts |
+| `experiment.trial` | explain one matrix trial outcome and per-trial evidence | trial start to trial artifact refs |
+| `experiment.run` | explain matrix planning/execution summary | CLI start to experiment artifacts |
 | `tool.qualify` | explain whether a tool can be evidence | CLI start to qualification report |
 
 ## Correlation Identifiers
 
 - Primary: `run_id`.
-- Operation-specific: `plan_id`, `approval_id`, `lease_id`, `result_id`, `event_id`, `matrix_id`, `tool_id`.
+- Operation-specific: `plan_id`, `approval_id`, `lease_id`, `result_id`, `event_id`, `matrix_id`, `trial_id`, `tool_id`.
 - Propagation: identifiers are serialized into JSON artifacts and audit events.
 
 ## Logs
@@ -99,10 +100,27 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
 - Signal: experiment claim decision.
 - Decision supported: whether matrix artifacts can support a target behavior claim.
 - Action owner: lab operator or agent reviewing the run.
-- Expected action when degraded: treat non-dry `not_implemented` trials as blocked evidence and wire audited execution before using claims.
-- Counter-metric: audit result for `experiment.run`.
-- Failure mode / misleading interpretation: planned matrix factors are not observed behavior.
+- Expected action when degraded: inspect trial `failure`, trial artifact refs,
+  and `experiment.trial` audit events before rerunning or broadening the matrix.
+- Counter-metric: per-trial status prevents a partially blocked or failed matrix
+  from becoming a broad supported claim.
+- Failure mode / misleading interpretation: completed `cpu_load_workers` trials
+  do not prove privileged governor, fixed-frequency, thermal safety, or
+  production behavior.
 - Artifact path: `artifact://lab/runs/<run_id>/reports/claim_evidence_trace.json`.
+
+- Signal: experiment trial artifact refs.
+- Decision supported: which observation/load artifacts justify each completed
+  trial.
+- Action owner: lab operator or agent reviewing the run.
+- Expected action when degraded: reject claims from trials without bounded
+  artifact refs or with `status=blocked|failed`.
+- Counter-metric: top-level `experiment.run` audit result summarizes completed,
+  blocked, and failed trial outcomes.
+- Failure mode / misleading interpretation: per-trial artifacts prove only the
+  allowlisted non-privileged steps that were executed.
+- Artifact path:
+  `artifact://lab/runs/<run_id>/experiments/trials/<trial_id>/...`.
 
 - Signal: read-only run manifest.
 - Decision supported: whether read-only target familiarization has inventory, toolchain, observation, audit, and claim trace artifacts.

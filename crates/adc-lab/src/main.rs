@@ -1,10 +1,11 @@
-use adc_lab_core::ids::now_unix_ms;
+use adc_lab_core::ids::{new_id, now_unix_ms};
 use adc_lab_core::*;
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::thread;
 use std::time::Duration;
 
 #[derive(Debug, Parser)]
@@ -210,6 +211,16 @@ struct ExperimentRunCommand {
     matrix: PathBuf,
     #[arg(long)]
     dry_run: bool,
+    #[arg(long, default_value = "1s")]
+    trial_load_duration: String,
+    #[arg(long, default_value = "0s")]
+    trial_observe_duration: String,
+    #[arg(long, default_value = "1s")]
+    trial_sample_interval: String,
+    #[arg(long = "load-abort-temp-c")]
+    load_abort_temp_c: Option<f64>,
+    #[arg(long)]
+    operator_abort_file: Option<PathBuf>,
     #[arg(long)]
     run_dir: Option<PathBuf>,
     #[arg(long)]
@@ -574,12 +585,19 @@ fn command_experiment_run(args: ExperimentRunCommand) -> Result<()> {
     let target = TargetSpec::parse(&args.target)?;
     let run = create_or_open_run(args.run_dir)?;
     let matrix: ExperimentMatrix = read_yaml(&args.matrix)?;
-    let (experiment_run, claim_trace) = run_experiment_matrix(
-        &matrix,
-        run.run_id.clone(),
-        target.target_id.clone(),
-        args.dry_run,
-    );
+    let (experiment_run, claim_trace) = if args.dry_run {
+        run_experiment_matrix(&matrix, run.run_id.clone(), target.target_id.clone(), true)?
+    } else {
+        let config = ExperimentRuntimeConfig {
+            load_duration: parse_duration(&args.trial_load_duration)?,
+            observe_duration: parse_duration(&args.trial_observe_duration)?,
+            sample_interval: parse_duration(&args.trial_sample_interval)?,
+            load_abort_temp_c: args.load_abort_temp_c,
+            operator_abort_file: args.operator_abort_file.clone(),
+        };
+        execute_experiment_matrix(&run, &target, &matrix, &config)?
+    };
+    let audit_result = experiment_run_result(&experiment_run);
     let run_path = run.run_dir.join("experiments/experiment_run.json");
     let trace_path = run.run_dir.join("reports/claim_evidence_trace.json");
     write_json_artifact(&run, &run_path, &experiment_run)?;
@@ -594,15 +612,297 @@ fn command_experiment_run(args: ExperimentRunCommand) -> Result<()> {
             risk_tier: RiskTier::Tier1LowRiskReversibleNonRoot,
             approval_ref: None,
             restore_lease_ref: None,
-            result: if args.dry_run {
-                "planned"
-            } else {
-                "not_implemented"
-            }
-            .to_string(),
+            result: audit_result,
         },
     )?;
     print_artifact(&run, &run_path, experiment_run)
+}
+
+#[derive(Debug, Clone)]
+struct ExperimentRuntimeConfig {
+    load_duration: Duration,
+    observe_duration: Duration,
+    sample_interval: Duration,
+    load_abort_temp_c: Option<f64>,
+    operator_abort_file: Option<PathBuf>,
+}
+
+fn execute_experiment_matrix(
+    run: &RunContext,
+    target: &TargetSpec,
+    matrix: &ExperimentMatrix,
+    config: &ExperimentRuntimeConfig,
+) -> Result<(ExperimentRun, ClaimEvidenceTrace)> {
+    validate_experiment_matrix_bounds(matrix)?;
+    let combinations = expand_factors(matrix)?;
+    let mut trials = Vec::new();
+    for repetition in 0..matrix.repetitions.max(1) {
+        for factors in &combinations {
+            let trial_id = format!("TRIAL-{}-{repetition}", new_id("MATRIX"));
+            let mut trial = ExperimentTrial {
+                trial_id: trial_id.clone(),
+                factors: factors.clone(),
+                status: "planned".to_string(),
+                artifact_refs: Vec::new(),
+                failure: None,
+                started_at_unix_ms: Some(now_unix_ms()),
+                ended_at_unix_ms: None,
+            };
+
+            if let Some(reason) = blocked_trial_reason(matrix, factors) {
+                trial.status = "blocked".to_string();
+                trial.failure = Some(reason);
+            } else {
+                sleep_experiment_phase(matrix.warmup_seconds);
+                let result = execute_supported_experiment_trial(run, target, &mut trial, config);
+                sleep_experiment_phase(matrix.cooldown_seconds);
+                if let Err(error) = result {
+                    trial.status = "failed".to_string();
+                    trial.failure = Some(error.to_string());
+                }
+            }
+            trial.ended_at_unix_ms = Some(now_unix_ms());
+            append_audit_event(
+                run,
+                AuditInput {
+                    target_id: target.target_id.clone(),
+                    actor: Actor::codex(),
+                    operation: "experiment.trial".to_string(),
+                    operation_id: Some(trial.trial_id.clone()),
+                    risk_tier: RiskTier::Tier1LowRiskReversibleNonRoot,
+                    approval_ref: None,
+                    restore_lease_ref: None,
+                    result: trial.status.clone(),
+                },
+            )?;
+            trials.push(trial);
+        }
+    }
+
+    let experiment_run = ExperimentRun {
+        schema_version: "lab.experiment_run.v1".to_string(),
+        run_id: run.run_id.clone(),
+        matrix_id: matrix.matrix_id.clone(),
+        target_id: target.target_id.clone(),
+        dry_run: false,
+        trials,
+        time_unix_ms: now_unix_ms(),
+    };
+    let claim_trace = real_experiment_claim_trace(&experiment_run);
+    Ok((experiment_run, claim_trace))
+}
+
+fn execute_supported_experiment_trial(
+    run: &RunContext,
+    target: &TargetSpec,
+    trial: &mut ExperimentTrial,
+    config: &ExperimentRuntimeConfig,
+) -> Result<()> {
+    if let Some(workers) = cpu_load_workers(&trial.factors)? {
+        if workers > 0 {
+            let trial_dir = trial_artifact_dir(run, &trial.trial_id);
+            let load_result = match target.transport {
+                TargetTransport::Local => {
+                    let plan = new_cpu_load_plan_with_operator_abort(
+                        target.target_id.clone(),
+                        workers,
+                        config.load_duration,
+                        config.load_abort_temp_c,
+                        config.operator_abort_file.is_some(),
+                    )?;
+                    let plan_path = trial_dir.join("load_plan.json");
+                    let plan_ref = write_json_artifact(run, &plan_path, &plan)?;
+                    trial.artifact_refs.push(plan_ref);
+                    run_cpu_load_with_options(
+                        &plan,
+                        &CpuLoadRuntimeOptions {
+                            operator_abort_file: config.operator_abort_file.clone(),
+                        },
+                    )?
+                }
+                TargetTransport::Ssh => load_cpu_ssh(
+                    target,
+                    workers,
+                    config.load_duration,
+                    config.load_abort_temp_c,
+                    config.operator_abort_file.as_deref(),
+                )?,
+            };
+            let result_path = trial_dir.join("load_result.json");
+            let result_status = load_result.status.clone();
+            let abort_reason = load_result.abort_reason.clone();
+            let result_ref = write_json_artifact(run, &result_path, &load_result)?;
+            trial.artifact_refs.push(result_ref);
+            if result_status != "completed" {
+                anyhow::bail!(
+                    "load step ended with status {result_status}: {}",
+                    abort_reason.unwrap_or_else(|| "no abort reason".to_string())
+                );
+            }
+        }
+    }
+
+    let observation = match target.transport {
+        TargetTransport::Local => observe_local(
+            target.target_id.clone(),
+            config.observe_duration,
+            config.sample_interval,
+            vec![Signal::Cpu, Signal::Freq, Signal::Thermal, Signal::Memory],
+        )?,
+        TargetTransport::Ssh => observe_ssh(
+            target,
+            config.observe_duration,
+            config.sample_interval,
+            &[Signal::Cpu, Signal::Freq, Signal::Thermal, Signal::Memory],
+        )?,
+    };
+    let observation_path = trial_artifact_dir(run, &trial.trial_id).join("observation.json");
+    let observation_ref = write_json_artifact(run, &observation_path, &observation)?;
+    trial.artifact_refs.push(observation_ref);
+    trial.status = "completed".to_string();
+    Ok(())
+}
+
+fn blocked_trial_reason(
+    matrix: &ExperimentMatrix,
+    factors: &std::collections::BTreeMap<String, String>,
+) -> Option<String> {
+    if matrix.order != "listed" {
+        return Some("randomized order requires seeded reproducible execution".to_string());
+    }
+    for factor in &matrix.factors {
+        if factor.kind == FactorKind::ControlledFactor && factor.name != "cpu_load_workers" {
+            return Some(format!(
+                "controlled factor '{}' is not supported by PR6 real runner",
+                factor.name
+            ));
+        }
+    }
+    if let Err(error) = cpu_load_workers(factors) {
+        return Some(error.to_string());
+    }
+    None
+}
+
+fn cpu_load_workers(factors: &std::collections::BTreeMap<String, String>) -> Result<Option<usize>> {
+    let Some(raw) = factors.get("cpu_load_workers") else {
+        return Ok(None);
+    };
+    if raw == "none" || raw == "0" {
+        return Ok(Some(0));
+    }
+    let workers = raw
+        .parse::<usize>()
+        .with_context(|| format!("invalid cpu_load_workers level '{raw}'"))?;
+    if workers == 0 {
+        Ok(Some(0))
+    } else {
+        Ok(Some(workers))
+    }
+}
+
+fn trial_artifact_dir(run: &RunContext, trial_id: &str) -> PathBuf {
+    run.run_dir
+        .join("experiments")
+        .join("trials")
+        .join(safe_artifact_id(trial_id, "TRIAL"))
+}
+
+fn real_experiment_claim_trace(run: &ExperimentRun) -> ClaimEvidenceTrace {
+    let experiment_ref = format!(
+        "artifact://lab/runs/{}/experiments/experiment_run.json",
+        run.run_id
+    );
+    let completed = run
+        .trials
+        .iter()
+        .filter(|trial| trial.status == "completed")
+        .count();
+    let blocked_or_failed = run
+        .trials
+        .iter()
+        .filter(|trial| trial.status == "blocked" || trial.status == "failed")
+        .count();
+    ClaimEvidenceTrace {
+        schema_version: "lab.claim_evidence_trace.v1".to_string(),
+        run_id: run.run_id.clone(),
+        target_id: run.target_id.clone(),
+        claims: vec![
+            ClaimTraceEntry {
+                claim: format!(
+                    "Bounded non-privileged experiment matrix executed {completed} completed trial(s)."
+                ),
+                decision: if completed > 0 {
+                    ClaimDecision::Supported
+                } else {
+                    ClaimDecision::Blocked
+                },
+                evidence_refs: if completed > 0 {
+                    vec![experiment_ref.clone()]
+                } else {
+                    Vec::new()
+                },
+                next_evidence_needed: if completed > 0 {
+                    vec![
+                        "controlled privileged factors require approval/apply/restore wiring"
+                            .to_string(),
+                    ]
+                } else {
+                    vec!["execute a supported cpu_load_workers matrix".to_string()]
+                },
+            },
+            ClaimTraceEntry {
+                claim: format!(
+                    "{blocked_or_failed} trial(s) were blocked or failed and cannot support claims."
+                ),
+                decision: if blocked_or_failed > 0 {
+                    ClaimDecision::Blocked
+                } else {
+                    ClaimDecision::Provisional
+                },
+                evidence_refs: vec![experiment_ref.clone()],
+                next_evidence_needed: vec![
+                    "inspect per-trial failure reasons and artifacts".to_string(),
+                ],
+            },
+            ClaimTraceEntry {
+                claim: "adc-lab verified behavior across all fixed CPU frequencies.".to_string(),
+                decision: ClaimDecision::Blocked,
+                evidence_refs: Vec::new(),
+                next_evidence_needed: vec![
+                    "controlled operating point matrix with fixed frequency support".to_string(),
+                ],
+            },
+            ClaimTraceEntry {
+                claim: "experiment matrix proves production physical-footprint safety".to_string(),
+                decision: ClaimDecision::Blocked,
+                evidence_refs: Vec::new(),
+                next_evidence_needed: vec![
+                    "target-specific sustained thermal, wakeup, power, storage, flash, latency, and observer-effect evidence".to_string(),
+                ],
+            },
+        ],
+        time_unix_ms: now_unix_ms(),
+    }
+}
+
+fn experiment_run_result(run: &ExperimentRun) -> String {
+    if run.dry_run {
+        return "planned".to_string();
+    }
+    if run.trials.iter().any(|trial| trial.status == "failed") {
+        "failed".to_string()
+    } else if run.trials.iter().any(|trial| trial.status == "blocked") {
+        "blocked".to_string()
+    } else {
+        "completed".to_string()
+    }
+}
+
+fn sleep_experiment_phase(seconds: u64) {
+    if seconds > 0 {
+        thread::sleep(Duration::from_secs(seconds));
+    }
 }
 
 fn command_familiarize_read_only(args: FamiliarizeReadOnlyCommand) -> Result<()> {
