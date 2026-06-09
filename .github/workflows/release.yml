@@ -88,6 +88,7 @@ jobs:
             export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
           fi
           ADC_LAB_GIT_SHA="${{ steps.release.outputs.git_sha }}" \
+            ADC_LAB_VERSION="${{ steps.release.outputs.version }}" \
             cargo build --workspace --release --target "${{ matrix.rust_target }}"
 
       - name: Package release tarball

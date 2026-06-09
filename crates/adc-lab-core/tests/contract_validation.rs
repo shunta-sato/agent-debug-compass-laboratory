@@ -379,6 +379,7 @@ fn contract_validation_release_workflow_publishes_checksummed_assets_with_scoped
     assert!(workflow.contains("id-token: write"));
     assert!(workflow.contains("attestations: write"));
     assert!(workflow.contains("sha256sum -c SHA256SUMS"));
+    assert!(workflow.contains("ADC_LAB_VERSION=\"${{ steps.release.outputs.version }}\""));
     assert!(workflow.contains("gh release create"));
     assert!(workflow.contains("actions/upload-artifact@v4"));
     assert!(workflow.contains("actions/download-artifact@v4"));

@@ -1,8 +1,14 @@
 use std::process::Command;
 
 fn main() {
+    println!("cargo:rerun-if-env-changed=ADC_LAB_VERSION");
     println!("cargo:rerun-if-env-changed=ADC_LAB_GIT_SHA");
 
+    let version = std::env::var("ADC_LAB_VERSION")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .or_else(|| std::env::var("CARGO_PKG_VERSION").ok())
+        .unwrap_or_else(|| "unknown".to_string());
     let git_sha = std::env::var("ADC_LAB_GIT_SHA")
         .ok()
         .filter(|value| !value.trim().is_empty())
@@ -11,6 +17,7 @@ fn main() {
     let target_triple = std::env::var("TARGET").unwrap_or_else(|_| "unknown".to_string());
     let build_profile = std::env::var("PROFILE").unwrap_or_else(|_| "unknown".to_string());
 
+    println!("cargo:rustc-env=ADC_LAB_VERSION={version}");
     println!("cargo:rustc-env=ADC_LAB_GIT_SHA={git_sha}");
     println!("cargo:rustc-env=ADC_LAB_TARGET_TRIPLE={target_triple}");
     println!("cargo:rustc-env=ADC_LAB_BUILD_PROFILE={build_profile}");
