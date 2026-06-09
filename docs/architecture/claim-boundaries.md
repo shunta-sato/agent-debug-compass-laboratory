@@ -18,6 +18,39 @@ Next evidence needed:
   controlled operating point matrix with fixed frequency or governor-controlled conditions.
 ```
 
+## Workload And Target Capability Profiles
+
+`lab.workload_profile.v1` defines the workload requirement. It answers "what is
+X?" before anyone says "target can run X".
+
+`lab.target_capability_profile.v1` links a target to that workload and to the
+run artifacts that were observed. In PR11 these profiles are exploratory
+short-smoke evidence only.
+
+Allowed PR11 claims:
+
+```text
+- the workload profile defines a shared measurement target
+- the target produced passive observation or bounded-load artifacts for that
+  workload profile
+- the target capability profile records missing evidence and blocked claims
+```
+
+Blocked PR11 claims:
+
+```text
+- Pi4 is sufficient for the workload
+- Pi5 is required for the workload
+- Pi4/Pi5 target selection is decided
+- battery safe
+- sustained production ready
+- fixed-frequency behavior verified
+- all operating points measured
+```
+
+The blocked claims are intentional. PR11 creates the evidence format; later
+comparison and suitability contracts decide target selection.
+
 `adc-lab report operating-point` creates `lab.operating_point_coverage.v1`.
 Coverage status is explicit:
 

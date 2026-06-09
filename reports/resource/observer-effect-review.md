@@ -3,7 +3,8 @@
 ## Observer
 
 - Component: procfs/sysfs observation, CPU load safety monitor, experiment trial
-  observer, controller-side report builders, and run artifact writer.
+  observer, controller-side report builders, target capability profile builder,
+  and run artifact writer.
 - Cadence: 1s default during explicit observation command; 100ms safety monitor during explicit CPU load; per-trial observation during explicit matrix runs.
 - Data captured: CPU ticks, memory availability, cpufreq, thermal readings.
 - Storage path: controller run artifacts; target runner writes only stdout in MVP.
@@ -54,6 +55,9 @@
   target observer effect.
 - [EOE-007] PR10 privilege provider status is controller-side report generation
   only; Option B remains planned-disabled and creates no target observer effect.
+- [EOE-008] PR11 target capability profile is controller-side artifact
+  interpretation only; it does not run target observation, target load,
+  privileged control, or SSH commands.
 
 ## Handoff
 

@@ -1,0 +1,20 @@
+{
+  "schema_version": "lab.workload_profile.v1",
+  "workload_id": "idle_observe_60s",
+  "description": "Passive read-only observation for 60 seconds under the current target policy",
+  "workload_class": "idle_observe",
+  "duration_seconds": 60,
+  "requirements": {
+    "thermal_celsius_max": null,
+    "max_abort_count": null,
+    "memory_mb_max": null,
+    "latency_p95_ms_max": null
+  },
+  "measurement_requirements": [
+    "cpu_busy_percent",
+    "temperature_celsius",
+    "frequency_khz",
+    "memory_available_kb"
+  ],
+  "claim_boundary": "exploratory_only"
+}

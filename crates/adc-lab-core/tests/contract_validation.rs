@@ -40,7 +40,7 @@ fn contract_validation_schema_fixtures_validate() {
         checked += 1;
     }
 
-    assert!(checked >= 21, "expected all MVP schemas to be checked");
+    assert!(checked >= 23, "expected all MVP schemas to be checked");
 }
 
 #[test]
@@ -154,6 +154,57 @@ fn contract_validation_privilege_provider_rejects_unknown_availability() {
     assert!(
         validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
         "privilege provider availability must stay in the schema enum"
+    );
+}
+
+#[test]
+fn contract_validation_workload_profile_rejects_unknown_claim_boundary() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.workload_profile.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.workload_profile.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["claim_boundary"] = serde_json::json!("selection_decision");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "workload profile claim boundary must stay in the schema enum"
+    );
+}
+
+#[test]
+fn contract_validation_target_capability_profile_rejects_unknown_status() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.target_capability_profile.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.target_capability_profile.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["capability_status"] = serde_json::json!("selection_ready");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "target capability profile status must not smuggle selection decisions"
+    );
+}
+
+#[test]
+fn contract_validation_target_capability_profile_requires_selection_ready_field() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.target_capability_profile.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.target_capability_profile.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json
+        .as_object_mut()
+        .unwrap()
+        .remove("selection_ready");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "target capability profile must expose selection readiness explicitly"
     );
 }
 

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lab.target_capability_profile.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_id", "workload_id", "evidence_pack_ref", "capability_status", "selection_ready", "observed_results", "supported_claims", "blocked_claims", "next_evidence_needed", "evidence_refs", "time_unix_ms"],
+  "properties": {
+    "schema_version": { "const": "lab.target_capability_profile.v1" },
+    "target_id": { "type": "string", "minLength": 1 },
+    "workload_id": { "type": "string", "minLength": 1 },
+    "evidence_pack_ref": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+    "capability_status": { "enum": ["no_evidence", "exploratory_partial", "measured_short_smoke", "insufficient_for_selection"] },
+    "selection_ready": { "type": "boolean" },
+    "observed_results": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_temp_c", "abort_count", "cpu_frequency_range_khz", "memory_available_kb_min", "max_load_duration_ms", "max_observation_duration_ms", "load_result_count", "observation_sample_count"],
+      "properties": {
+        "max_temp_c": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+        "abort_count": { "type": "integer", "minimum": 0 },
+        "cpu_frequency_range_khz": {
+          "anyOf": [
+            {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": { "type": "integer", "minimum": 0 }
+            },
+            { "type": "null" }
+          ]
+        },
+        "memory_available_kb_min": { "anyOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+        "max_load_duration_ms": { "type": "integer", "minimum": 0 },
+        "max_observation_duration_ms": { "type": "integer", "minimum": 0 },
+        "load_result_count": { "type": "integer", "minimum": 0 },
+        "observation_sample_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "supported_claims": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "blocked_claims": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "next_evidence_needed": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "time_unix_ms": { "type": "integer", "minimum": 0 }
+  }
+}

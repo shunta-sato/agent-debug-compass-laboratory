@@ -26,6 +26,11 @@ Gate decision: experimental-only
 - PR10 privilege provider status is hardware-free verified as controller-side
   policy posture reporting; it does not install or start a root provider,
   systemd unit, or Unix socket.
+- PR11 target capability profile is hardware-free verified as controller-side
+  workload/profile evidence normalization; it does not execute target
+  observation, load, helper apply, SSH commands, or destructive experiments.
+- PR11 profiles keep target-selection and production physical-footprint claims
+  blocked with `selection_ready=false`.
 - Production physical-footprint claims remain blocked until wakeup, battery/power, flash/storage, jitter, sustained thermal, degraded, and recovery evidence exists.
 - `make command-smoke` verifies command wiring only and explicitly reports `resource_metrics_collected=false`; it is not resource evidence.
 
@@ -55,6 +60,7 @@ Gate decision: experimental-only
 | capability-cost model report | controller-side report | none on target | command lifetime | no | PR8 capability evidence packet tests passed |
 | agent-created adapter qualification report | controller-side report | none on target | command lifetime | no | PR9 adapter qualification tests passed |
 | privilege provider status report | controller-side report | none on target | command lifetime | no | PR10 provider status tests passed |
+| target capability profile report | controller-side report | none on target | command lifetime | no | PR11 profile generation tests passed |
 | target runner | command-triggered | none while idle | process lifetime | no | target55 smoke passed |
 
 ## Artifact Check
@@ -71,6 +77,8 @@ Gate decision: experimental-only
 - Resource report: `examples/demos/target55/baselines/resource/idle.json`, `examples/demos/target55/baselines/resource/nominal_workload.json`.
 - Hot-path report: `reports/resource/hot-path-review.md`.
 - Observer-effect report: `reports/resource/observer-effect-review.md`.
+- Workload/profile contracts: `schemas/lab.workload_profile.v1.schema.json`,
+  `schemas/lab.target_capability_profile.v1.schema.json`.
 
 ## Claims Review
 
@@ -84,6 +92,8 @@ Gate decision: experimental-only
 | PR8 capability cost model blocks offload and production architecture claims without cost evidence | `crates/adc-lab-core/src/report.rs` | hardware-free core/CLI tests and `lab.capability_cost_model.v1` schema | allowed contract/report claim |
 | PR9 agent-created observation adapter can become qualified only with bounded evidence artifacts | `crates/adc-lab-core/src/qualification.rs` | hardware-free core/CLI tests and `lab.tool_qualification.v1` schema | allowed contract/report claim |
 | PR10 Option B provider is planned-disabled and not active | `crates/adc-lab-core/src/privilege.rs` | hardware-free core/CLI tests and `lab.privilege_provider_status.v1` schema | allowed contract/report claim |
+| PR11 target capability profile links workload requirements to existing run evidence | `crates/adc-lab-core/src/capability_profile.rs` | hardware-free core/CLI tests and `lab.workload_profile.v1` / `lab.target_capability_profile.v1` schemas | allowed contract/report claim |
+| Pi4 is sufficient or Pi5 is required for a workload | none | no same-suite comparison or suitability decision evidence | blocked if introduced |
 | low overhead | none | short smoke insufficient | blocked if introduced |
 | battery safe | none | none | blocked if introduced |
 | production ready target runtime | none | none | blocked if introduced |
@@ -110,6 +120,9 @@ Gate decision: experimental-only
 - Option B privilege provider is not installed or started in PR10. Provider
   status evidence is not proof of helper ownership, socket hardening, daemon
   footprint, or remote privileged apply readiness.
+- PR11 target capability profiles are not comparison reports or suitability
+  decisions. They normalize existing evidence for a workload id and keep
+  `selection_ready=false`.
 
 ## Handoff To Quality Gate
 

@@ -30,6 +30,10 @@ MVP behavior:
   fixed Option A helper as active and the future Option B systemd/Unix-socket
   provider as planned-disabled; it does not enable a daemon, socket, or new
   privileged transport.
+- PR11 target capability profile reporting is Tier 0 read-only reporting. It
+  reads existing run artifacts for a supplied workload profile and writes a
+  controller-side report; it does not execute observe, load, helper apply, SSH,
+  or destructive experiments.
 - Tier 2 approval artifacts are generated from a validated control plan and are local-target only in this MVP.
 - Tier 2 approvals are bound to plan id, plan digest, exact operation, and bounds.
 - Tier 2 control plan bounds are authorization/experiment bounds. The helper
@@ -40,6 +44,9 @@ MVP behavior:
   trial execution.
 - Operating point coverage reporting is Tier 0. It reads existing artifacts and
   classifies claim boundaries; it does not execute new target operations.
+- Target capability profile reporting keeps `selection_ready=false` in PR11.
+  Target-selection claims remain blocked until comparison and suitability
+  decision contracts are added with matching evidence.
 - Coverage statuses are safety-gated: unsupported controlled points become
   `not_controllable`, and degradation-inducing points become `blocked_unsafe`.
 - Tier 3 is documentation-only in this MVP.

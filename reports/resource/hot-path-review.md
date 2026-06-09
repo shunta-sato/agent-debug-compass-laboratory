@@ -3,7 +3,8 @@
 ## Hot Path
 
 - Entry point: `adc-lab observe`, `adc-lab-target observe`, `adc-lab load cpu`,
-  `adc-lab experiment run`, `adc-lab report operating-point`.
+  `adc-lab experiment run`, `adc-lab report operating-point`,
+  `adc-lab report capability-profile`.
 - Cadence or trigger: command-triggered; observation default interval is 1s; CPU load loop is bounded by duration; CPU load safety monitor runs at 100ms only during explicit load; experiment runner sequences bounded trials.
 - Default mode: no always-on target-local loop.
 - Burst mode: explicit command.
@@ -48,6 +49,9 @@
 - [EHP-006] PR10 privilege provider status reads policy constants and writes a
   controller-side report only; it does not install or run a systemd socket
   provider.
+- [EHP-007] PR11 target capability profile reads controller-side run artifacts
+  only; it adds no target-local hot path and does not execute workload or
+  observe commands.
 
 ## Handoff
 
