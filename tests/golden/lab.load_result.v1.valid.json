@@ -9,5 +9,12 @@
   "abort_reason": null,
   "max_observed_temp_c": 54.2,
   "worker_iterations": [100, 120],
+  "safety_monitor": {
+    "sample_interval_ms": 100,
+    "samples": 300,
+    "thermal_surface_available": true,
+    "operator_abort_observed": false,
+    "restore_on_abort_status": "not_required"
+  },
   "time_unix_ms": 1780000000000
 }

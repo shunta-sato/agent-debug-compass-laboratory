@@ -149,6 +149,20 @@ pub fn qualify_tool_info(tool: &ToolInfo, inventory_ref: Option<String>) -> Tool
             "builtin read-only tool is accepted as an evidence source".to_string(),
             Vec::new(),
         )
+    } else if is_builtin_bounded_load_evidence_tool(tool) {
+        checks.push("builtin_bounded_load_allowlist".to_string());
+        checks.push("pr5_safety_monitor_contract_present".to_string());
+        (
+            ToolSource::Builtin,
+            QualificationStatus::Builtin,
+            true,
+            false,
+            "builtin bounded CPU load is accepted for lab.load_plan.v1 and lab.load_result.v1 evidence".to_string(),
+            vec![
+                "accepted only for explicit Tier 1 bounded CPU load results with duration, worker, thermal, operator-abort, and safety-monitor evidence".to_string(),
+                "does not support sustained thermal, battery, flash, latency, low-overhead, or production readiness claims".to_string(),
+            ],
+        )
     } else if tool.qualification == QualificationStatus::ExternalUnqualified {
         (
             ToolSource::External,
@@ -178,24 +192,13 @@ pub fn qualify_tool_info(tool: &ToolInfo, inventory_ref: Option<String>) -> Tool
                     "approval, restore, and verification evidence are required before control output can support claims".to_string(),
                 ],
             )
-    } else if tool.category == ToolCategory::Load {
-        (
-                ToolSource::Builtin,
-                QualificationStatus::Refused,
-                false,
-                true,
-                "load tool evidence is deferred until bounded load safety evidence exists".to_string(),
-                vec![
-                    "bounded load and safety monitor evidence are required before load results can support claims".to_string(),
-                ],
-            )
     } else {
         (
             ToolSource::Builtin,
             QualificationStatus::Refused,
             false,
             true,
-            "tool is not in the PR3 read-only evidence allowlist".to_string(),
+            "tool is not in the current evidence allowlist".to_string(),
             vec!["explicit qualification policy is required".to_string()],
         )
     };
@@ -229,6 +232,14 @@ fn is_builtin_read_only_evidence_tool(tool: &ToolInfo) -> bool {
                 | ToolCategory::ReportNormalizer
                 | ToolCategory::HealthCheck
         )
+}
+
+fn is_builtin_bounded_load_evidence_tool(tool: &ToolInfo) -> bool {
+    tool.available
+        && tool.tool_id == "adc-lab-builtin-cpu-load"
+        && tool.category == ToolCategory::Load
+        && tool.qualification == QualificationStatus::Builtin
+        && tool.privilege == PrivilegeLevel::User
 }
 
 fn tool_category_from_manifest_kind(kind: &str) -> ToolCategory {
@@ -316,6 +327,29 @@ mod tests {
         );
         assert_eq!(report.status, QualificationStatus::NeedsControlTest);
         assert!(!report.evidence_accepted);
+    }
+
+    #[test]
+    fn contract_validation_builtin_cpu_load_is_bounded_evidence_source() {
+        let report = qualify_tool_info(
+            &ToolInfo {
+                tool_id: "adc-lab-builtin-cpu-load".to_string(),
+                category: ToolCategory::Load,
+                available: true,
+                privilege: PrivilegeLevel::User,
+                qualification: QualificationStatus::Builtin,
+            },
+            Some("artifact://lab/runs/LAB-RUN-001/toolchain/toolchain_inventory.json".to_string()),
+        );
+        assert_eq!(report.status, QualificationStatus::Builtin);
+        assert!(report.evidence_accepted);
+        assert!(report
+            .checks
+            .contains(&"pr5_safety_monitor_contract_present".to_string()));
+        assert!(report
+            .limitations
+            .iter()
+            .any(|limit| limit.contains("production readiness")));
     }
 
     #[test]

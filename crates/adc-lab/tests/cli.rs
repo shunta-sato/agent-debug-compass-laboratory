@@ -33,6 +33,19 @@ fn single_approval_path(run_dir: &std::path::Path) -> PathBuf {
         .unwrap()
 }
 
+fn single_load_artifact_path(run_dir: &std::path::Path, suffix: &str) -> PathBuf {
+    fs::read_dir(run_dir.join("loads"))
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(suffix))
+        })
+        .unwrap()
+}
+
 #[test]
 fn cli_help_mentions_adc_lab() {
     Command::cargo_bin("adc-lab")
@@ -382,6 +395,69 @@ fn restore_dry_run_does_not_write_restore_health_check() {
         .exists());
 }
 
+#[test]
+fn load_cpu_operator_abort_records_safety_monitor_without_abort_path() {
+    let temp = tempfile::tempdir().unwrap();
+    let abort_file = temp.path().join("operator-abort");
+    fs::write(&abort_file, b"abort").unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "load",
+            "cpu",
+            "--target",
+            "local",
+            "--workers",
+            "1",
+            "--duration",
+            "3s",
+            "--operator-abort-file",
+            abort_file.to_str().unwrap(),
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"status\": \"aborted\""))
+        .stdout(contains("\"abort_reason\": \"operator_abort\""));
+
+    let abort_path_text = abort_file.to_str().unwrap();
+    let plan_path = single_load_artifact_path(temp.path(), ".plan.json");
+    let result_path = single_load_artifact_path(temp.path(), ".result.json");
+    let plan_text = fs::read_to_string(&plan_path).unwrap();
+    let result_text = fs::read_to_string(&result_path).unwrap();
+    assert!(!plan_text.contains(abort_path_text));
+    assert!(!result_text.contains(abort_path_text));
+
+    let plan: serde_json::Value = serde_json::from_str(&plan_text).unwrap();
+    assert_eq!(
+        plan["safety_monitor"]["operator_abort_enabled"],
+        serde_json::json!(true)
+    );
+    assert_eq!(
+        plan["safety_monitor"]["restore_on_abort"],
+        serde_json::json!("not_required")
+    );
+
+    let result: serde_json::Value = serde_json::from_str(&result_text).unwrap();
+    assert_eq!(result["status"], "aborted");
+    assert_eq!(result["abort_reason"], "operator_abort");
+    assert_eq!(
+        result["safety_monitor"]["operator_abort_observed"],
+        serde_json::json!(true)
+    );
+    assert_eq!(
+        result["safety_monitor"]["restore_on_abort_status"],
+        serde_json::json!("not_required")
+    );
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"load.cpu\""));
+    assert!(audit.contains("\"result\":\"aborted\""));
+}
+
 fn matching_approval(plan: &ControlPlan) -> ApprovalRecord {
     ApprovalRecord {
         schema_version: "lab.approval_record.v1".to_string(),
@@ -565,7 +641,7 @@ fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
 }
 
 #[test]
-fn tool_qualify_inventory_accepts_builtin_readonly_and_rejects_unqualified_tools() {
+fn tool_qualify_inventory_accepts_builtin_readonly_and_bounded_load_tools() {
     let temp = tempfile::tempdir().unwrap();
     Command::cargo_bin("adc-lab")
         .unwrap()
@@ -604,11 +680,16 @@ fn tool_qualify_inventory_accepts_builtin_readonly_and_rejects_unqualified_tools
         .unwrap()
         .iter()
         .any(|tool| tool == "linux.procfs"));
-    assert!(summary["evidence_rejected_tool_ids"]
+    assert!(summary["evidence_accepted_tool_ids"]
         .as_array()
         .unwrap()
         .iter()
         .any(|tool| tool == "adc-lab-builtin-cpu-load"));
+    assert!(summary["evidence_rejected_tool_ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|tool| tool == "linux.cpufreq.sysfs"));
 
     let procfs_report: serde_json::Value = serde_json::from_slice(
         &fs::read(temp.path().join("tools/linux-procfs.qualification.json")).unwrap(),
@@ -625,11 +706,16 @@ fn tool_qualify_inventory_accepts_builtin_readonly_and_rejects_unqualified_tools
         .unwrap(),
     )
     .unwrap();
-    assert_eq!(load_report["evidence_accepted"], false);
+    assert_eq!(load_report["evidence_accepted"], true);
     assert!(load_report["reason"]
         .as_str()
         .unwrap()
-        .contains("bounded load"));
+        .contains("builtin bounded CPU load"));
+    assert!(load_report["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item.as_str().unwrap().contains("production readiness")));
 
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"tool.qualify_inventory\""));

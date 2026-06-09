@@ -313,6 +313,41 @@ pub struct ControlResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
+pub struct LoadSafetyMonitorPlan {
+    pub sample_interval_ms: u64,
+    pub thermal_abort_c: Option<f64>,
+    pub operator_abort_enabled: bool,
+    pub restore_on_abort: LoadRestoreOnAbortPolicy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LoadRestoreOnAbortPolicy {
+    NotRequired,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LoadRestoreOnAbortStatus {
+    NotRequired,
+    NotConfigured,
+    Attempted,
+    Succeeded,
+    Failed,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct LoadSafetyMonitorResult {
+    pub sample_interval_ms: u64,
+    pub samples: u64,
+    pub thermal_surface_available: bool,
+    pub operator_abort_observed: bool,
+    pub restore_on_abort_status: LoadRestoreOnAbortStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct LoadPlan {
     pub schema_version: String,
     pub load_id: String,
@@ -321,6 +356,7 @@ pub struct LoadPlan {
     pub workers: usize,
     pub duration_seconds: u64,
     pub abort_temp_c: Option<f64>,
+    pub safety_monitor: LoadSafetyMonitorPlan,
     pub created_by: Actor,
     pub time_unix_ms: u64,
 }
@@ -338,6 +374,7 @@ pub struct LoadResult {
     pub abort_reason: Option<String>,
     pub max_observed_temp_c: Option<f64>,
     pub worker_iterations: Vec<u64>,
+    pub safety_monitor: LoadSafetyMonitorResult,
     pub time_unix_ms: u64,
 }
 

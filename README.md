@@ -42,7 +42,7 @@ adc-lab control approve --plan lab/runs/LAB-RUN-.../plans/PLAN-....json --approv
 adc-lab control apply --plan lab/runs/LAB-RUN-.../plans/PLAN-....json --approval lab/runs/LAB-RUN-.../approvals/APPROVAL-....json --dry-run
 adc-lab restore --lease lab/runs/LAB-RUN-.../leases/LEASE-....json --dry-run
 
-adc-lab load cpu --target local --workers 2 --duration 5s --abort-temp-c 75
+adc-lab load cpu --target local --workers 2 --duration 5s --abort-temp-c 75 --operator-abort-file <target-abort-file>
 adc-lab experiment run --target local --matrix examples/experiments/pi4_cpu_governor_smoke.yaml --dry-run
 adc-lab report pack --run lab/runs/LAB-RUN-...
 adc-lab health-check --target local
@@ -50,6 +50,11 @@ adc-lab health-check --target local
 
 For SSH targets, `adc-lab` uses fixed `adc-lab-target` subcommands over SSH. It does not expose arbitrary remote shell.
 `ADC_LAB_TARGET_RUNNER` is a development override only and must name `adc-lab-target` from an allowlisted safe path such as `/usr/local/bin/adc-lab-target` or `/home/<user>/.local/bin/adc-lab-target`.
+
+`adc-lab load cpu` is a Tier 1 experimental burst. It is capped by duration and
+available parallelism, supports optional thermal abort and operator abort, and
+records safety monitor evidence in `lab.load_result.v1`. The operator abort
+file path is runtime input only and is not serialized into run artifacts.
 
 ## Verification
 

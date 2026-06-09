@@ -31,9 +31,12 @@ modes:
     description: Command-triggered observation or CPU load.
     trigger: explicit operator command
     burst_sampling_interval_ms_min: 1000
+    cpu_load_safety_monitor_interval_ms: 100
     burst_duration_seconds_max: 300
     duration_seconds_max: 300
     burst_requires_trigger_or_marker: true
+    operator_abort_supported_for_cpu_load: true
+    cpu_load_restore_on_abort_status: not_required
     cpu_percent_max: null
     wakeups_per_second_added_max: null
     disk_write_bytes_total_max: null
@@ -45,6 +48,7 @@ degraded_modes:
   battery_low: remove battery claims and require target policy before use
   memory_pressure: fail closed or reduce output volume
   thermal_pressure: abort load when threshold is configured and reached
+  operator_abort: stop bounded CPU load when the target-local abort marker is observed
   storage_pressure: fail closed before unbounded writes
   measurement_unavailable: remove claims or mark experimental
 
@@ -52,6 +56,7 @@ measurement:
   target_command_smoke: ADC_LAB_TARGET_RUNNER=/home/demo/.local/bin/adc-lab-target scripts/resource/run-resource-smoke.sh --target ssh://target55
   host_fallback_command_smoke: scripts/resource/run-resource-smoke.sh --host-fallback
   command_smoke_resource_metrics_collected: false
+  pr5_operator_abort_contract_verified_by: cargo test -p adc-lab --test cli load_cpu_operator_abort_records_safety_monitor_without_abort_path
   baseline_path: examples/demos/target55/baselines/resource/idle.json
   report_path: examples/demos/target55/reports/target-characterization.json
   missing_evidence:

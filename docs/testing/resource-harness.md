@@ -19,6 +19,8 @@ ADC_LAB_TARGET_RUNNER=/home/demo/.local/bin/adc-lab-target scripts/resource/run-
 - idle baseline
 - default steady state
 - bounded burst
+- bounded burst with operator abort marker
+- bounded burst with thermal surface unavailable or explicitly recorded
 - degraded battery_low
 - degraded storage_pressure
 - observer-on vs observer-off when instrumentation is target-local
@@ -34,5 +36,7 @@ ADC_LAB_TARGET_RUNNER=/home/demo/.local/bin/adc-lab-target scripts/resource/run-
 - Demo target smoke passed for `target55` after non-root deployment of `adc-lab-target` to `/home/demo/.local/bin/adc-lab-target`; the tracked demo pack lives under `examples/demos/target55/`.
 - Host fallback proves command wiring and schema behavior only.
 - Command smoke reports `resource_metrics_collected=false` and `resource_claims_supported=false`.
+- PR5 hardware-free tests verify operator-abort contract behavior; they do not
+  measure target thermal, wakeup, power, flash, or latency impact.
 - Target55 smoke proves only the short bounded target scenarios captured here.
 - Manual measurement is required before production physical-footprint claims.

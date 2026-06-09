@@ -11,8 +11,14 @@ Risk tiers:
 MVP behavior:
 
 - Tier 0 inventory, toolchain, and observation are audited.
-- Tier 1 CPU load is bounded by worker count, duration, and optional thermal abort.
+- Tier 1 CPU load is bounded by worker count, duration, optional thermal abort,
+  and optional operator abort.
 - Tier 1 CPU load default policy caps duration at 300s and worker count at available parallelism.
+- Tier 1 CPU load records a safety monitor summary in `lab.load_result.v1`,
+  including monitor samples, thermal surface availability, operator abort
+  observation, and restore-on-abort status.
+- Tier 1 CPU load does not mutate target state in this MVP, so
+  restore-on-abort status is `not_required`.
 - Tier 2 cpufreq governor control uses the privileged helper and restore lease, but apply/restore is local-target only in this MVP.
 - Tier 2 approval artifacts are generated from a validated control plan and are local-target only in this MVP.
 - Tier 2 approvals are bound to plan id, plan digest, exact operation, and bounds.

@@ -17,6 +17,9 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
 | Helper path before sudo | controller-internal helper path differs from fixed MVP helper | `LabError::Policy` before invoking `sudo` |
 | Restore lease validation | forged policy segment, invalid governor, non-numeric frequency, unsupported operation | structured `ControlResult.status=refused` |
 | Restore | backend restore failure or read-back verification failure | structured `ControlResult.status=failed` with restore attempt details |
+| CPU load policy | zero duration, duration above 300s, zero workers, or workers above available parallelism | `LabError::Validation` or `LabError::Policy` before load starts |
+| CPU load safety monitor | operator abort marker observed or thermal threshold reached | structured `LoadResult.status=aborted` with `abort_reason` |
+| CPU load worker execution | worker thread panic or unreadable operator abort marker | CLI error; load result is not trusted as evidence |
 | Experiment matrix execution | non-dry execution requested before runner wiring exists | trial `status=not_implemented` and blocked/provisional claims |
 
 ## Caller Contract
@@ -39,5 +42,11 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
 - Restore success requires read-back verification.
 - Post-restore health check is diagnostic evidence only and does not rewrite a restore `ControlResult`.
 - If apply or verify fails after state capture, restore is attempted immediately and the original operation remains failed even if restore succeeds.
+- Tier 1 CPU load is refused before execution when duration or worker bounds
+  exceed MVP policy.
+- Operator abort stops CPU load as `LoadResult.status=aborted`; the abort file
+  path is runtime input only and is not serialized into load artifacts.
+- CPU load restore-on-abort status is `not_required` in PR5 because the load
+  command does not mutate target state.
 - Non-dry experiment matrix output cannot become supported evidence until execution is implemented.
 - If target physical evidence is unavailable, reports mark claims provisional or blocked.

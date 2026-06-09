@@ -54,6 +54,8 @@ struct LoadCpuArgs {
     #[arg(long)]
     abort_temp_c: Option<f64>,
     #[arg(long)]
+    operator_abort_file: Option<std::path::PathBuf>,
+    #[arg(long)]
     json: bool,
 }
 
@@ -88,9 +90,19 @@ fn main() -> Result<()> {
         Commands::Load { command } => match command {
             LoadCommand::Cpu(args) => {
                 let duration = parse_duration(&args.duration)?;
-                let plan =
-                    new_cpu_load_plan(target.target_id, args.workers, duration, args.abort_temp_c)?;
-                print_json(&run_cpu_load(&plan)?)
+                let plan = new_cpu_load_plan_with_operator_abort(
+                    target.target_id,
+                    args.workers,
+                    duration,
+                    args.abort_temp_c,
+                    args.operator_abort_file.is_some(),
+                )?;
+                print_json(&run_cpu_load_with_options(
+                    &plan,
+                    &CpuLoadRuntimeOptions {
+                        operator_abort_file: args.operator_abort_file,
+                    },
+                )?)
             }
         },
         Commands::HealthCheck(_) => print_json(&HealthOutput {

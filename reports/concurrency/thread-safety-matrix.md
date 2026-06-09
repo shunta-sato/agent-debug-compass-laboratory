@@ -9,7 +9,7 @@ Concurrent code in MVP is limited to bounded CPU load workers in `crates/adc-lab
 - Model: one monitor/controller thread plus N worker threads.
 - Shared state: `Arc<AtomicBool>` stop flag only.
 - Synchronization: atomic cancellation with `Ordering::Relaxed`; no mutexes, shared buffers, queues, or lock ordering.
-- Shutdown: monitor sets stop flag at duration or thermal abort, then joins all workers.
+- Shutdown: monitor sets stop flag at duration, thermal abort, or operator abort, then joins all workers.
 - Error propagation: worker panic maps to `LabError::Validation`; setup failures return before worker spawn.
 
 ## Verification Matrix
@@ -25,6 +25,8 @@ Concurrent code in MVP is limited to bounded CPU load workers in `crates/adc-lab
 ## Risks And Mitigations
 
 - Risk: thermal abort is only as good as target thermal surface availability.
+- Risk: operator abort depends on the target-local abort marker being readable
+  by the non-root runner.
 - Mitigation: result records `max_observed_temp_c` and leaves physical claims experimental-only when unavailable.
 
 - Risk: high worker count can intentionally load the target.
