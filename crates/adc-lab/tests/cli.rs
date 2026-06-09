@@ -682,6 +682,150 @@ order: listed
 }
 
 #[test]
+fn report_operating_point_marks_read_only_run_observational_only() {
+    let temp = tempfile::tempdir().unwrap();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "familiarize",
+            "read-only",
+            "--target",
+            "local",
+            "--duration",
+            "0s",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    let output = Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "operating-point",
+            "--run",
+            temp.path().to_str().unwrap(),
+            "--target-id",
+            "local-target",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("operating_point_coverage.json"))
+        .stdout(contains("\"coverage_status\": \"observational_only\""))
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let coverage = &value["coverage"];
+    assert_eq!(coverage["coverage_status"], "observational_only");
+    assert!(coverage["observed_points"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|point| point["factor_id"] == "default_policy_frequency"
+            && point["coverage_status"] == "observational_only"));
+    assert!(coverage["blocked_points"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|point| point["factor_id"] == "fixed_cpu_frequency"
+            && point["coverage_status"] == "not_controllable"));
+    assert!(coverage["claim_boundaries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|boundary| boundary["decision"] == "blocked"
+            && boundary["claim"]
+                .as_str()
+                .unwrap()
+                .contains("fixed CPU frequencies")));
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"report.operating_point\""));
+    assert!(audit.contains("\"result\":\"observational_only\""));
+}
+
+#[test]
+fn report_operating_point_marks_bounded_matrix_controlled_subset() {
+    let temp = tempfile::tempdir().unwrap();
+    let matrix = workspace_root().join("examples/experiments/bounded_load_observe_smoke.yaml");
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "experiment",
+            "run",
+            "--target",
+            "local",
+            "--matrix",
+            matrix.to_str().unwrap(),
+            "--trial-load-duration",
+            "1s",
+            "--trial-observe-duration",
+            "0s",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    let output = Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "operating-point",
+            "--run",
+            temp.path().to_str().unwrap(),
+            "--target-id",
+            "local-target",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"coverage_status\": \"controlled_subset\""))
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let coverage = &value["coverage"];
+    assert_eq!(coverage["coverage_status"], "controlled_subset");
+    assert!(coverage["controlled_points"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|point| point["factor_id"] == "cpu_load_workers"
+            && point["coverage_status"] == "controlled_subset"
+            && point["evidence_class"] == "bounded_load"));
+    assert!(coverage["claim_boundaries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|boundary| boundary["decision"] == "supported"
+            && boundary["claim"]
+                .as_str()
+                .unwrap()
+                .contains("bounded workload")));
+    assert!(coverage["claim_boundaries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|boundary| boundary["decision"] == "blocked"
+            && boundary["claim"]
+                .as_str()
+                .unwrap()
+                .contains("fixed CPU frequencies")));
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"report.operating_point\""));
+    assert!(audit.contains("\"result\":\"controlled_subset\""));
+}
+
+#[test]
 fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
     let temp = tempfile::tempdir().unwrap();
     let output = Command::cargo_bin("adc-lab")

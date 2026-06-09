@@ -27,6 +27,7 @@
 | `load.cpu` | explain bounded load outcome, abort reason, and safety monitor result | CLI start to load result |
 | `experiment.trial` | explain one matrix trial outcome and per-trial evidence | trial start to trial artifact refs |
 | `experiment.run` | explain matrix planning/execution summary | CLI start to experiment artifacts |
+| `report.operating_point` | explain observed vs controlled operating-point coverage | CLI start to coverage artifact |
 | `tool.qualify` | explain whether a tool can be evidence | CLI start to qualification report |
 
 ## Correlation Identifiers
@@ -121,6 +122,19 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
   allowlisted non-privileged steps that were executed.
 - Artifact path:
   `artifact://lab/runs/<run_id>/experiments/trials/<trial_id>/...`.
+
+- Signal: operating point coverage report.
+- Decision supported: whether a run is observational-only, a controlled subset,
+  fully controlled, not controllable, or safety-blocked.
+- Action owner: lab operator or agent reviewing claims.
+- Expected action when degraded: treat blocked points as unsupported and collect
+  the listed next evidence before broadening claims.
+- Counter-metric: `blocked_points` and `claim_boundaries` prevent observed
+  frequency movement from being interpreted as a controlled sweep.
+- Failure mode / misleading interpretation: `controlled_subset` for
+  `cpu_load_workers` does not prove fixed-frequency or governor behavior.
+- Artifact path:
+  `artifact://lab/runs/<run_id>/reports/operating_point_coverage.json`.
 
 - Signal: read-only run manifest.
 - Decision supported: whether read-only target familiarization has inventory, toolchain, observation, audit, and claim trace artifacts.

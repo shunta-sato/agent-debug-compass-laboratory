@@ -7,6 +7,9 @@ Findings: 0
 ## Checks Run
 
 - `cargo fmt --all` - pass.
+- `cargo test -p adc-lab-core operating_point -- --nocapture` - pass.
+- `cargo test -p adc-lab --test cli report_operating_point -- --nocapture` -
+  pass.
 - `make contract` - pass.
 - `cargo test -p adc-lab --tests -- --nocapture` - pass.
 - `cargo clippy --workspace --all-targets -- -D warnings` - pass.
@@ -21,65 +24,57 @@ Findings: 0
 - Rust toolchain: verified through `make verify` with workspace build, fmt
   check, clippy, tests, contract validation, docs smoke, and command smoke.
 - Repo command wrapper: `Makefile` remains the canonical command surface.
-- Schema/config paths: `schemas/lab.experiment_matrix.v1.schema.json`,
-  `schemas/lab.experiment_run.v1.schema.json`,
-  `tests/golden/lab.experiment_run.v1.valid.json`, and
+- Schema/config paths:
+  `schemas/lab.operating_point_coverage.v1.schema.json`,
+  `tests/golden/lab.operating_point_coverage.v1.valid.json`, and
   `examples/experiments/bounded_load_observe_smoke.yaml`.
 - Target connection state: no hardware target required for default
-  verification. PR6 tests run local hardware-free experiment matrix paths.
-- Artifact/log paths expected from PR6 workflow:
-  `experiments/experiment_run.json`,
-  `experiments/trials/<trial_id>/load_plan.json`,
-  `experiments/trials/<trial_id>/load_result.json`,
-  `experiments/trials/<trial_id>/observation.json`,
-  `reports/claim_evidence_trace.json`, and `audit.jsonl` operations
-  `experiment.trial` and `experiment.run`.
+  verification. PR7 tests use local hardware-free read/report paths and the
+  existing bounded matrix test path.
+- Artifact/log paths expected from PR7 workflow:
+  `reports/operating_point_coverage.json`,
+  `reports/capability_cost_model.json`, and `audit.jsonl` operation
+  `report.operating_point`.
 
 ## Triggered Branch Evidence
 
 - ExecPlan - present:
-  `plans/20260609-pr6-real-experiment-matrix-runner.md`.
+  `plans/20260609-pr7-controlled-operating-point-coverage.md`.
+- Function boundary review - present:
+  `reports/architecture/function-boundary-review.md`.
+- Error handling - present:
+  `docs/architecture/error-handling.md`.
+- Observability - present:
+  `docs/architecture/observability-plan.md`.
 - Embedded NFR design/gate - present:
   `docs/nfr/adc-lab-target-runtime.md`,
   `requirements/nfr/adc-lab-target-runtime.yaml`,
   `requirements/physical_budgets.yaml`, and
   `reports/resource/nfr-gate-report.md`.
-- Embedded hot-path review - present:
-  `reports/resource/hot-path-review.md`.
-- Embedded observer-effect review - present:
+- Hot-path and observer-effect reports - present:
+  `reports/resource/hot-path-review.md` and
   `reports/resource/observer-effect-review.md`.
-- Embedded NFR harness design - present:
-  `docs/testing/resource-harness.md`.
-- Error handling - present:
-  `docs/architecture/error-handling.md`.
-- Observability - present:
-  `docs/architecture/observability-plan.md`.
-- Concurrency/shutdown evidence for existing load worker threads - present:
-  `reports/concurrency/thread-safety-matrix.md`.
 
 ## Exit Criteria Review
 
-- `lab.experiment_run.v1` records per-trial artifact refs, failure reason, and
-  start/end timestamps.
-- Real `adc-lab experiment run` execution is limited to listed-order
-  `cpu_load_workers` matrices.
-- Supported trials produce bounded load and/or passive observation artifacts
-  before they can become `completed`.
-- Unsupported controlled factors, randomized order, failed loads, and failed
-  observations become `blocked` or `failed`, not supported claims.
-- Each trial emits an `experiment.trial` audit event. The run emits an
-  `experiment.run` audit summary.
-- Claim trace supports only completed bounded non-privileged matrix execution
-  and keeps fixed-frequency, privileged-control, and production physical
-  footprint claims blocked.
+- `lab.operating_point_coverage.v1` now records explicit coverage statuses:
+  `observational_only`, `controlled_subset`, `controlled_full`,
+  `not_controllable`, and `blocked_unsafe`.
+- Read-only observation runs produce `observational_only` coverage, with fixed
+  CPU frequency sweep claims blocked.
+- Completed PR6 `cpu_load_workers` trials produce `controlled_subset` coverage
+  for bounded workload levels only.
+- Blocked/failed trials become `blocked_points` with reason and next evidence.
+- `report operating-point` emits `report.operating_point` audit.
+- Claim boundaries keep passive observed frequency movement separate from
+  controlled fixed-frequency or governor evidence.
 - Default verification remains hardware-free.
-- PR6 adds no privileged control, sudo helper behavior, cpufreq write,
-  fixed-frequency sweep, memory pressure, I/O stress, thermal stress, GPU/NPU
-  load, destructive experiment, randomized execution, concurrent
-  observe-while-load, or production physical-footprint claim.
+- PR7 adds no privileged control, sudo helper behavior, cpufreq write,
+  fixed-frequency sweep, load generation, target-local runtime, destructive
+  experiment, or production physical-footprint claim.
 
 ## Gate Decision
 
-Submit. The change is experimental-only for embedded NFR purposes, all
-production physical-footprint claims remain blocked, and the required contracts,
-tests, docs, and scans are present.
+Submit. The change is report/contract-only for operating-point evidence
+classification. It improves claim boundaries without adding target-local
+runtime or broadening production physical-footprint claims.

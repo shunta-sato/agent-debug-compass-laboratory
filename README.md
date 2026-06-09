@@ -49,6 +49,7 @@ adc-lab load cpu --target local --workers 2 --duration 5s --abort-temp-c 75 --op
 adc-lab experiment run --target local --matrix examples/experiments/pi4_cpu_governor_smoke.yaml --dry-run
 adc-lab experiment run --target local --matrix examples/experiments/bounded_load_observe_smoke.yaml --trial-load-duration 1s --trial-observe-duration 0s
 adc-lab report pack --run lab/runs/LAB-RUN-...
+adc-lab report operating-point --run lab/runs/LAB-RUN-... --target-id local-target
 adc-lab health-check --target local
 ```
 
@@ -63,6 +64,11 @@ file path is runtime input only and is not serialized into run artifacts.
 `adc-lab experiment run` only marks a trial `completed` when supported
 non-privileged steps actually produced per-trial artifacts and audit events.
 Unsupported controlled factors are recorded as `blocked`, not completed.
+
+`adc-lab report operating-point` classifies run evidence as
+`observational_only`, `controlled_subset`, `controlled_full`,
+`not_controllable`, or `blocked_unsafe`. Passive frequency variation remains
+observational evidence; it is not a fixed-frequency sweep.
 
 ## Verification
 

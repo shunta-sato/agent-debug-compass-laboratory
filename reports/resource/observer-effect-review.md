@@ -44,6 +44,8 @@
 - [EOE-003] PR6 matrix runner records per-trial observation artifacts after
   supported bounded steps; this is accepted for experimental burst mode but not
   calibrated observer-overhead evidence.
+- [EOE-004] PR7 operating-point coverage is controller-side artifact
+  interpretation and adds no target observer effect.
 
 ## Handoff
 

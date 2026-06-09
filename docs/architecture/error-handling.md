@@ -21,6 +21,7 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
 | CPU load safety monitor | operator abort marker observed or thermal threshold reached | structured `LoadResult.status=aborted` with `abort_reason` |
 | CPU load worker execution | worker thread panic or unreadable operator abort marker | CLI error; load result is not trusted as evidence |
 | Experiment matrix execution | unsupported controlled factor, randomized order, failed load, failed observation, or safety-aborted load | trial `status=blocked` or `status=failed`; only successful supported trials become `completed` |
+| Operating point coverage report | missing observation/experiment artifacts, blocked trial, failed trial, unsupported factor, or unsafe factor | structured coverage with `observational_only`, `controlled_subset`, `not_controllable`, or `blocked_unsafe`; malformed JSON artifacts are CLI errors |
 
 ## Caller Contract
 
@@ -55,4 +56,9 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
   recorded as `blocked`, not `completed`.
 - Failed or safety-aborted trial steps remain diagnostic evidence and cannot
   support behavior claims.
+- Operating point coverage is generated from existing run artifacts. Missing
+  optional artifacts lower the coverage status or add blocked points; malformed
+  artifacts fail the command because evidence cannot be trusted.
+- Observed frequency variation is always kept separate from fixed-frequency
+  control coverage.
 - If target physical evidence is unavailable, reports mark claims provisional or blocked.

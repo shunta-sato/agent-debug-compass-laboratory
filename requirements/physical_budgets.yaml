@@ -36,6 +36,13 @@ target_classes:
       experiment_runner_cooldown_seconds_max: 60
       experiment_runner_repetitions_max: 10
       experiment_runner_expanded_trials_max: 64
+      operating_point_coverage_report_target_runtime: none
+      operating_point_coverage_statuses:
+        - observational_only
+        - controlled_subset
+        - controlled_full
+        - not_controllable
+        - blocked_unsafe
 
 degraded_modes:
   battery_low: experimental-only until target policy is characterized

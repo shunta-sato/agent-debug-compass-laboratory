@@ -37,6 +37,8 @@
   bounds.
 - [EHP-002] PR6 experiment runner sequences trials and writes artifacts after
   each bounded trial; it does not add an always-on target-local loop.
+- [EHP-003] PR7 operating-point coverage reads controller-side artifacts only;
+  it adds no target-local hot path.
 
 ## Handoff
 
