@@ -5,6 +5,9 @@
 - Instrumentation config/schema paths: none existed before this bootstrap.
 - Logging/metrics/tracing library and version/status output: no metrics/tracing dependency in MVP.
 - External dependency interface and connection state: local filesystem and fixed `ssh adc-lab-target` command path.
+- CI/CD external interface and connection state: GitHub Actions workflow files
+  under `.github/workflows/`; Release asset publication uses `GITHUB_TOKEN`
+  inside GitHub Actions, not local credentials.
 - Existing dashboard/query/log artifact paths: none.
 
 ## Operations To Observe
@@ -32,6 +35,7 @@
 | `report.target_capability_profile` | explain workload-to-target evidence profile generation | CLI start to target capability profile artifact |
 | `tool.qualify` | explain whether an agent-created tool can be evidence | CLI start to evidence artifact copy and qualification report |
 | `privilege.provider_status` | explain which privilege provider is active or disabled | CLI start to provider status artifact |
+| `release.package` | explain binary release identity and package integrity | release workflow build to tarball, checksum, attestation, and Release asset |
 
 ## Correlation Identifiers
 
@@ -221,3 +225,17 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
   policy posture only.
 - Artifact path:
   `artifact://lab/runs/<run_id>/privilege/privilege_provider_status.json`.
+
+- Signal: release binary identity.
+- Decision supported: whether a Pi4/Pi5 measurement used a specific adc-lab
+  version, git sha, target triple, and build profile.
+- Action owner: lab operator or agent preparing target capability evidence.
+- Expected action when degraded: reject same-binary comparison claims and rerun
+  with a verified GitHub Release asset.
+- Counter-metric: `SHA256SUMS`, GitHub artifact attestation, and
+  `release-manifest.json` prevent local source builds from being mistaken for
+  release binaries.
+- Failure mode / misleading interpretation: a release binary proves
+  build/package identity only; it does not prove resource overhead, target
+  suitability, battery safety, thermal safety, or production readiness.
+- Artifact path: GitHub Release asset plus tarball `release-manifest.json`.

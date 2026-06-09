@@ -11,7 +11,15 @@ if [[ -z "$target" ]]; then
   exit 2
 fi
 
-cargo run -q -p adc-lab -- familiarize read-only \
+if [[ -n "${ADC_LAB_BIN:-}" ]]; then
+  adc_lab=("$ADC_LAB_BIN")
+elif command -v adc-lab >/dev/null 2>&1; then
+  adc_lab=(adc-lab)
+else
+  adc_lab=(cargo run -q -p adc-lab --)
+fi
+
+"${adc_lab[@]}" familiarize read-only \
   --target "$target" \
   --duration "$duration" \
   --signals cpu,freq,thermal,memory \

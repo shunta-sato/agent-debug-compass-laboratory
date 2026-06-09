@@ -7,43 +7,44 @@ Findings: 0
 ## Checks Run
 
 - `cargo fmt --all --check` - pass.
-- `cargo test -p adc-lab-core capability_profile -- --nocapture` - pass.
-- `cargo test -p adc-lab --test cli report_capability_profile -- --nocapture` -
-  pass.
-- `cargo test -p adc-lab-core --test contract_validation workload_profile -- --nocapture` -
-  pass.
-- `cargo test -p adc-lab-core --test contract_validation target_capability_profile -- --nocapture` -
-  pass.
-- `make contract` - pass.
-- `make verify` - pass.
 - `git diff --check` - pass.
-- High-confidence sensitive-data scan over PR added lines and changed file
-  names - pass. No private key material, contact addresses, network-address
-  literals, or security-event strings were found in PR11 additions.
+- `cargo test -p adc-lab --test cli version_commands_emit_build_info_json -- --nocapture` - pass.
+- `cargo test --workspace contract_validation -- --nocapture` - pass.
+- `make build-release` - pass.
+- Local release package smoke - pass:
+  - `scripts/release/package-release.sh ...`
+  - `sha256sum -c SHA256SUMS`
+  - tarball content inspection for `bin/adc-lab`,
+    `bin/adc-lab-target`, `bin/adc-lab-priv-helper`, README, LICENSE,
+    getting-started docs, and `release-manifest.json`.
+- `make verify` - pass.
+- High-confidence sensitive-data scan over changed tracked and untracked files
+  - pass. No API keys, passwords, private keys, IP addresses, email addresses,
+  personal names, or security-incident indicators were found in PR additions.
 
 ## Live Discovery
 
-- Rust toolchain: verified through `make verify` with workspace build, fmt
-  check, clippy, tests, contract validation, docs smoke, and command smoke.
-- Repo command wrapper: `Makefile` remains the canonical command surface.
-- Schema/config paths:
-  `schemas/lab.workload_profile.v1.schema.json`,
-  `schemas/lab.target_capability_profile.v1.schema.json`,
-  `tests/golden/lab.workload_profile.v1.valid.json`, and
-  `tests/golden/lab.target_capability_profile.v1.valid.json`.
-- Target connection state: no hardware target required for default
-  verification. PR11 profile generation is controller-side report generation
-  over existing artifacts and does not contact a target.
-- Artifact/log paths expected from PR11 workflow:
-  `reports/target_capability_profile.<workload_id>.json` and `audit.jsonl`
-  operation `report.target_capability_profile`.
+- GitHub Actions docs: `GITHUB_TOKEN` permissions can be scoped at workflow/job
+  level; ordinary CI is kept at `contents: read`, while release publication
+  uses the narrower write permissions needed for assets and attestations.
+- GitHub workflow artifacts docs: workflow artifacts are used for build
+  handoff between jobs, not as the user distribution surface.
+- GitHub release assets docs: Release assets are the intended user download
+  surface.
+- GitHub artifact attestations docs: artifact attestations provide signed
+  build provenance for produced release assets.
+- Local GitHub CLI status: `gh` is installed but not authenticated locally.
+  This does not block adding workflows; release permission can only be fully
+  proven by GitHub Actions when the workflow runs.
+- Target connection state: no hardware target required. PR11 CI/CD release
+  foundation does not contact a target or execute target measurements.
 
 ## Triggered Branch Evidence
 
 - ExecPlan - present:
-  `plans/20260609-pr11-workload-target-capability-profile.md`.
+  `plans/20260609-pr11-ci-cd-release-binary-foundation.md`.
 - Architecture decision analysis - present:
-  `reports/architecture/workload-target-capability-profile-decision.md`.
+  `reports/architecture/ci-cd-release-binary-foundation-decision.md`.
 - Function boundary review - present:
   `reports/architecture/function-boundary-review.md`.
 - Error handling - present:
@@ -55,34 +56,38 @@ Findings: 0
   `requirements/nfr/adc-lab-target-runtime.yaml`,
   `requirements/physical_budgets.yaml`, and
   `reports/resource/nfr-gate-report.md`.
-- Hot-path and observer-effect reports - present:
+- Hot-path and observer-effect reports - present from prior target-runtime
+  gates:
   `reports/resource/hot-path-review.md` and
   `reports/resource/observer-effect-review.md`.
 
 ## Exit Criteria Review
 
-- `lab.workload_profile.v1` defines workload identity, class, duration,
-  requirements, measurement requirements, and claim boundary.
-- `lab.target_capability_profile.v1` links target id, workload id, run/evidence
-  refs, observed results, supported claims, blocked claims, next evidence, and
-  explicit `selection_ready`.
-- `adc-lab report capability-profile` reads existing run artifacts only, writes
-  a target capability profile artifact, and appends a Tier 0 audit event.
-- Generated profiles keep `selection_ready=false` in PR11 and block target
-  selection claims such as "Pi4 is sufficient" and "Pi5 is required".
-- Observed duration is recorded, so shorter evidence cannot silently satisfy a
-  longer workload profile.
-- Pi4 and Pi5 example profiles use the same schema format. The Pi4 example is
-  limited to existing target55 short-smoke evidence; the Pi5 example is
-  evidence-pending and contains no invented measurements.
-- Default verification remains hardware-free.
-- PR11 adds no arbitrary shell, no new helper override, no root daemon, no
-  privileged control, no remote privileged apply, no target-local always-on
-  runtime, no destructive experiment, and no production physical-footprint
+- Pull request CI runs `make verify` through `.github/workflows/ci.yml`.
+- Release workflow runs `make verify`, builds `aarch64-unknown-linux-gnu` and
+  `x86_64-unknown-linux-gnu`, packages tarballs, uploads workflow artifacts,
+  publishes GitHub Release assets, emits `SHA256SUMS`, and adds artifact
+  attestations.
+- CI workflow uses `permissions: contents: read`.
+- Release workflow keeps build jobs read-only and gives only the publish job
+  `contents: write`, `id-token: write`, and `attestations: write`.
+- `adc-lab`, `adc-lab-target`, and `adc-lab-priv-helper` expose top-level
+  JSON `--version` output with name, version, git sha, target triple, and build
+  profile.
+- `lab.release_manifest.v1` has schema and golden fixture coverage.
+- Release tarballs contain all three binaries, README, LICENSE, getting-started
+  docs, and `release-manifest.json`.
+- Install docs require `sha256sum -c SHA256SUMS` before Pi4/Pi5 measurement
+  and keep helper install optional.
+- Measurement prompt uses release binaries/checksum verification and blocks
+  Pi4/Pi5 suitability, battery, sustained thermal, operating-point, and
+  production claims.
+- `make verify` remains the default local gate.
+- PR11 adds no arbitrary shell, no new privileged control surface, no helper
+  override, no root daemon, no destructive experiment, and no resource/NFR
   claim.
 
 ## Gate Decision
 
-Submit. The change adds a controller-side workload/profile evidence contract
-and report generator that makes later Pi4/Pi5 comparison safer without making
-comparison or suitability decisions in PR11.
+Submit. The change adds CI/CD and release-binary distribution integrity without
+turning release artifacts into target measurement evidence.

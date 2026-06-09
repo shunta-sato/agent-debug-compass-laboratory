@@ -1,10 +1,28 @@
 # Getting Started: Pi5 Controller To Pi4 Target
 
+For Pi4/Pi5 measurements that need the same binary identity, install from a
+GitHub Release and verify `SHA256SUMS` first. See
+`docs/getting-started/install-release-binaries.md`.
+
+Release-binary preflight:
+
+```sh
+sha256sum -c SHA256SUMS
+tar -xzf adc-lab-v0.1.0-linux-aarch64.tar.gz
+bin/adc-lab --version
+bin/adc-lab-target --version
+cat release-manifest.json
+```
+
 Build on the controller:
 
 ```sh
 make build-release
 ```
+
+The source-build path above is for local development. Same-suite Pi4/Pi5
+measurement prompts should prefer release binaries and record `--version` plus
+`release-manifest.json`.
 
 Install the helper on a lab target after reviewing the script:
 

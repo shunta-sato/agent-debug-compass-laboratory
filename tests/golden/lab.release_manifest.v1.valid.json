@@ -1,0 +1,20 @@
+{
+  "schema_version": "lab.release_manifest.v1",
+  "version": "0.1.0",
+  "git_sha": "291defb12345",
+  "target_triple": "aarch64-unknown-linux-gnu",
+  "binaries": [
+    {
+      "name": "adc-lab",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "name": "adc-lab-target",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "name": "adc-lab-priv-helper",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ]
+}

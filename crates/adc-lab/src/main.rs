@@ -349,6 +349,9 @@ struct HealthOutput {
 }
 
 fn main() -> Result<()> {
+    if print_version_if_requested("adc-lab")? {
+        return Ok(());
+    }
     let cli = Cli::parse();
     match cli.command {
         Commands::Inventory(args) => command_inventory(args),
@@ -384,6 +387,18 @@ fn main() -> Result<()> {
             ToolCommand::Qualify(args) => command_tool_qualify(args),
             ToolCommand::QualifyInventory(args) => command_tool_qualify_inventory(args),
         },
+    }
+}
+
+fn print_version_if_requested(name: &str) -> Result<bool> {
+    let Some(arg) = std::env::args_os().nth(1) else {
+        return Ok(false);
+    };
+    if arg == "--version" || arg == "-V" {
+        print_json(&build_info(name))?;
+        Ok(true)
+    } else {
+        Ok(false)
     }
 }
 

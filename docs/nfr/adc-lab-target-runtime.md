@@ -31,6 +31,9 @@
 - PR11 target capability profile: controller-side report generation only. It
   normalizes existing run artifacts against a workload profile; it does not run
   target commands, helper apply, load, observe, or destructive experiments.
+- PR11 CI/CD release binary foundation: GitHub Actions build/package/release
+  only. It produces binary identity and checksum/provenance evidence; it does
+  not execute target commands or measure target physical footprint.
 - Measurement surfaces available in the demo: target55 procfs CPU/memory, sysfs thermal, sysfs cpufreq read surface. Demo artifacts live under `examples/demos/target55/`.
 - Measurement surfaces unavailable: wakeups, storage writes, battery/power, latency/jitter, sustained thermal recovery.
 
@@ -63,6 +66,7 @@
 | `adc-lab tool qualify --manifest ...` with evidence files | controller-side qualification report | none on target | command lifetime | no | PR9 hardware-free adapter qualification tests |
 | `adc-lab privilege provider-status` | controller-side report | none on target | command lifetime | no | PR10 hardware-free provider status tests |
 | `adc-lab report capability-profile` | controller-side report | none on target | command lifetime | no | PR11 hardware-free profile generation tests |
+| GitHub Release binary packaging | build/package integrity | none on target | workflow duration | no | PR11 CI/CD workflow and local package smoke |
 | `adc-lab-target` | command-triggered | none while idle | process lifetime | no daemon | demo target55 smoke passed |
 
 ## Degraded-Mode Policy
@@ -102,6 +106,9 @@
   tests. It proves workload/profile artifact generation and conservative claim
   blocking only; it does not prove Pi4/Pi5 suitability or production physical
   footprint.
+- PR11 CI/CD release verification is hardware-free. It proves build, package,
+  checksum, and provenance wiring only; it does not prove target resource/NFR
+  behavior.
 - Demo evidence pack: `examples/demos/target55/`.
 - Demo baseline: `examples/demos/target55/baselines/resource/`.
 - Demo report path: `examples/demos/target55/reports/operating-envelope/`, `examples/demos/target55/reports/target-characterization.json`.

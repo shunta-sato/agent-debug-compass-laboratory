@@ -1,0 +1,182 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, for example v0.1.0
+        required: true
+        default: v0.1.0
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: make verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Verify
+        run: make verify
+
+  build:
+    name: Build ${{ matrix.asset_triple }}
+    runs-on: ubuntu-latest
+    needs: verify
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rust_target: aarch64-unknown-linux-gnu
+            asset_triple: linux-aarch64
+            apt_packages: gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+          - rust_target: x86_64-unknown-linux-gnu
+            asset_triple: linux-x86_64
+            apt_packages: ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust stable
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup target add "${{ matrix.rust_target }}"
+
+      - name: Install cross toolchain
+        if: matrix.apt_packages != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.apt_packages }}
+
+      - name: Resolve release metadata
+        id: release
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="${{ inputs.tag }}"
+          fi
+          if [[ ! "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+([._+-][A-Za-z0-9._+-]+)?$ ]]; then
+            echo "invalid release tag: $tag" >&2
+            exit 2
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "git_sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: Build release binaries
+        run: |
+          if [[ "${{ matrix.rust_target }}" == "aarch64-unknown-linux-gnu" ]]; then
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+          fi
+          ADC_LAB_GIT_SHA="${{ steps.release.outputs.git_sha }}" \
+            cargo build --workspace --release --target "${{ matrix.rust_target }}"
+
+      - name: Package release tarball
+        run: |
+          scripts/release/package-release.sh \
+            --version "${{ steps.release.outputs.version }}" \
+            --git-sha "${{ steps.release.outputs.git_sha }}" \
+            --target-triple "${{ matrix.rust_target }}" \
+            --asset-triple "${{ matrix.asset_triple }}" \
+            --target-dir "target/${{ matrix.rust_target }}/release" \
+            --dist-dir "dist"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.asset_triple }}
+          path: dist/adc-lab-v${{ steps.release.outputs.version }}-${{ matrix.asset_triple }}.tar.gz
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release metadata
+        id: release
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="${{ inputs.tag }}"
+          fi
+          if [[ ! "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+([._+-][A-Za-z0-9._+-]+)?$ ]]; then
+            echo "invalid release tag: $tag" >&2
+            exit 2
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Download workflow artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-download
+
+      - name: Create SHA256SUMS
+        run: |
+          mkdir -p dist-assets
+          find dist-download -name '*.tar.gz' -type f -exec cp {} dist-assets/ \;
+          test "$(find dist-assets -name '*.tar.gz' -type f | wc -l)" -ge 1
+          (
+            cd dist-assets
+            sha256sum *.tar.gz > SHA256SUMS
+            sha256sum -c SHA256SUMS
+          )
+
+      - name: Attest release assets
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist-assets/*
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ steps.release.outputs.tag }}"
+          notes='Binary release for adc-lab toolchain distribution.
+
+This release proves build, checksum, and package integrity only. It does not make target resource, NFR, Pi4/Pi5 comparison, or production-readiness claims.
+
+Verify downloaded assets with:
+
+```sh
+sha256sum -c SHA256SUMS
+```'
+
+          assets=(dist-assets/*.tar.gz dist-assets/SHA256SUMS)
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${assets[@]}" --clobber
+          else
+            gh release create "$tag" "${assets[@]}" \
+              --target "$GITHUB_SHA" \
+              --title "$tag" \
+              --notes "$notes"
+          fi
