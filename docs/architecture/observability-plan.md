@@ -21,6 +21,7 @@
 | `report.claim_trace` | explain claim-boundary artifact generation | CLI start to claim trace artifact |
 | `run_manifest.write` | explain run manifest generation | CLI start to manifest artifact |
 | `report.pack` | explain familiarization pack generation | CLI start to pack artifact |
+| `tool.version` | explain controller or target runner binary identity capture | CLI start to version artifact |
 | `tool.qualify_inventory` | explain discovered tool evidence acceptance/rejection | CLI start to qualification summary artifact |
 | `control.plan` | explain planned state change | CLI start to plan artifact |
 | `control.approve` | explain operator approval artifact generation | CLI start to approval artifact |
@@ -175,11 +176,44 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
   `artifact://lab/runs/<run_id>/reports/target_capability_profile.<workload_id>.json`.
 
 - Signal: read-only run manifest.
-- Decision supported: whether read-only target familiarization has inventory, toolchain, observation, audit, and claim trace artifacts.
+- Decision supported: whether target familiarization has inventory, toolchain,
+  observation, optional bounded-load, audit, release identity, and claim trace
+  artifacts consistent with one logical run.
 - Action owner: lab operator or agent reviewing the run.
-- Expected action when degraded: inspect `data_quality.missing`, rerun missing read-only operations, and keep control/load/production claims blocked.
-- Counter-metric: familiarization pack `blocked_claims` and claim trace blocked entries.
-- Failure mode / misleading interpretation: a complete read-only pack is still not controlled operating-point, load, battery, flash, or production evidence.
+- Expected action when degraded: inspect `operations_summary`,
+  `data_quality.missing`, and `data_quality.inconsistent`; rerun missing or
+  inconsistent operations before creating target capability profiles.
+- Counter-metric: familiarization pack `pack_status`, claim trace blocked
+  entries, and target capability profile `selection_ready=false`.
+- Failure mode / misleading interpretation: an exploratory short-smoke pack is
+  not controlled operating-point, battery, flash, sustained thermal, or
+  production evidence.
+- Artifact path: `artifact://lab/runs/<run_id>/run_manifest.json`.
+
+- Signal: run context artifact.
+- Decision supported: whether repeated commands using the same `--run-dir`
+  share one logical `run_id`.
+- Action owner: lab operator or agent reviewing audit completeness.
+- Expected action when degraded: reject or regenerate packs whose
+  `audit.jsonl` contains events with a different `run_id` than
+  `run_manifest.run_id`.
+- Counter-metric: `run_manifest.data_quality.inconsistent`.
+- Failure mode / misleading interpretation: directory path equality alone does
+  not prove run identity; the logical `run_id` must match.
+- Artifact path: `artifact://lab/runs/<run_id>/run_context.json`.
+
+- Signal: operation summary.
+- Decision supported: which operations actually ran in the evidence pack:
+  inventory, toolchain discovery, passive observe, bounded load, privileged
+  control, controlled operating point, and sustained thermal.
+- Action owner: lab operator or agent preparing target capability profiles.
+- Expected action when degraded: keep unsupported claims blocked when an
+  operation is `not_run`, and rerun report pack after adding artifacts to a
+  run directory.
+- Counter-metric: claim trace supported/blocked entries must be generated from
+  the same operation summary.
+- Failure mode / misleading interpretation: artifact presence without matching
+  operation status and audit evidence is not enough for formal comparison.
 - Artifact path: `artifact://lab/runs/<run_id>/run_manifest.json`.
 
 - Signal: tool qualification summary.

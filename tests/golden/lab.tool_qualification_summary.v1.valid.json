@@ -1,10 +1,27 @@
 {
   "schema_version": "lab.tool_qualification_summary.v1",
   "target_id": "pi4-demo",
+  "tools": [
+    {
+      "tool_id": "linux.procfs",
+      "status": "builtin",
+      "evidence_accepted": true
+    },
+    {
+      "tool_id": "adc-lab-builtin-cpu-load",
+      "status": "builtin_bounded",
+      "evidence_accepted": true
+    },
+    {
+      "tool_id": "linux.cpufreq.sysfs",
+      "status": "needs_control_test",
+      "evidence_accepted": false
+    }
+  ],
   "qualification_refs": [
     "artifact://lab/runs/LAB-RUN-001/tools/linux-procfs.qualification.json"
   ],
-  "evidence_accepted_tool_ids": ["linux.procfs"],
+  "evidence_accepted_tool_ids": ["linux.procfs", "adc-lab-builtin-cpu-load"],
   "evidence_rejected_tool_ids": ["linux.cpufreq.sysfs"],
   "missing_tool_ids": ["stress-ng"],
   "time_unix_ms": 1780000000000

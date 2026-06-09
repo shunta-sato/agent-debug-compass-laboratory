@@ -1125,11 +1125,36 @@ fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
     let manifest: serde_json::Value =
         serde_json::from_slice(&fs::read(temp.path().join("run_manifest.json")).unwrap()).unwrap();
     assert_eq!(manifest["mode"], "read_only_familiarization");
+    assert_eq!(
+        manifest["run_id"], value["run_id"],
+        "manifest and command output must share the same logical run_id"
+    );
+    assert_eq!(manifest["operations_summary"]["inventory"], "completed");
+    assert_eq!(
+        manifest["operations_summary"]["toolchain_discovery"],
+        "completed"
+    );
+    assert_eq!(
+        manifest["operations_summary"]["passive_observe"],
+        "completed"
+    );
+    assert_eq!(manifest["operations_summary"]["bounded_load"], "not_run");
+    assert!(!manifest["adc_lab_version"].as_str().unwrap().is_empty());
+    assert!(!manifest["adc_lab_git_sha"].as_str().unwrap().is_empty());
+    assert!(!manifest["adc_lab_target_version"]
+        .as_str()
+        .unwrap()
+        .is_empty());
+    assert!(manifest["release_tag"].as_str().unwrap().starts_with('v'));
+    assert!(manifest["binary_sha256"]["adc-lab"]
+        .as_str()
+        .unwrap()
+        .starts_with("sha256:"));
     assert!(manifest["data_quality"]["missing"]
         .as_array()
         .unwrap()
         .iter()
-        .any(|item| item == "no controlled operating point experiment was run"));
+        .any(|item| item == "controlled operating point experiment was not run"));
 
     let trace: serde_json::Value = serde_json::from_slice(
         &fs::read(temp.path().join("reports/claim_evidence_trace.json")).unwrap(),
@@ -1156,6 +1181,7 @@ fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
         "toolchain.discover",
         "observe",
         "tool.qualify_inventory",
+        "tool.version",
         "report.claim_trace",
         "run_manifest.write",
         "report.pack",

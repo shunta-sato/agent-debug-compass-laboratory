@@ -644,6 +644,8 @@ pub struct RunArtifactRef {
 #[serde(deny_unknown_fields)]
 pub struct RunDataQuality {
     pub missing: Vec<String>,
+    pub inconsistent: Vec<String>,
+    pub notes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -657,6 +659,15 @@ pub struct RunManifest {
     pub started_at_unix_ms: u64,
     pub ended_at_unix_ms: u64,
     pub adc_lab_version: String,
+    pub adc_lab_git_sha: String,
+    pub adc_lab_target_version: String,
+    pub adc_lab_target_git_sha: String,
+    pub release_tag: String,
+    pub release_asset: String,
+    pub release_asset_sha256: String,
+    pub binary_sha256: BTreeMap<String, String>,
+    pub operations_summary: BTreeMap<String, String>,
+    pub operation_audit_refs: BTreeMap<String, String>,
     pub artifacts: Vec<RunArtifactRef>,
     pub audit_ref: String,
     pub claim_trace_ref: Option<String>,
@@ -695,11 +706,20 @@ pub struct ToolQualification {
 pub struct ToolQualificationSummary {
     pub schema_version: String,
     pub target_id: String,
+    pub tools: Vec<ToolQualificationSummaryEntry>,
     pub qualification_refs: Vec<String>,
     pub evidence_accepted_tool_ids: Vec<String>,
     pub evidence_rejected_tool_ids: Vec<String>,
     pub missing_tool_ids: Vec<String>,
     pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ToolQualificationSummaryEntry {
+    pub tool_id: String,
+    pub status: String,
+    pub evidence_accepted: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -888,6 +908,7 @@ pub struct FamiliarizationPack {
     pub run_id: String,
     pub target_id: String,
     pub pack_status: String,
+    pub operations_summary: BTreeMap<String, String>,
     pub artifact_refs: Vec<String>,
     pub supported_claims: Vec<String>,
     pub blocked_claims: Vec<String>,
@@ -895,5 +916,6 @@ pub struct FamiliarizationPack {
     pub audit_event_count: usize,
     pub restore_status: String,
     pub claim_trace_ref: Option<String>,
+    pub tool_qualification_summary_ref: Option<String>,
     pub time_unix_ms: u64,
 }

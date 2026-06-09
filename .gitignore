@@ -1,6 +1,7 @@
 /.agents/
 /target/
 /lab/runs/
+/crates/adc-lab/lab/
 /baselines/resource/*.json
 !/baselines/resource/.gitkeep
 /reports/resource/*.json

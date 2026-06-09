@@ -1,10 +1,10 @@
 use crate::contracts::{
-    LoadResult, ObservedCapabilityResults, TargetCapabilityProfile, TargetCapabilityStatus,
-    WorkloadClass, WorkloadProfile,
+    LoadResult, ObservedCapabilityResults, RunManifest, TargetCapabilityProfile,
+    TargetCapabilityStatus, WorkloadClass, WorkloadProfile,
 };
 use crate::ids::now_unix_ms;
 use crate::observe::ObservationResult;
-use crate::{artifact_uri_for_run, LabError, LabResult};
+use crate::{artifact_uri_for_run, run_id_from_run_dir, LabError, LabResult};
 use serde::de::DeserializeOwned;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -18,6 +18,8 @@ pub fn target_capability_profile(
     let run_dir = run_dir.as_ref();
     let run_id = run_id_from_dir(run_dir);
     let evidence_pack_ref = artifact_ref_if_exists(run_dir, &run_id, "run_manifest.json")?;
+    let manifest: Option<RunManifest> =
+        read_json_artifact_if_exists(run_dir.join("run_manifest.json"))?;
     let load_artifacts = load_result_artifacts(run_dir, &run_id)?;
     let observation_artifacts = observation_artifacts(run_dir, &run_id)?;
     let observed_results = observed_capability_results(&load_artifacts, &observation_artifacts);
@@ -45,8 +47,8 @@ pub fn target_capability_profile(
         capability_status,
         selection_ready: false,
         supported_claims: supported_claims(&observed_results),
-        blocked_claims: blocked_claims(),
-        next_evidence_needed: next_evidence_needed(&observed_results),
+        blocked_claims: blocked_claims(manifest.as_ref()),
+        next_evidence_needed: next_evidence_needed(&observed_results, manifest.as_ref()),
         observed_results,
         evidence_refs,
         time_unix_ms: now_unix_ms(),
@@ -244,8 +246,8 @@ fn supported_claims(observed: &ObservedCapabilityResults) -> Vec<String> {
     claims
 }
 
-fn blocked_claims() -> Vec<String> {
-    vec![
+fn blocked_claims(manifest: Option<&RunManifest>) -> Vec<String> {
+    let mut claims = vec![
         "Pi4 is sufficient for this workload".to_string(),
         "Pi5 is required for this workload".to_string(),
         "battery safe".to_string(),
@@ -253,10 +255,20 @@ fn blocked_claims() -> Vec<String> {
         "all operating points measured".to_string(),
         "fixed-frequency behavior verified".to_string(),
         "low overhead under all operating points".to_string(),
-    ]
+    ];
+    if manifest_has_identity_inconsistency(manifest) {
+        claims.push(
+            "formal comparison requires matching adc-lab and adc-lab-target release identity"
+                .to_string(),
+        );
+    }
+    claims
 }
 
-fn next_evidence_needed(observed: &ObservedCapabilityResults) -> Vec<String> {
+fn next_evidence_needed(
+    observed: &ObservedCapabilityResults,
+    manifest: Option<&RunManifest>,
+) -> Vec<String> {
     let mut needed = Vec::new();
     if observed.observation_sample_count == 0 {
         needed.push("passive observation artifact for the workload run".to_string());
@@ -271,7 +283,23 @@ fn next_evidence_needed(observed: &ObservedCapabilityResults) -> Vec<String> {
         "latency/jitter measurement".to_string(),
         "battery/power and storage/write evidence".to_string(),
     ]);
+    if manifest_has_identity_inconsistency(manifest) {
+        needed.push("rerun with matching release binary identity and checksums".to_string());
+    }
     needed
+}
+
+fn manifest_has_identity_inconsistency(manifest: Option<&RunManifest>) -> bool {
+    manifest
+        .map(|manifest| {
+            manifest.data_quality.inconsistent.iter().any(|item| {
+                item.contains("adc-lab version")
+                    || item.contains("adc-lab git_sha")
+                    || item.contains("release manifest version")
+                    || item.contains("run_id")
+            })
+        })
+        .unwrap_or(false)
 }
 
 fn load_result_artifacts(run_dir: &Path, run_id: &str) -> LabResult<Vec<LoadArtifact>> {
@@ -333,6 +361,13 @@ fn read_json_artifact<T: DeserializeOwned>(path: &Path) -> LabResult<T> {
     })
 }
 
+fn read_json_artifact_if_exists<T: DeserializeOwned>(path: PathBuf) -> LabResult<Option<T>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    read_json_artifact(&path).map(Some)
+}
+
 fn artifact_ref_if_exists(
     run_dir: &Path,
     run_id: &str,
@@ -368,11 +403,7 @@ fn collect_files(path: &Path, out: &mut Vec<PathBuf>) -> LabResult<()> {
 }
 
 fn run_id_from_dir(run_dir: &Path) -> String {
-    run_dir
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("LAB-RUN-unknown")
-        .to_string()
+    run_id_from_run_dir(run_dir)
 }
 
 #[cfg(test)]
@@ -413,7 +444,7 @@ mod tests {
         std::fs::create_dir_all(temp.path().join("loads")).unwrap();
         write_json_pretty(
             temp.path().join("run_manifest.json"),
-            &serde_json::json!({}),
+            &valid_run_manifest_json(),
         )
         .unwrap();
         write_json_pretty(
@@ -496,6 +527,27 @@ mod tests {
     }
 
     #[test]
+    fn capability_profile_blocks_formal_comparison_when_toolchain_identity_is_inconsistent() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut manifest = valid_run_manifest_json();
+        manifest["data_quality"]["inconsistent"] = serde_json::json!([
+            "adc-lab version 0.1.10 does not match adc-lab-target version 0.1.9"
+        ]);
+        write_json_pretty(temp.path().join("run_manifest.json"), &manifest).unwrap();
+
+        let profile =
+            target_capability_profile(temp.path(), "pi4-demo".to_string(), workload()).unwrap();
+        assert!(!profile.selection_ready);
+        assert!(profile.blocked_claims.iter().any(|claim| {
+            claim.contains("formal comparison requires matching adc-lab and adc-lab-target")
+        }));
+        assert!(profile
+            .next_evidence_needed
+            .iter()
+            .any(|item| { item.contains("matching release binary identity") }));
+    }
+
+    #[test]
     fn capability_profile_rejects_bad_workload_schema_version() {
         let temp = tempfile::tempdir().unwrap();
         let mut workload = workload();
@@ -526,5 +578,46 @@ mod tests {
             ],
             claim_boundary: WorkloadClaimBoundary::SyntheticShortSmokeOnly,
         }
+    }
+
+    fn valid_run_manifest_json() -> serde_json::Value {
+        serde_json::json!({
+            "schema_version": "lab.run_manifest.v1",
+            "run_id": "LAB-RUN-001",
+            "target_id": "pi4-demo",
+            "target": "local",
+            "mode": "exploratory_short_smoke",
+            "started_at_unix_ms": 1,
+            "ended_at_unix_ms": 2,
+            "adc_lab_version": "0.1.10",
+            "adc_lab_git_sha": "test",
+            "adc_lab_target_version": "0.1.10",
+            "adc_lab_target_git_sha": "test",
+            "release_tag": "v0.1.10",
+            "release_asset": "adc-lab-v0.1.10-linux-x86_64.tar.gz",
+            "release_asset_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "binary_sha256": {
+                "adc-lab": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "adc-lab-target": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+            },
+            "operations_summary": {
+                "inventory": "completed",
+                "toolchain_discovery": "completed",
+                "passive_observe": "completed",
+                "bounded_load": "completed",
+                "privileged_control": "not_run",
+                "controlled_operating_point": "not_run",
+                "sustained_thermal": "not_run"
+            },
+            "operation_audit_refs": {},
+            "artifacts": [],
+            "audit_ref": "artifact://lab/runs/LAB-RUN-001/audit.jsonl",
+            "claim_trace_ref": null,
+            "data_quality": {
+                "missing": [],
+                "inconsistent": [],
+                "notes": []
+            }
+        })
     }
 }

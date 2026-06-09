@@ -1,5 +1,6 @@
-use crate::{LabError, LabResult};
+use crate::{build_info, BuildInfo, LabError, LabResult};
 use std::path::Path;
+use std::process::Command;
 
 pub const LOCAL_TARGET_ID: &str = "local-target";
 
@@ -95,6 +96,28 @@ pub fn validate_ssh_runner_program(value: &str) -> LabResult<()> {
         Err(LabError::Policy(
             "ADC_LAB_TARGET_RUNNER path is outside the adc-lab-target allowlist".to_string(),
         ))
+    }
+}
+
+pub fn target_runner_build_info(target: &TargetSpec) -> LabResult<BuildInfo> {
+    match target.transport {
+        TargetTransport::Local => Ok(build_info("adc-lab-target")),
+        TargetTransport::Ssh => {
+            let output = Command::new("ssh")
+                .arg(&target.endpoint)
+                .arg(ssh_runner_program()?)
+                .arg("--version")
+                .output()?;
+            if !output.status.success() {
+                return Err(LabError::Command(format!(
+                    "ssh target runner version failed: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                )));
+            }
+            let mut info: BuildInfo = serde_json::from_slice(&output.stdout)?;
+            info.name = "adc-lab-target".to_string();
+            Ok(info)
+        }
     }
 }
 
