@@ -3,7 +3,7 @@ use crate::BuildInfo;
 pub fn build_info(name: &str) -> BuildInfo {
     BuildInfo {
         name: name.to_string(),
-        version: env!("CARGO_PKG_VERSION").to_string(),
+        version: env!("ADC_LAB_VERSION").to_string(),
         git_sha: env!("ADC_LAB_GIT_SHA").to_string(),
         target_triple: env!("ADC_LAB_TARGET_TRIPLE").to_string(),
         build_profile: env!("ADC_LAB_BUILD_PROFILE").to_string(),

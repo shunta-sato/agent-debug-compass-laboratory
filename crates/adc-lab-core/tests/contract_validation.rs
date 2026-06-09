@@ -359,6 +359,7 @@ fn validate_schema(
 fn contract_validation_ci_workflow_runs_make_verify_with_read_only_contents() {
     let root = workspace_root();
     let workflow = fs::read_to_string(root.join(".github/workflows/ci.yml")).unwrap();
+    assert_workflow_yaml_parses(&workflow);
     assert!(workflow.contains("pull_request:"));
     assert!(workflow.contains("branches:"));
     assert!(workflow.contains("- main"));
@@ -371,6 +372,7 @@ fn contract_validation_ci_workflow_runs_make_verify_with_read_only_contents() {
 fn contract_validation_release_workflow_publishes_checksummed_assets_with_scoped_permissions() {
     let root = workspace_root();
     let workflow = fs::read_to_string(root.join(".github/workflows/release.yml")).unwrap();
+    assert_workflow_yaml_parses(&workflow);
     assert!(workflow.contains("tags:"));
     assert!(workflow.contains("'v*'"));
     assert!(workflow.contains("aarch64-unknown-linux-gnu"));
@@ -379,10 +381,18 @@ fn contract_validation_release_workflow_publishes_checksummed_assets_with_scoped
     assert!(workflow.contains("id-token: write"));
     assert!(workflow.contains("attestations: write"));
     assert!(workflow.contains("sha256sum -c SHA256SUMS"));
+    assert!(workflow.contains("ADC_LAB_VERSION=\"${{ steps.release.outputs.version }}\""));
+    assert!(workflow.contains("--notes-file release-notes.md"));
     assert!(workflow.contains("gh release create"));
     assert!(workflow.contains("actions/upload-artifact@v4"));
     assert!(workflow.contains("actions/download-artifact@v4"));
     assert!(workflow.contains("actions/attest-build-provenance@v2"));
+}
+
+fn assert_workflow_yaml_parses(workflow: &str) {
+    let parsed: serde_yaml::Value =
+        serde_yaml::from_str(workflow).expect("workflow yaml must parse");
+    assert!(parsed.is_mapping(), "workflow yaml must be a mapping");
 }
 
 #[test]
