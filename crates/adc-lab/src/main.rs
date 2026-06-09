@@ -598,6 +598,7 @@ fn command_restore(args: RestoreCommand) -> Result<()> {
 fn command_load_cpu(args: LoadCpuCommand) -> Result<()> {
     let target = TargetSpec::parse(&args.target)?;
     let run = create_or_open_run(args.run_dir)?;
+    persist_target_runner_version_if_absent(&run, &target)?;
     let duration = parse_duration(&args.duration)?;
     let result = match target.transport {
         TargetTransport::Local => {
@@ -652,6 +653,7 @@ fn command_load_cpu(args: LoadCpuCommand) -> Result<()> {
 fn command_experiment_run(args: ExperimentRunCommand) -> Result<()> {
     let target = TargetSpec::parse(&args.target)?;
     let run = create_or_open_run(args.run_dir)?;
+    persist_target_runner_version_if_absent(&run, &target)?;
     let matrix: ExperimentMatrix = read_yaml(&args.matrix)?;
     let (experiment_run, claim_trace) = if args.dry_run {
         run_experiment_matrix(&matrix, run.run_id.clone(), target.target_id.clone(), true)?
@@ -1013,13 +1015,7 @@ fn command_familiarize_read_only(args: FamiliarizeReadOnlyCommand) -> Result<()>
 
 fn command_report_pack(args: ReportPackCommand) -> Result<()> {
     let run = existing_run_context(args.run);
-    if !run
-        .run_dir
-        .join("reports/claim_evidence_trace.json")
-        .exists()
-    {
-        persist_read_only_claim_trace(&run, args.target_id.clone())?;
-    }
+    persist_read_only_claim_trace(&run, args.target_id.clone())?;
     let now = now_unix_ms();
     persist_run_manifest(&run, args.target_id.clone(), args.target, now, now)?;
     let (pack, path, _) = persist_familiarization_pack(&run, args.target_id)?;
@@ -1375,6 +1371,7 @@ fn persist_inventory(
     run: &RunContext,
     target: &TargetSpec,
 ) -> Result<(TargetInventory, PathBuf, String)> {
+    persist_target_runner_version_if_absent(run, target)?;
     let inventory = collect_inventory(target)?;
     let path = run.run_dir.join("inventory/target_inventory.json");
     let artifact_ref = write_json_artifact(run, &path, &inventory)?;
@@ -1398,6 +1395,7 @@ fn persist_toolchain(
     run: &RunContext,
     target: &TargetSpec,
 ) -> Result<(ToolchainInventory, PathBuf, String)> {
+    persist_target_runner_version_if_absent(run, target)?;
     let inventory = discover_toolchain(target)?;
     let path = run.run_dir.join("toolchain/toolchain_inventory.json");
     let artifact_ref = write_json_artifact(run, &path, &inventory)?;
@@ -1459,6 +1457,7 @@ fn persist_observation(
     interval: Duration,
     signals: Vec<Signal>,
 ) -> Result<(ObservationResult, PathBuf, String)> {
+    persist_target_runner_version_if_absent(run, target)?;
     let observation = match target.transport {
         TargetTransport::Local => {
             observe_local(target.target_id.clone(), duration, interval, signals)?
@@ -1513,6 +1512,7 @@ fn persist_run_manifest(
     started_at_unix_ms: u64,
     ended_at_unix_ms: u64,
 ) -> Result<(RunManifest, PathBuf, String)> {
+    persist_controller_version_if_absent(run)?;
     append_audit_event(
         run,
         AuditInput {
@@ -1532,11 +1532,56 @@ fn persist_run_manifest(
         target,
         started_at_unix_ms,
         ended_at_unix_ms,
-        env!("CARGO_PKG_VERSION").to_string(),
+        build_info("adc-lab"),
     )?;
     let path = run.run_dir.join("run_manifest.json");
     let artifact_ref = write_json_artifact(run, &path, &manifest)?;
     Ok((manifest, path, artifact_ref))
+}
+
+fn persist_controller_version_if_absent(run: &RunContext) -> Result<()> {
+    let path = run.run_dir.join("tools/adc-lab.version.json");
+    if path.exists() {
+        return Ok(());
+    }
+    write_json_artifact(run, &path, &build_info("adc-lab"))?;
+    append_audit_event(
+        run,
+        AuditInput {
+            target_id: "controller".to_string(),
+            actor: Actor::codex(),
+            operation: "tool.version".to_string(),
+            operation_id: Some("adc-lab".to_string()),
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: "recorded".to_string(),
+        },
+    )?;
+    Ok(())
+}
+
+fn persist_target_runner_version_if_absent(run: &RunContext, target: &TargetSpec) -> Result<()> {
+    let path = run.run_dir.join("tools/adc-lab-target.version.json");
+    if path.exists() {
+        return Ok(());
+    }
+    let info = target_runner_build_info(target)?;
+    write_json_artifact(run, &path, &info)?;
+    append_audit_event(
+        run,
+        AuditInput {
+            target_id: target.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "tool.version".to_string(),
+            operation_id: Some("adc-lab-target".to_string()),
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: "recorded".to_string(),
+        },
+    )?;
+    Ok(())
 }
 
 fn persist_familiarization_pack(

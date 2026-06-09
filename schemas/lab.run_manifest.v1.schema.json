@@ -3,16 +3,44 @@
   "$id": "lab.run_manifest.v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "run_id", "target_id", "target", "mode", "started_at_unix_ms", "ended_at_unix_ms", "adc_lab_version", "artifacts", "audit_ref", "claim_trace_ref", "data_quality"],
+  "required": ["schema_version", "run_id", "target_id", "target", "mode", "started_at_unix_ms", "ended_at_unix_ms", "adc_lab_version", "adc_lab_git_sha", "adc_lab_target_version", "adc_lab_target_git_sha", "release_tag", "release_asset", "release_asset_sha256", "binary_sha256", "operations_summary", "operation_audit_refs", "artifacts", "audit_ref", "claim_trace_ref", "data_quality"],
   "properties": {
     "schema_version": { "const": "lab.run_manifest.v1" },
     "run_id": { "type": "string", "minLength": 1 },
     "target_id": { "type": "string", "minLength": 1 },
     "target": { "type": "string", "minLength": 1 },
-    "mode": { "enum": ["read_only_familiarization"] },
+    "mode": { "enum": ["read_only_familiarization", "exploratory_short_smoke"] },
     "started_at_unix_ms": { "type": "integer", "minimum": 0 },
     "ended_at_unix_ms": { "type": "integer", "minimum": 0 },
     "adc_lab_version": { "type": "string", "minLength": 1 },
+    "adc_lab_git_sha": { "type": "string", "minLength": 1 },
+    "adc_lab_target_version": { "type": "string", "minLength": 1 },
+    "adc_lab_target_git_sha": { "type": "string", "minLength": 1 },
+    "release_tag": { "type": "string", "minLength": 1 },
+    "release_asset": { "type": "string", "minLength": 1 },
+    "release_asset_sha256": { "type": "string", "minLength": 1 },
+    "binary_sha256": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "operations_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inventory", "toolchain_discovery", "passive_observe", "bounded_load", "privileged_control", "controlled_operating_point", "sustained_thermal"],
+      "properties": {
+        "inventory": { "enum": ["completed", "not_run"] },
+        "toolchain_discovery": { "enum": ["completed", "not_run"] },
+        "passive_observe": { "enum": ["completed", "not_run"] },
+        "bounded_load": { "enum": ["completed", "not_run"] },
+        "privileged_control": { "enum": ["completed", "not_run"] },
+        "controlled_operating_point": { "enum": ["completed", "not_run"] },
+        "sustained_thermal": { "enum": ["completed", "not_run"] }
+      }
+    },
+    "operation_audit_refs": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
     "artifacts": {
       "type": "array",
       "items": {
@@ -31,9 +59,11 @@
     "data_quality": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["missing"],
+      "required": ["missing", "inconsistent", "notes"],
       "properties": {
-        "missing": { "type": "array", "items": { "type": "string" } }
+        "missing": { "type": "array", "items": { "type": "string" } },
+        "inconsistent": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "array", "items": { "type": "string" } }
       }
     }
   }

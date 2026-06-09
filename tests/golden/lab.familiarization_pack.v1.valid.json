@@ -2,19 +2,36 @@
   "schema_version": "lab.familiarization_pack.v1",
   "run_id": "LAB-RUN-001",
   "target_id": "pi4-target55",
-  "pack_status": "observational_read_only",
-  "artifact_refs": ["artifact://lab/runs/LAB-RUN-001/audit.jsonl"],
+  "pack_status": "exploratory_short_smoke",
+  "operations_summary": {
+    "inventory": "completed",
+    "toolchain_discovery": "completed",
+    "passive_observe": "completed",
+    "bounded_load": "completed",
+    "privileged_control": "not_run",
+    "controlled_operating_point": "not_run",
+    "sustained_thermal": "not_run"
+  },
+  "artifact_refs": [
+    "artifact://lab/runs/LAB-RUN-001/audit.jsonl",
+    "artifact://lab/runs/LAB-RUN-001/loads/LOAD-001.result.json",
+    "artifact://lab/runs/LAB-RUN-001/tools/tool_qualification_summary.json"
+  ],
   "supported_claims": [
-    "target inventory was collected through read-only surfaces"
+    "target inventory was collected through read-only surfaces",
+    "target completed bounded CPU load short-smoke under configured safety bounds"
   ],
   "blocked_claims": [
-    "fixed CPU frequency behavior was not verified"
+    "fixed CPU frequency behavior was not verified",
+    "thermally safe for sustained production load"
   ],
   "next_evidence_needed": [
-    "controlled operating point matrix"
+    "controlled operating point matrix",
+    "sustained thermal run"
   ],
-  "audit_event_count": 1,
+  "audit_event_count": 4,
   "restore_status": "pending_or_recorded",
   "claim_trace_ref": "artifact://lab/runs/LAB-RUN-001/reports/claim_evidence_trace.json",
+  "tool_qualification_summary_ref": "artifact://lab/runs/LAB-RUN-001/tools/tool_qualification_summary.json",
   "time_unix_ms": 1780000000000
 }

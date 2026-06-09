@@ -3,10 +3,36 @@
   "run_id": "LAB-RUN-001",
   "target_id": "pi4-target55",
   "target": "ssh://pi4",
-  "mode": "read_only_familiarization",
+  "mode": "exploratory_short_smoke",
   "started_at_unix_ms": 1780000000000,
   "ended_at_unix_ms": 1780000030000,
-  "adc_lab_version": "0.1.0",
+  "adc_lab_version": "0.1.10",
+  "adc_lab_git_sha": "291defb",
+  "adc_lab_target_version": "0.1.10",
+  "adc_lab_target_git_sha": "291defb",
+  "release_tag": "v0.1.10",
+  "release_asset": "adc-lab-v0.1.10-linux-aarch64.tar.gz",
+  "release_asset_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "binary_sha256": {
+    "adc-lab": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "adc-lab-target": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "operations_summary": {
+    "inventory": "completed",
+    "toolchain_discovery": "completed",
+    "passive_observe": "completed",
+    "bounded_load": "completed",
+    "privileged_control": "not_run",
+    "controlled_operating_point": "not_run",
+    "sustained_thermal": "not_run"
+  },
+  "operation_audit_refs": {
+    "inventory": "artifact://lab/runs/LAB-RUN-001/audit.jsonl",
+    "load.cpu": "artifact://lab/runs/LAB-RUN-001/audit.jsonl",
+    "observe": "artifact://lab/runs/LAB-RUN-001/audit.jsonl",
+    "tool.qualify_inventory": "artifact://lab/runs/LAB-RUN-001/audit.jsonl",
+    "toolchain.discover": "artifact://lab/runs/LAB-RUN-001/audit.jsonl"
+  },
   "artifacts": [
     {
       "name": "target_inventory",
@@ -23,7 +49,11 @@
   "claim_trace_ref": "artifact://lab/runs/LAB-RUN-001/reports/claim_evidence_trace.json",
   "data_quality": {
     "missing": [
-      "no controlled operating point experiment was run"
+      "controlled operating point experiment was not run"
+    ],
+    "inconsistent": [],
+    "notes": [
+      "bounded non-root CPU load short-smoke was run"
     ]
   }
 }

@@ -1,6 +1,6 @@
 use crate::contracts::{
     PrivilegeLevel, QualificationStatus, ToolCategory, ToolInfo, ToolQualification,
-    ToolQualificationSummary, ToolSource, ToolchainInventory,
+    ToolQualificationSummary, ToolQualificationSummaryEntry, ToolSource, ToolchainInventory,
 };
 use crate::ids::now_unix_ms;
 use crate::{LabError, LabResult};
@@ -295,9 +295,15 @@ pub fn summarize_tool_qualifications(
     let mut evidence_accepted_tool_ids = Vec::new();
     let mut evidence_rejected_tool_ids = Vec::new();
     let mut missing_tool_ids = Vec::new();
+    let mut tools = Vec::new();
 
     for (report, artifact_ref) in reports {
         qualification_refs.push(artifact_ref.clone());
+        tools.push(ToolQualificationSummaryEntry {
+            tool_id: report.tool_id.clone(),
+            status: summary_status(report),
+            evidence_accepted: report.evidence_accepted,
+        });
         if report.evidence_accepted {
             evidence_accepted_tool_ids.push(report.tool_id.clone());
         } else {
@@ -311,11 +317,26 @@ pub fn summarize_tool_qualifications(
     ToolQualificationSummary {
         schema_version: "lab.tool_qualification_summary.v1".to_string(),
         target_id,
+        tools,
         qualification_refs,
         evidence_accepted_tool_ids,
         evidence_rejected_tool_ids,
         missing_tool_ids,
         time_unix_ms: now_unix_ms(),
+    }
+}
+
+fn summary_status(report: &ToolQualification) -> String {
+    if report.status == QualificationStatus::Builtin
+        && report.category == ToolCategory::Load
+        && report.privilege == PrivilegeLevel::User
+    {
+        "builtin_bounded".to_string()
+    } else {
+        serde_json::to_string(&report.status)
+            .unwrap_or_else(|_| "\"unknown\"".to_string())
+            .trim_matches('"')
+            .to_string()
     }
 }
 
