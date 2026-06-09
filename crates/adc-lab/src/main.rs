@@ -1,3 +1,4 @@
+use adc_lab_core::ids::now_unix_ms;
 use adc_lab_core::*;
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
@@ -34,6 +35,10 @@ enum Commands {
     Experiment {
         #[command(subcommand)]
         command: ExperimentCommand,
+    },
+    Familiarize {
+        #[command(subcommand)]
+        command: FamiliarizeCommand,
     },
     Report {
         #[command(subcommand)]
@@ -158,6 +163,28 @@ enum ExperimentCommand {
     Run(ExperimentRunCommand),
 }
 
+#[derive(Debug, Subcommand)]
+enum FamiliarizeCommand {
+    #[command(name = "read-only")]
+    ReadOnly(FamiliarizeReadOnlyCommand),
+}
+
+#[derive(Debug, Args)]
+struct FamiliarizeReadOnlyCommand {
+    #[arg(long, default_value = "local")]
+    target: String,
+    #[arg(long)]
+    duration: String,
+    #[arg(long, default_value = "1s")]
+    sample_interval: String,
+    #[arg(long, value_delimiter = ',')]
+    signals: Vec<Signal>,
+    #[arg(long)]
+    run_dir: Option<PathBuf>,
+    #[arg(long)]
+    json: bool,
+}
+
 #[derive(Debug, Args)]
 struct ExperimentRunCommand {
     #[arg(long, default_value = "local")]
@@ -184,6 +211,8 @@ struct ReportPackCommand {
     run: PathBuf,
     #[arg(long, default_value = "unknown-target")]
     target_id: String,
+    #[arg(long, default_value = "unknown-target")]
+    target: String,
     #[arg(long)]
     json: bool,
 }
@@ -206,8 +235,19 @@ struct ToolQualifyCommand {
 #[derive(Debug, Serialize)]
 #[serde(deny_unknown_fields)]
 struct ArtifactOutput<T: Serialize> {
-    artifact_path: String,
+    artifact_ref: String,
     value: T,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ReadOnlyFamiliarizeOutput {
+    run_id: String,
+    target_id: String,
+    run_manifest_ref: String,
+    familiarization_pack_ref: String,
+    claim_trace_ref: String,
+    value: FamiliarizationPack,
 }
 
 #[derive(Debug, Serialize)]
@@ -239,6 +279,9 @@ fn main() -> Result<()> {
         Commands::Experiment { command } => match command {
             ExperimentCommand::Run(args) => command_experiment_run(args),
         },
+        Commands::Familiarize { command } => match command {
+            FamiliarizeCommand::ReadOnly(args) => command_familiarize_read_only(args),
+        },
         Commands::Report { command } => match command {
             ReportCommand::Pack(args) => command_report_pack(args),
             ReportCommand::OperatingPoint(args) => command_report_operating_point(args),
@@ -255,7 +298,7 @@ fn command_inventory(args: TargetCommand) -> Result<()> {
     let run = create_or_open_run(args.run_dir)?;
     let inventory = collect_inventory(&target)?;
     let path = run.run_dir.join("inventory/target_inventory.json");
-    write_json_pretty(&path, &inventory)?;
+    write_json_artifact(&run, &path, &inventory)?;
     append_audit_event(
         &run,
         AuditInput {
@@ -269,10 +312,7 @@ fn command_inventory(args: TargetCommand) -> Result<()> {
             result: "collected".to_string(),
         },
     )?;
-    print_json(&ArtifactOutput {
-        artifact_path: path.display().to_string(),
-        value: inventory,
-    })
+    print_artifact(&run, &path, inventory)
 }
 
 fn command_toolchain_discover(args: TargetCommand) -> Result<()> {
@@ -280,7 +320,7 @@ fn command_toolchain_discover(args: TargetCommand) -> Result<()> {
     let run = create_or_open_run(args.run_dir)?;
     let inventory = discover_toolchain(&target)?;
     let path = run.run_dir.join("toolchain/toolchain_inventory.json");
-    write_json_pretty(&path, &inventory)?;
+    write_json_artifact(&run, &path, &inventory)?;
     append_audit_event(
         &run,
         AuditInput {
@@ -294,10 +334,7 @@ fn command_toolchain_discover(args: TargetCommand) -> Result<()> {
             result: "collected".to_string(),
         },
     )?;
-    print_json(&ArtifactOutput {
-        artifact_path: path.display().to_string(),
-        value: inventory,
-    })
+    print_artifact(&run, &path, inventory)
 }
 
 fn command_observe(args: ObserveCommand) -> Result<()> {
@@ -317,7 +354,7 @@ fn command_observe(args: ObserveCommand) -> Result<()> {
         TargetTransport::Ssh => observe_ssh(&target, duration, interval, &signals)?,
     };
     let path = run.run_dir.join("observations/observe.json");
-    write_json_pretty(&path, &observation)?;
+    write_json_artifact(&run, &path, &observation)?;
     append_audit_event(
         &run,
         AuditInput {
@@ -331,10 +368,7 @@ fn command_observe(args: ObserveCommand) -> Result<()> {
             result: "collected".to_string(),
         },
     )?;
-    print_json(&ArtifactOutput {
-        artifact_path: path.display().to_string(),
-        value: observation,
-    })
+    print_artifact(&run, &path, observation)
 }
 
 fn command_control_plan(args: ControlPlanCommand) -> Result<()> {
@@ -357,7 +391,7 @@ fn command_control_plan(args: ControlPlanCommand) -> Result<()> {
         .run_dir
         .join("plans")
         .join(format!("{}.json", plan.plan_id));
-    write_json_pretty(&path, &plan)?;
+    write_json_artifact(&run, &path, &plan)?;
     append_audit_event(
         &run,
         AuditInput {
@@ -371,10 +405,7 @@ fn command_control_plan(args: ControlPlanCommand) -> Result<()> {
             result: "planned".to_string(),
         },
     )?;
-    print_json(&ArtifactOutput {
-        artifact_path: path.display().to_string(),
-        value: plan,
-    })
+    print_artifact(&run, &path, plan)
 }
 
 fn command_control_apply(args: ControlApplyCommand) -> Result<()> {
@@ -435,7 +466,7 @@ fn command_load_cpu(args: LoadCpuCommand) -> Result<()> {
                 .run_dir
                 .join("loads")
                 .join(format!("{}.plan.json", plan.load_id));
-            write_json_pretty(&plan_path, &plan)?;
+            write_json_artifact(&run, &plan_path, &plan)?;
             run_cpu_load(&plan)?
         }
         TargetTransport::Ssh => load_cpu_ssh(&target, args.workers, duration, args.abort_temp_c)?,
@@ -444,7 +475,7 @@ fn command_load_cpu(args: LoadCpuCommand) -> Result<()> {
         .run_dir
         .join("loads")
         .join(format!("{}.result.json", result.load_id));
-    write_json_pretty(&path, &result)?;
+    write_json_artifact(&run, &path, &result)?;
     append_audit_event(
         &run,
         AuditInput {
@@ -458,10 +489,7 @@ fn command_load_cpu(args: LoadCpuCommand) -> Result<()> {
             result: result.status.clone(),
         },
     )?;
-    print_json(&ArtifactOutput {
-        artifact_path: path.display().to_string(),
-        value: result,
-    })
+    print_artifact(&run, &path, result)
 }
 
 fn command_experiment_run(args: ExperimentRunCommand) -> Result<()> {
@@ -476,8 +504,8 @@ fn command_experiment_run(args: ExperimentRunCommand) -> Result<()> {
     );
     let run_path = run.run_dir.join("experiments/experiment_run.json");
     let trace_path = run.run_dir.join("reports/claim_evidence_trace.json");
-    write_json_pretty(&run_path, &experiment_run)?;
-    write_json_pretty(&trace_path, &claim_trace)?;
+    write_json_artifact(&run, &run_path, &experiment_run)?;
+    write_json_artifact(&run, &trace_path, &claim_trace)?;
     append_audit_event(
         &run,
         AuditInput {
@@ -496,38 +524,78 @@ fn command_experiment_run(args: ExperimentRunCommand) -> Result<()> {
             .to_string(),
         },
     )?;
-    print_json(&ArtifactOutput {
-        artifact_path: run_path.display().to_string(),
-        value: experiment_run,
-    })
+    print_artifact(&run, &run_path, experiment_run)
 }
 
-fn command_report_pack(args: ReportPackCommand) -> Result<()> {
-    let pack = pack_run(&args.run, args.target_id)?;
-    let path = args.run.join("reports/familiarization_pack.json");
-    write_json_pretty(&path, &pack)?;
-    print_json(&ArtifactOutput {
-        artifact_path: path.display().to_string(),
+fn command_familiarize_read_only(args: FamiliarizeReadOnlyCommand) -> Result<()> {
+    let target = TargetSpec::parse(&args.target)?;
+    let run = create_or_open_run(args.run_dir)?;
+    let started_at = now_unix_ms();
+    let duration = parse_duration(&args.duration)?;
+    let interval = parse_duration(&args.sample_interval)?;
+    let signals = if args.signals.is_empty() {
+        vec![Signal::Cpu, Signal::Freq, Signal::Thermal, Signal::Memory]
+    } else {
+        args.signals
+    };
+
+    persist_inventory(&run, &target)?;
+    persist_toolchain(&run, &target)?;
+    persist_observation(&run, &target, duration, interval, signals)?;
+    let (_, _, claim_trace_ref) = persist_read_only_claim_trace(&run, target.target_id.clone())?;
+    let ended_at = now_unix_ms();
+    let (_, _, run_manifest_ref) = persist_run_manifest(
+        &run,
+        target.target_id.clone(),
+        target.raw.clone(),
+        started_at,
+        ended_at,
+    )?;
+    let (pack, _, familiarization_pack_ref) =
+        persist_familiarization_pack(&run, target.target_id.clone())?;
+
+    print_json(&ReadOnlyFamiliarizeOutput {
+        run_id: run.run_id,
+        target_id: target.target_id,
+        run_manifest_ref,
+        familiarization_pack_ref,
+        claim_trace_ref,
         value: pack,
     })
 }
 
+fn command_report_pack(args: ReportPackCommand) -> Result<()> {
+    let run = existing_run_context(args.run);
+    if !run
+        .run_dir
+        .join("reports/claim_evidence_trace.json")
+        .exists()
+    {
+        persist_read_only_claim_trace(&run, args.target_id.clone())?;
+    }
+    let now = now_unix_ms();
+    persist_run_manifest(&run, args.target_id.clone(), args.target, now, now)?;
+    let (pack, path, _) = persist_familiarization_pack(&run, args.target_id)?;
+    print_artifact(&run, &path, pack)
+}
+
 fn command_report_operating_point(args: ReportPackCommand) -> Result<()> {
-    let run_id = args
-        .run
+    let run = existing_run_context(args.run);
+    let run_id = run
+        .run_dir
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("LAB-RUN-unknown")
         .to_string();
     let coverage = operating_point_coverage(run_id.clone(), args.target_id.clone());
     let cost = capability_cost_model(run_id, args.target_id);
-    let coverage_path = args.run.join("reports/operating_point_coverage.json");
-    let cost_path = args.run.join("reports/capability_cost_model.json");
-    write_json_pretty(&coverage_path, &coverage)?;
-    write_json_pretty(&cost_path, &cost)?;
+    let coverage_path = run.run_dir.join("reports/operating_point_coverage.json");
+    let cost_path = run.run_dir.join("reports/capability_cost_model.json");
+    let coverage_ref = write_json_artifact(&run, &coverage_path, &coverage)?;
+    let cost_ref = write_json_artifact(&run, &cost_path, &cost)?;
     print_json(&serde_json::json!({
-        "operating_point_coverage_path": coverage_path,
-        "capability_cost_model_path": cost_path,
+        "operating_point_coverage_ref": coverage_ref,
+        "capability_cost_model_ref": cost_ref,
         "coverage": coverage,
         "cost_model": cost
     }))
@@ -559,7 +627,7 @@ fn command_tool_qualify(args: ToolQualifyCommand) -> Result<()> {
         .run_dir
         .join("tools")
         .join(format!("{}.qualification.json", report.tool_id));
-    write_json_pretty(&path, &report)?;
+    write_json_artifact(&run, &path, &report)?;
     append_audit_event(
         &run,
         AuditInput {
@@ -573,10 +641,163 @@ fn command_tool_qualify(args: ToolQualifyCommand) -> Result<()> {
             result: "recorded_unqualified".to_string(),
         },
     )?;
-    print_json(&ArtifactOutput {
-        artifact_path: path.display().to_string(),
-        value: report,
-    })
+    print_artifact(&run, &path, report)
+}
+
+fn persist_inventory(
+    run: &RunContext,
+    target: &TargetSpec,
+) -> Result<(TargetInventory, PathBuf, String)> {
+    let inventory = collect_inventory(target)?;
+    let path = run.run_dir.join("inventory/target_inventory.json");
+    let artifact_ref = write_json_artifact(run, &path, &inventory)?;
+    append_audit_event(
+        run,
+        AuditInput {
+            target_id: inventory.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "inventory".to_string(),
+            operation_id: None,
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: "collected".to_string(),
+        },
+    )?;
+    Ok((inventory, path, artifact_ref))
+}
+
+fn persist_toolchain(
+    run: &RunContext,
+    target: &TargetSpec,
+) -> Result<(ToolchainInventory, PathBuf, String)> {
+    let inventory = discover_toolchain(target)?;
+    let path = run.run_dir.join("toolchain/toolchain_inventory.json");
+    let artifact_ref = write_json_artifact(run, &path, &inventory)?;
+    append_audit_event(
+        run,
+        AuditInput {
+            target_id: inventory.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "toolchain.discover".to_string(),
+            operation_id: None,
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: "collected".to_string(),
+        },
+    )?;
+    Ok((inventory, path, artifact_ref))
+}
+
+fn persist_observation(
+    run: &RunContext,
+    target: &TargetSpec,
+    duration: Duration,
+    interval: Duration,
+    signals: Vec<Signal>,
+) -> Result<(ObservationResult, PathBuf, String)> {
+    let observation = match target.transport {
+        TargetTransport::Local => {
+            observe_local(target.target_id.clone(), duration, interval, signals)?
+        }
+        TargetTransport::Ssh => observe_ssh(target, duration, interval, &signals)?,
+    };
+    let path = run.run_dir.join("observations/observe.json");
+    let artifact_ref = write_json_artifact(run, &path, &observation)?;
+    append_audit_event(
+        run,
+        AuditInput {
+            target_id: observation.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "observe".to_string(),
+            operation_id: None,
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: "collected".to_string(),
+        },
+    )?;
+    Ok((observation, path, artifact_ref))
+}
+
+fn persist_read_only_claim_trace(
+    run: &RunContext,
+    target_id: String,
+) -> Result<(ClaimEvidenceTrace, PathBuf, String)> {
+    let trace = read_only_claim_trace(&run.run_dir, target_id.clone())?;
+    let path = run.run_dir.join("reports/claim_evidence_trace.json");
+    let artifact_ref = write_json_artifact(run, &path, &trace)?;
+    append_audit_event(
+        run,
+        AuditInput {
+            target_id,
+            actor: Actor::codex(),
+            operation: "report.claim_trace".to_string(),
+            operation_id: None,
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: "recorded".to_string(),
+        },
+    )?;
+    Ok((trace, path, artifact_ref))
+}
+
+fn persist_run_manifest(
+    run: &RunContext,
+    target_id: String,
+    target: String,
+    started_at_unix_ms: u64,
+    ended_at_unix_ms: u64,
+) -> Result<(RunManifest, PathBuf, String)> {
+    append_audit_event(
+        run,
+        AuditInput {
+            target_id: target_id.clone(),
+            actor: Actor::codex(),
+            operation: "run_manifest.write".to_string(),
+            operation_id: None,
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: "recorded".to_string(),
+        },
+    )?;
+    let manifest = run_manifest(
+        &run.run_dir,
+        target_id,
+        target,
+        started_at_unix_ms,
+        ended_at_unix_ms,
+        env!("CARGO_PKG_VERSION").to_string(),
+    )?;
+    let path = run.run_dir.join("run_manifest.json");
+    let artifact_ref = write_json_artifact(run, &path, &manifest)?;
+    Ok((manifest, path, artifact_ref))
+}
+
+fn persist_familiarization_pack(
+    run: &RunContext,
+    target_id: String,
+) -> Result<(FamiliarizationPack, PathBuf, String)> {
+    append_audit_event(
+        run,
+        AuditInput {
+            target_id: target_id.clone(),
+            actor: Actor::codex(),
+            operation: "report.pack".to_string(),
+            operation_id: None,
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: "recorded".to_string(),
+        },
+    )?;
+    let pack = pack_run(&run.run_dir, target_id)?;
+    let path = run.run_dir.join("reports/familiarization_pack.json");
+    let artifact_ref = write_json_artifact(run, &path, &pack)?;
+    Ok((pack, path, artifact_ref))
 }
 
 fn persist_control_result(
@@ -762,6 +983,28 @@ fn load_cpu_ssh(
     let mut result: LoadResult = serde_json::from_slice(&output.stdout)?;
     result.target_id = target.target_id.clone();
     Ok(result)
+}
+
+fn existing_run_context(run_dir: PathBuf) -> RunContext {
+    let run_id = run_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("LAB-RUN-unknown")
+        .to_string();
+    RunContext { run_id, run_dir }
+}
+
+fn write_json_artifact<T: Serialize>(run: &RunContext, path: &Path, value: &T) -> Result<String> {
+    write_json_pretty(path, value)?;
+    Ok(run.artifact_uri(path)?)
+}
+
+fn print_artifact<T: Serialize>(run: &RunContext, path: &Path, value: T) -> Result<()> {
+    let artifact_ref = run.artifact_uri(path)?;
+    print_json(&ArtifactOutput {
+        artifact_ref,
+        value,
+    })
 }
 
 fn print_json<T: Serialize>(value: &T) -> Result<()> {

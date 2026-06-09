@@ -14,6 +14,10 @@
 | `inventory` | explain target fingerprint collection | CLI start to artifact write |
 | `toolchain.discover` | explain evidence-source availability | CLI start to artifact write |
 | `observe` | explain bounded read-only sampling | CLI start to observation artifact |
+| `familiarize.read_only` | explain read-only evidence pack generation | CLI start to manifest and pack artifacts |
+| `report.claim_trace` | explain claim-boundary artifact generation | CLI start to claim trace artifact |
+| `run_manifest.write` | explain run manifest generation | CLI start to manifest artifact |
+| `report.pack` | explain familiarization pack generation | CLI start to pack artifact |
 | `control.plan` | explain planned state change | CLI start to plan artifact |
 | `control.apply` | explain privileged apply result, refusal, or restore-after-failure outcome | CLI start to helper/core result |
 | `restore` | explain restore result | CLI start to helper/core result |
@@ -71,3 +75,11 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
 - Counter-metric: audit result for `experiment.run`.
 - Failure mode / misleading interpretation: planned matrix factors are not observed behavior.
 - Artifact path: `artifact://lab/runs/<run_id>/reports/claim_evidence_trace.json`.
+
+- Signal: read-only run manifest.
+- Decision supported: whether read-only target familiarization has inventory, toolchain, observation, audit, and claim trace artifacts.
+- Action owner: lab operator or agent reviewing the run.
+- Expected action when degraded: inspect `data_quality.missing`, rerun missing read-only operations, and keep control/load/production claims blocked.
+- Counter-metric: familiarization pack `blocked_claims` and claim trace blocked entries.
+- Failure mode / misleading interpretation: a complete read-only pack is still not controlled operating-point, load, battery, flash, or production evidence.
+- Artifact path: `artifact://lab/runs/<run_id>/run_manifest.json`.

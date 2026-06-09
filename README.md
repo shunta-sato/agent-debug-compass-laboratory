@@ -34,6 +34,7 @@ Target-specific live-run artifacts that are useful as examples live under `examp
 adc-lab inventory --target local
 adc-lab toolchain discover --target local
 adc-lab observe --target local --duration 5s --signals cpu,freq,thermal,memory
+adc-lab familiarize read-only --target local --duration 5s --signals cpu,freq,thermal,memory
 
 adc-lab control plan --target local cpu.governor --set performance
 adc-lab control apply --plan lab/runs/LAB-RUN-.../plans/PLAN-....json --dry-run

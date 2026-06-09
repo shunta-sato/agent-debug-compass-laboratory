@@ -1,0 +1,29 @@
+{
+  "schema_version": "lab.run_manifest.v1",
+  "run_id": "LAB-RUN-001",
+  "target_id": "pi4-target55",
+  "target": "ssh://pi4",
+  "mode": "read_only_familiarization",
+  "started_at_unix_ms": 1780000000000,
+  "ended_at_unix_ms": 1780000030000,
+  "adc_lab_version": "0.1.0",
+  "artifacts": [
+    {
+      "name": "target_inventory",
+      "ref": "artifact://lab/runs/LAB-RUN-001/inventory/target_inventory.json",
+      "schema_version": "lab.target_inventory.v1"
+    },
+    {
+      "name": "audit_log",
+      "ref": "artifact://lab/runs/LAB-RUN-001/audit.jsonl",
+      "schema_version": "lab.audit_event.v1"
+    }
+  ],
+  "audit_ref": "artifact://lab/runs/LAB-RUN-001/audit.jsonl",
+  "claim_trace_ref": "artifact://lab/runs/LAB-RUN-001/reports/claim_evidence_trace.json",
+  "data_quality": {
+    "missing": [
+      "no controlled operating point experiment was run"
+    ]
+  }
+}
