@@ -58,6 +58,10 @@ modes:
       - target_evidence_partial
       - cost_model_ready_for_lab_claims
     capability_cost_blocks_architecture_recommendations_without_cost_evidence: true
+    agent_adapter_qualification_target_runtime: none
+    agent_adapter_qualification_executes_adapter: false
+    agent_adapter_qualification_duration_seconds_max: 30
+    agent_adapter_qualification_output_bytes_max: 1048576
     cpu_percent_max: null
     wakeups_per_second_added_max: null
     disk_write_bytes_total_max: null
@@ -81,6 +85,7 @@ measurement:
   pr6_matrix_runner_contract_verified_by: cargo test -p adc-lab --test cli experiment_real_run -- --nocapture
   pr7_operating_point_coverage_verified_by: cargo test -p adc-lab --test cli report_operating_point -- --nocapture
   pr8_capability_cost_model_verified_by: cargo test -p adc-lab-core capability_cost -- --nocapture
+  pr9_agent_adapter_qualification_verified_by: cargo test -p adc-lab --test cli tool_qualification -- --nocapture
   baseline_path: examples/demos/target55/baselines/resource/idle.json
   report_path: examples/demos/target55/reports/target-characterization.json
   missing_evidence:

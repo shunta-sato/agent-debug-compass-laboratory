@@ -13,8 +13,12 @@ marked `builtin` and accepted only for explicit Tier 1 bounded CPU load
 `lab.load_plan.v1` / `lab.load_result.v1` evidence that includes duration,
 worker, thermal, operator-abort, and safety-monitor fields.
 
-External, agent-created, control-capable, privileged, missing, or non-allowlisted
-load tools are not evidence sources until qualification evidence exists.
+External, control-capable, privileged, missing, or non-allowlisted load tools
+are not evidence sources until qualification evidence exists. Starting in PR9,
+an agent-created non-privileged observation/probe/report-normalizer style
+adapter can become `qualified` only when artifact-backed dry-run, manual
+comparison, output schema, static safety review, version, and sha256 evidence
+are all recorded.
 
 Inventory qualification command:
 
@@ -38,7 +42,10 @@ Statuses:
   restore, and verification evidence before supporting claims.
 - `external_unqualified`: available external tools without dry-run, output
   validation, version/hash, and comparison evidence.
-- `agent_created_unqualified`: manifest-only agent-created tools.
+- `agent_created_unqualified`: manifest-only agent-created tools, or tools
+  outside the PR9 qualification scope.
+- `qualified`: agent-created, non-state-writing, non-privileged observation,
+  probe, report-normalizer, or health-check adapter with complete PR9 evidence.
 - `refused`: missing tools or tools outside the current evidence allowlist.
 
 Agent-created tool path:
@@ -52,6 +59,32 @@ Agent-created tool path:
 7. Bounded experiment uses the tool.
 8. Evidence is accepted only when qualification status allows it.
 
-MVP `adc-lab tool qualify` records manifest checks and keeps evidence rejected
-when dry-run, manual comparison, version/hash, and output validation evidence is
-missing.
+PR9 `adc-lab tool qualify` remains non-executing. It records supplied evidence
+artifacts and validates their bounded shape; it never runs arbitrary adapter
+commands or shell.
+
+Example:
+
+```sh
+adc-lab tool qualify \
+  --manifest examples/tools/linux_cpufreq_reader.yaml \
+  --tool-version 0.1.0 \
+  --tool-sha256 sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  --output-schema examples/tools/linux_cpufreq_reader.output_schema.json \
+  --dry-run-output examples/tools/linux_cpufreq_reader.dry_run.json \
+  --manual-comparison examples/tools/linux_cpufreq_reader.manual_comparison.json \
+  --static-safety-review examples/tools/linux_cpufreq_reader.static_safety_review.txt
+```
+
+Qualification evidence is copied into the run under `tools/`, and the report
+stores only `artifact://lab/runs/...` refs. Raw local evidence input paths are
+not serialized into Agent-facing fields.
+
+PR9 still refuses evidence acceptance for:
+
+- control or restore adapters,
+- privileged adapters,
+- state-writing adapters,
+- load tools,
+- tools exceeding the 30s / 1 MiB agent-adapter policy,
+- malformed or oversized dry-run/manual comparison evidence.

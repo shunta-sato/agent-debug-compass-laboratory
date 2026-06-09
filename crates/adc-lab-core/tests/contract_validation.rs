@@ -122,6 +122,25 @@ fn contract_validation_capability_cost_model_rejects_legacy_string_capabilities(
     );
 }
 
+#[test]
+fn contract_validation_tool_qualification_requires_agent_adapter_evidence_fields() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.tool_qualification.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.tool_qualification.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json
+        .as_object_mut()
+        .unwrap()
+        .remove("qualification_scope");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "tool qualification must expose qualification scope"
+    );
+}
+
 fn validate_schema(
     root: &serde_json::Value,
     schema: &serde_json::Value,
