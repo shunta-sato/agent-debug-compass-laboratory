@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lab.tool_qualification.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool_id", "status", "evidence_accepted", "dry_run_required", "checks", "limitations", "time_unix_ms"],
+  "properties": {
+    "schema_version": { "const": "lab.tool_qualification.v1" },
+    "tool_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["builtin", "needs_control_test", "external_unqualified", "agent_created_unqualified", "qualified", "refused"] },
+    "evidence_accepted": { "type": "boolean" },
+    "dry_run_required": { "type": "boolean" },
+    "checks": { "type": "array", "items": { "type": "string" } },
+    "limitations": { "type": "array", "items": { "type": "string" } },
+    "time_unix_ms": { "type": "integer", "minimum": 0 }
+  }
+}

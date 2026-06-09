@@ -1,0 +1,29 @@
+[workspace]
+members = [
+    "crates/adc-lab",
+    "crates/adc-lab-core",
+    "crates/adc-lab-target",
+    "crates/adc-lab-priv-helper",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/agent-debug-compass/agent-debug-compass-laboratory"
+
+[workspace.dependencies]
+anyhow = "1.0"
+assert_cmd = "2.0"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+clap = { version = "4.5", features = ["derive"] }
+humantime = "2.1"
+predicates = "3.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+sha2 = "0.10"
+tempfile = "3.10"
+thiserror = "1.0"
+uuid = { version = "1.8", features = ["v4", "serde"] }

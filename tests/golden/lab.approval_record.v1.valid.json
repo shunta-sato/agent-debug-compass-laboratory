@@ -1,0 +1,28 @@
+{
+  "schema_version": "lab.approval_record.v1",
+  "approval_id": "APPROVAL-001",
+  "target_id": "pi4-target55",
+  "risk_tier": "tier2_privileged_reversible",
+  "operation_summary": "Set CPU governor to performance for controlled experiment",
+  "approved_plan_id": "PLAN-001",
+  "approved_plan_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "approved_operation": {
+    "operation_id": "linux.cpufreq.set_governor",
+    "desired_state": {
+      "governor": "performance"
+    }
+  },
+  "approved_by": {
+    "kind": "human",
+    "id": "operator"
+  },
+  "bounds": {
+    "duration_seconds_max": 60,
+    "thermal_celsius_abort": 75
+  },
+  "restore_required": true,
+  "approved_actions": [
+    "linux.cpufreq.set_governor"
+  ],
+  "time_unix_ms": 1780000000000
+}

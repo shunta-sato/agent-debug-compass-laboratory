@@ -1,0 +1,11 @@
+{
+  "schema_version": "lab.control_surface.v1",
+  "target_id": "pi4-target55",
+  "surfaces": [
+    {
+      "surface_id": "linux.cpufreq.sysfs",
+      "available": true,
+      "requires_privilege": true
+    }
+  ]
+}

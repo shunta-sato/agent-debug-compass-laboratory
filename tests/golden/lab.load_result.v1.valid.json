@@ -1,0 +1,13 @@
+{
+  "schema_version": "lab.load_result.v1",
+  "result_id": "LOAD-RESULT-001",
+  "load_id": "LOAD-001",
+  "target_id": "pi4-target55",
+  "status": "completed",
+  "workers": 2,
+  "duration_ms": 30000,
+  "abort_reason": null,
+  "max_observed_temp_c": 54.2,
+  "worker_iterations": [100, 120],
+  "time_unix_ms": 1780000000000
+}

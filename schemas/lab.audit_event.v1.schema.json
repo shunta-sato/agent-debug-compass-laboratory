@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lab.audit_event.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "run_id", "target_id", "actor", "operation", "operation_id", "risk_tier", "approval_ref", "restore_lease_ref", "result", "policy_version", "time_unix_ms"],
+  "properties": {
+    "schema_version": { "const": "lab.audit_event.v1" },
+    "event_id": { "type": "string", "minLength": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "target_id": { "type": "string", "minLength": 1 },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "enum": ["agent", "human", "system"] },
+        "id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "operation": { "type": "string", "minLength": 1 },
+    "operation_id": { "type": ["string", "null"] },
+    "risk_tier": { "enum": ["tier0_read_only_observation", "tier1_low_risk_reversible_non_root", "tier2_privileged_reversible", "tier3_hard_to_restore", "tier4_normally_prohibited"] },
+    "approval_ref": { "type": ["string", "null"] },
+    "restore_lease_ref": { "type": ["string", "null"] },
+    "result": { "type": "string" },
+    "policy_version": { "type": "string", "minLength": 1 },
+    "time_unix_ms": { "type": "integer", "minimum": 0 }
+  }
+}

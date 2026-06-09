@@ -1,0 +1,13 @@
+tool_id: linux_cpufreq_reader
+kind: observation
+writes_target_state: false
+requires_privilege: false
+bounded:
+  duration_seconds_max: 30
+  output_bytes_max: 1048576
+expected_overhead: low
+failure_modes:
+  - cpufreq surface missing
+qualification:
+  dry_run_required: true
+  compare_with_manual_sample: true

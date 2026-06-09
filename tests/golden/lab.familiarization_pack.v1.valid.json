@@ -1,0 +1,10 @@
+{
+  "schema_version": "lab.familiarization_pack.v1",
+  "run_id": "LAB-RUN-001",
+  "target_id": "pi4-target55",
+  "artifact_refs": ["artifact://lab/runs/LAB-RUN-001/audit.jsonl"],
+  "audit_event_count": 1,
+  "restore_status": "pending_or_recorded",
+  "claim_trace_ref": "artifact://lab/runs/LAB-RUN-001/reports/claim_evidence_trace.json",
+  "time_unix_ms": 1780000000000
+}

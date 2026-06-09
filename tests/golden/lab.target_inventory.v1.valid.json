@@ -1,0 +1,26 @@
+{
+  "schema_version": "lab.target_inventory.v1",
+  "target_id": "pi4-target55",
+  "target": "ssh://pi4",
+  "collected_by": "adc-lab",
+  "time_unix_ms": 1780000000000,
+  "software_stack": {
+    "os": "linux",
+    "kernel": "6.x",
+    "arch": "aarch64",
+    "board": "raspberry_pi_4"
+  },
+  "hardware": {
+    "cpu_count": 4,
+    "memory_total_kb": 4194304,
+    "thermal_zones": 1,
+    "cpufreq_policies": 1
+  },
+  "control_surfaces": [
+    {
+      "surface_id": "linux.cpufreq.sysfs",
+      "available": true,
+      "requires_privilege": true
+    }
+  ]
+}

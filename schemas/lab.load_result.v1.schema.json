@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lab.load_result.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "result_id", "load_id", "target_id", "status", "workers", "duration_ms", "abort_reason", "max_observed_temp_c", "worker_iterations", "time_unix_ms"],
+  "properties": {
+    "schema_version": { "const": "lab.load_result.v1" },
+    "result_id": { "type": "string", "minLength": 1 },
+    "load_id": { "type": "string", "minLength": 1 },
+    "target_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["completed", "aborted"] },
+    "workers": { "type": "integer", "minimum": 1 },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "abort_reason": { "type": ["string", "null"] },
+    "max_observed_temp_c": { "type": ["number", "null"] },
+    "worker_iterations": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+    "time_unix_ms": { "type": "integer", "minimum": 0 }
+  }
+}

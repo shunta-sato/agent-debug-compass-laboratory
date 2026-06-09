@@ -1,0 +1,28 @@
+target_class: raspberry_pi_4
+profile_name: initial_pi4_target
+power_source: unknown
+memory_mb: null
+storage_type: sd
+
+measurement_surfaces:
+  cpu: procfs
+  wakeups: unavailable_in_mvp
+  memory: procfs
+  storage_writes: unavailable_in_mvp
+  battery_power: unavailable
+  thermal: sysfs_thermal_zone
+  latency_jitter: unavailable_in_mvp
+
+resource_smoke:
+  command: scripts/resource/run-resource-smoke.sh --target ssh://pi4
+  baseline_path: baselines/resource/raspberry_pi_4.json
+
+default_budgets:
+  default_polling_interval_ms_min: 1000
+  default_sampling_rate_hz_max: 1
+  burst_duration_seconds_max: 300
+  steady_state_cpu_percent_max: null
+  wakeups_per_second_added_max: null
+  rss_mb_max: null
+  continuous_disk_write_bytes_per_second_max: 0
+  thermal_rise_celsius_max: null

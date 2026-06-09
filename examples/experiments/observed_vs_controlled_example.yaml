@@ -1,0 +1,20 @@
+schema_version: lab.experiment_matrix.v1
+matrix_id: MATRIX-OBSERVED-VS-CONTROLLED
+description: Demonstrates that observed variation is not a controlled operating-point sweep.
+factors:
+  - name: default_policy_frequency
+    kind: observed_covariate
+    levels:
+      - observed
+  - name: governor
+    kind: controlled_factor
+    levels:
+      - default
+  - name: fixed_frequency
+    kind: uncontrolled_confounder
+    levels:
+      - not_controlled
+warmup_seconds: 0
+cooldown_seconds: 0
+repetitions: 1
+order: listed

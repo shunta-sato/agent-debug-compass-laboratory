@@ -1,0 +1,22 @@
+# Safety Model
+
+Risk tiers:
+
+- Tier 0: read-only observation.
+- Tier 1: low-risk reversible or non-root bounded activity.
+- Tier 2: privileged reversible control with approval and restore.
+- Tier 3: hard-to-restore or degradation-inducing experiments.
+- Tier 4: normally prohibited operations.
+
+MVP behavior:
+
+- Tier 0 inventory, toolchain, and observation are audited.
+- Tier 1 CPU load is bounded by worker count, duration, and optional thermal abort.
+- Tier 1 CPU load default policy caps duration at 300s and worker count at available parallelism.
+- Tier 2 cpufreq governor control uses the privileged helper and restore lease, but apply/restore is local-target only in this MVP.
+- Tier 2 approvals are bound to plan id, plan digest, exact operation, and bounds.
+- Tier 2 control plan bounds are authorization/experiment bounds. The helper
+  enforces approval coverage and restore verification; load and future matrix
+  execution enforce runtime duration and thermal abort behavior.
+- Tier 3 is documentation-only in this MVP.
+- Tier 4 is prohibited by normal `adc-lab` approval.

@@ -1,0 +1,9 @@
+{
+  "schema_version": "lab.capability_cost_model.v1",
+  "run_id": "LAB-RUN-001",
+  "target_id": "pi4-target55",
+  "capabilities": ["cpu_load_response", "thermal_trend"],
+  "cost_model_status": "provisional_target_evidence_missing",
+  "limitations": ["host fallback cannot prove target physical footprint"],
+  "time_unix_ms": 1780000000000
+}
