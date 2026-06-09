@@ -4,13 +4,41 @@
   "category": "observation",
   "privilege": "none",
   "source": "agent_created",
-  "available": false,
-  "status": "agent_created_unqualified",
-  "evidence_accepted": false,
+  "available": true,
+  "status": "qualified",
+  "evidence_accepted": true,
   "dry_run_required": true,
-  "evidence_refs": [],
-  "checks": ["manifest_parsed", "bounds_present"],
-  "limitations": ["not accepted as evidence until dry-run and comparison are recorded"],
-  "reason": "agent-created tool manifest lacks qualification evidence",
+  "qualification_scope": "agent_created_bounded_observation_adapter",
+  "tool_version": "0.1.0",
+  "tool_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "output_schema_ref": "artifact://lab/runs/LAB-RUN-001/tools/linux_cpufreq_reader.output_schema.json",
+  "dry_run_ref": "artifact://lab/runs/LAB-RUN-001/tools/linux_cpufreq_reader.dry_run.json",
+  "manual_comparison_ref": "artifact://lab/runs/LAB-RUN-001/tools/linux_cpufreq_reader.manual_comparison.json",
+  "static_safety_review_ref": "artifact://lab/runs/LAB-RUN-001/tools/linux_cpufreq_reader.static_safety_review.txt",
+  "validated_output_bytes": 256,
+  "evidence_refs": [
+    "artifact://lab/runs/LAB-RUN-001/tools/linux_cpufreq_reader.output_schema.json",
+    "artifact://lab/runs/LAB-RUN-001/tools/linux_cpufreq_reader.dry_run.json",
+    "artifact://lab/runs/LAB-RUN-001/tools/linux_cpufreq_reader.manual_comparison.json",
+    "artifact://lab/runs/LAB-RUN-001/tools/linux_cpufreq_reader.static_safety_review.txt"
+  ],
+  "checks": [
+    "manifest_parsed",
+    "bounds_present",
+    "failure_modes_declared",
+    "dry_run_evidence_recorded",
+    "manual_comparison_recorded",
+    "tool_version_recorded",
+    "tool_sha256_recorded",
+    "output_schema_ref_recorded",
+    "static_safety_review_recorded",
+    "output_bytes_within_bounds",
+    "agent_adapter_scope_allowlist"
+  ],
+  "limitations": [
+    "qualified only for the declared bounded non-privileged adapter output scope",
+    "does not qualify control, restore, load, production readiness, battery, flash, thermal safety, or low-overhead claims"
+  ],
+  "reason": "agent-created bounded adapter has required qualification evidence",
   "time_unix_ms": 1780000000000
 }

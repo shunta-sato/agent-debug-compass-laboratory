@@ -1,0 +1,8 @@
+{
+  "manual_sample": {
+    "governor": "ondemand",
+    "scaling_cur_freq_khz": 600000
+  },
+  "adapter_output_matches_manual_sample": true,
+  "comparison_scope": "single read-only cpufreq sample"
+}

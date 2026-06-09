@@ -45,6 +45,10 @@ target_classes:
         - blocked_unsafe
       capability_cost_report_target_runtime: none
       capability_cost_blocks_architecture_recommendations_without_cost_evidence: true
+      agent_adapter_qualification_target_runtime: none
+      agent_adapter_qualification_executes_adapter: false
+      agent_adapter_qualification_duration_seconds_max: 30
+      agent_adapter_qualification_output_bytes_max: 1048576
 
 degraded_modes:
   battery_low: experimental-only until target policy is characterized

@@ -37,6 +37,7 @@ Target-specific live-run artifacts that are useful as examples live under `examp
 adc-lab inventory --target local
 adc-lab toolchain discover --target local
 adc-lab tool qualify-inventory --inventory lab/runs/LAB-RUN-.../toolchain/toolchain_inventory.json
+adc-lab tool qualify --manifest examples/tools/linux_cpufreq_reader.yaml --tool-version 0.1.0 --tool-sha256 sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --output-schema examples/tools/linux_cpufreq_reader.output_schema.json --dry-run-output examples/tools/linux_cpufreq_reader.dry_run.json --manual-comparison examples/tools/linux_cpufreq_reader.manual_comparison.json --static-safety-review examples/tools/linux_cpufreq_reader.static_safety_review.txt
 adc-lab observe --target local --duration 5s --signals cpu,freq,thermal,memory
 adc-lab familiarize read-only --target local --duration 5s --signals cpu,freq,thermal,memory
 

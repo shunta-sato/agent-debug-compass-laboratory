@@ -42,6 +42,9 @@
   it adds no target-local hot path.
 - [EHP-004] PR8 capability cost model reads controller-side run artifacts only;
   it adds no target-local hot path and does not probe accelerators.
+- [EHP-005] PR9 agent-created adapter qualification validates supplied
+  controller-side evidence files only; it does not execute adapters or add a
+  target-local hot path.
 
 ## Handoff
 

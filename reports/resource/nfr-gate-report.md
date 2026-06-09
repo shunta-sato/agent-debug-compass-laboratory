@@ -20,6 +20,9 @@ Gate decision: experimental-only
   architecture evidence classification; it is not accelerator, storage,
   network, battery, wakeup, flash, latency/jitter, sustained thermal, or
   production cost evidence.
+- PR9 agent-created adapter qualification is hardware-free verified as
+  controller-side evidence gating; it does not execute adapters or add target
+  physical measurement evidence.
 - Production physical-footprint claims remain blocked until wakeup, battery/power, flash/storage, jitter, sustained thermal, degraded, and recovery evidence exists.
 - `make command-smoke` verifies command wiring only and explicitly reports `resource_metrics_collected=false`; it is not resource evidence.
 
@@ -47,6 +50,7 @@ Gate decision: experimental-only
 | experiment matrix runner | experimental-only burst | listed trial sequence | warmup <=60s, cooldown <=60s, repetitions <=10, expanded trials <=64 | no | PR6 local real-run and blocked-factor tests passed |
 | operating-point coverage report | controller-side report | none on target | command lifetime | no | PR7 coverage classification tests passed |
 | capability-cost model report | controller-side report | none on target | command lifetime | no | PR8 capability evidence packet tests passed |
+| agent-created adapter qualification report | controller-side report | none on target | command lifetime | no | PR9 adapter qualification tests passed |
 | target runner | command-triggered | none while idle | process lifetime | no | target55 smoke passed |
 
 ## Artifact Check
@@ -74,6 +78,7 @@ Gate decision: experimental-only
 | PR6 matrix runner completes supported `cpu_load_workers` trials and blocks unsupported governor factor | `crates/adc-lab/tests/cli.rs` | hardware-free CLI tests and `lab.experiment_run.v1` schema | allowed contract/runtime claim |
 | PR7 operating-point coverage separates observed variation from controlled subset evidence | `crates/adc-lab/tests/cli.rs` | hardware-free CLI tests and `lab.operating_point_coverage.v1` schema | allowed contract/report claim |
 | PR8 capability cost model blocks offload and production architecture claims without cost evidence | `crates/adc-lab-core/src/report.rs` | hardware-free core/CLI tests and `lab.capability_cost_model.v1` schema | allowed contract/report claim |
+| PR9 agent-created observation adapter can become qualified only with bounded evidence artifacts | `crates/adc-lab-core/src/qualification.rs` | hardware-free core/CLI tests and `lab.tool_qualification.v1` schema | allowed contract/report claim |
 | low overhead | none | short smoke insufficient | blocked if introduced |
 | battery safe | none | none | blocked if introduced |
 | production ready target runtime | none | none | blocked if introduced |
@@ -93,6 +98,10 @@ Gate decision: experimental-only
 - Capability-cost reports classify existing artifacts only. GPU/NPU/DSP,
   storage/network-heavy, and production physical-footprint architecture
   recommendations remain blocked without qualified cost evidence.
+- Agent-created adapter qualification does not execute adapter commands. A
+  qualified report is evidence-source gating only and does not prove target
+  overhead, thermal safety, battery safety, flash safety, or production
+  readiness.
 
 ## Handoff To Quality Gate
 

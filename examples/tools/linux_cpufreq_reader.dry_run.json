@@ -1,0 +1,4 @@
+{
+  "governor": "ondemand",
+  "scaling_cur_freq_khz": 600000
+}

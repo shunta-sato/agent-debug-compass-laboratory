@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["governor", "scaling_cur_freq_khz"],
+  "properties": {
+    "governor": { "type": "string" },
+    "scaling_cur_freq_khz": { "type": "integer", "minimum": 0 }
+  }
+}

@@ -1,0 +1,7 @@
+Read-only cpufreq adapter example.
+
+Safety notes:
+- Does not write target state.
+- Does not require privilege.
+- Emits bounded JSON output.
+- Does not support fixed-frequency sweep, governor control, production readiness, thermal safety, battery safety, or flash safety claims.

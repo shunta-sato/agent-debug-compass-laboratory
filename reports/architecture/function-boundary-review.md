@@ -1,52 +1,50 @@
-# Function Boundary Review: PR8 Capability Cost Model
+# Function Boundary Review: PR9 Agent Adapter Qualification
 
 ## Scope
 
 Changed functions/helpers:
 
-- `capability_cost_model`, `capability_evidence`,
-  `capability_model_status`, capability-specific builders, architecture option
-  builders, blocked-claim builders, and JSON artifact readers in
-  `crates/adc-lab-core/src/report.rs`.
-- `command_report_operating_point` in `crates/adc-lab/src/main.rs`.
-- `CapabilityCostModel`, `CapabilityEvidence`, `CapabilityCostDimension`,
-  `ArchitectureOptionEvidence`, `CapabilityClaimBoundary`, and their enums in
-  `crates/adc-lab-core/src/contracts.rs`.
+- `qualify_tool_with_evidence`, `validate_agent_tool_evidence`,
+  `agent_adapter_scope_is_qualifiable`, and related policy helpers in
+  `crates/adc-lab-core/src/qualification.rs`.
+- `command_tool_qualify`, `build_pending_tool_qualification_evidence`,
+  evidence readers, and evidence artifact persistence helpers in
+  `crates/adc-lab/src/main.rs`.
+- `ToolQualification` and `ToolQualificationEvidence` contracts in
+  `crates/adc-lab-core/src/contracts.rs` and
+  `crates/adc-lab-core/src/qualification.rs`.
 
 ## Semantic Neighbors
 
 | Function / Type | Neighbor classification | Decision |
 | --- | --- | --- |
-| `capability_cost_model` | report-domain peer of `operating_point_coverage` | keep in `report.rs`; it interprets existing run artifacts only |
-| `capability_evidence` | capability packet assembly | keep split from top-level builder so observed/missing capability rules remain readable |
-| capability-specific builders | repeated DTO construction with different claim boundaries | keep small helpers instead of a generic map until real platform adapters add evidence |
-| `architecture_options` | architecture claim boundary domain | keep separate from capability facts because option decisions are not capability discovery |
-| `capability_blocked_claims` | claim-trace neighbor with architecture semantics | keep separate from read-only and operating-point claim traces |
-| `read_json_artifact_if_exists` | artifact parsing boundary | use as generic optional parser; malformed JSON is a validation error |
-| `read_experiment_run_if_exists` | named domain adapter around generic parser | keep thin wrapper for call-site meaning |
-| `command_report_operating_point` | CLI side-effect boundary | keep artifact writes and audit in CLI; core owns model semantics |
-| Capability DTOs | contract domain | keep in `contracts.rs`; schema mirrors the public Agent-facing contract |
+| `qualify_tool` | manifest-only compatibility wrapper | keep as wrapper around `qualify_tool_with_evidence` |
+| `qualify_tool_with_evidence` | main policy boundary for agent-created tools | split from inventory qualification so agent evidence rules do not leak into builtin policy |
+| `validate_agent_tool_evidence` | evidence-field validation boundary | keep pure core validation for refs, sha, bounds, and version |
+| `agent_adapter_scope_is_qualifiable` | scope allowlist policy | keep explicit and conservative; no generic adapter framework yet |
+| `qualify_tool_info` | discovered toolchain inventory qualification | keep parallel because builtin/external inventory policy differs from agent-created evidence policy |
+| `build_pending_tool_qualification_evidence` | CLI boundary for local evidence files | keep in CLI because it reads filesystem inputs and writes run artifacts |
+| evidence file readers | filesystem/format validation | keep separate by JSON vs text error contracts |
+| `ToolQualificationEvidence` | core input DTO, not an artifact contract | keep in `qualification.rs`; report artifact remains `ToolQualification` |
 
 ## Decisions
 
-- No architecture-decision engine is introduced. PR8 records evidence
-  sufficiency and blocked options; it does not choose GPU/NPU/DSP/storage
-  designs.
-- No platform adapter is added. Missing GPU/NPU/DSP/storage/network evidence is
-  represented explicitly instead of probing new surfaces.
-- No target-local runtime is added. The model reads controller-side run
-  artifacts and writes a report artifact.
-- Malformed JSON artifacts fail report generation because evidence cannot be
-  trusted. Missing optional artifacts become `missing_evidence`, blocked
-  claims, or limitations.
-- CLI owns persistence and emits `report.capability_cost`; core owns
-  architecture evidence semantics.
+- No arbitrary adapter execution is added. PR9 validates supplied files and
+  records artifact-backed evidence only.
+- No merge with `qualify_tool_info`. Inventory qualification and agent-created
+  adapter qualification have different sources, side effects, and error
+  contracts.
+- `ToolQualification` remains the single report artifact. Optional evidence
+  fields are explicit nulls for builtin/unqualified cases.
+- CLI owns local path handling and artifact copying. Core owns policy decisions
+  over logical refs and manifest fields.
+- Control/load/privileged/state-writing adapters are deliberately kept
+  unqualified in PR9.
 - Ledger update not required: no long-lived sibling abstraction, staged adapter,
   or intentional duplicate implementation remains.
 
 ## Verification
 
-- `cargo test -p adc-lab-core capability_cost -- --nocapture`: pass.
-- `cargo test -p adc-lab --test cli report_operating_point -- --nocapture`:
-  pass.
+- `cargo test -p adc-lab-core qualification -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli tool_qualification -- --nocapture`: pass.
 - Full workspace verification is recorded in `reports/quality-gate.md`.

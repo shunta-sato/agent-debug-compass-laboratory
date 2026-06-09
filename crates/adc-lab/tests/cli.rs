@@ -1070,3 +1070,147 @@ fn tool_qualification_records_unqualified_agent_tool() {
         .stdout(contains("\"status\": \"agent_created_unqualified\""))
         .stdout(contains("\"evidence_accepted\": false"));
 }
+
+#[test]
+fn tool_qualification_accepts_complete_agent_observation_adapter_evidence() {
+    let temp = tempfile::tempdir().unwrap();
+    let evidence_dir = temp.path().join("evidence-inputs");
+    fs::create_dir_all(&evidence_dir).unwrap();
+    let output_schema = evidence_dir.join("output-schema.json");
+    let dry_run = evidence_dir.join("dry-run.json");
+    let manual_comparison = evidence_dir.join("manual-comparison.json");
+    let static_safety_review = evidence_dir.join("static-safety-review.txt");
+    fs::write(
+        &output_schema,
+        r#"{"type":"object","required":["governor"],"additionalProperties":false}"#,
+    )
+    .unwrap();
+    fs::write(&dry_run, r#"{"governor":"ondemand"}"#).unwrap();
+    fs::write(
+        &manual_comparison,
+        r#"{"manual_sample":{"governor":"ondemand"},"matches":true}"#,
+    )
+    .unwrap();
+    fs::write(
+        &static_safety_review,
+        "Read-only cpufreq adapter. No target writes. Output bounded.",
+    )
+    .unwrap();
+
+    let manifest = workspace_root().join("examples/tools/linux_cpufreq_reader.yaml");
+    let output = Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "tool",
+            "qualify",
+            "--manifest",
+            manifest.to_str().unwrap(),
+            "--tool-version",
+            "0.1.0",
+            "--tool-sha256",
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "--output-schema",
+            output_schema.to_str().unwrap(),
+            "--dry-run-output",
+            dry_run.to_str().unwrap(),
+            "--manual-comparison",
+            manual_comparison.to_str().unwrap(),
+            "--static-safety-review",
+            static_safety_review.to_str().unwrap(),
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"status\": \"qualified\""))
+        .stdout(contains("\"evidence_accepted\": true"))
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let report = &value["value"];
+    assert_eq!(
+        report["qualification_scope"],
+        "agent_created_bounded_observation_adapter"
+    );
+    for field in [
+        "output_schema_ref",
+        "dry_run_ref",
+        "manual_comparison_ref",
+        "static_safety_review_ref",
+    ] {
+        assert!(report[field]
+            .as_str()
+            .unwrap()
+            .starts_with("artifact://lab/runs/"));
+    }
+    let report_text = serde_json::to_string(report).unwrap();
+    assert!(!report_text.contains(evidence_dir.to_str().unwrap()));
+    assert!(temp
+        .path()
+        .join("tools/linux_cpufreq_reader.output_schema.json")
+        .exists());
+    assert!(temp
+        .path()
+        .join("tools/linux_cpufreq_reader.dry_run.json")
+        .exists());
+    assert!(temp
+        .path()
+        .join("tools/linux_cpufreq_reader.manual_comparison.json")
+        .exists());
+    assert!(temp
+        .path()
+        .join("tools/linux_cpufreq_reader.static_safety_review.txt")
+        .exists());
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"tool.qualify\""));
+    assert!(audit.contains("\"result\":\"qualified\""));
+}
+
+#[test]
+fn tool_qualification_rejects_malformed_dry_run_evidence_before_acceptance() {
+    let temp = tempfile::tempdir().unwrap();
+    let evidence_dir = temp.path().join("evidence-inputs");
+    fs::create_dir_all(&evidence_dir).unwrap();
+    let output_schema = evidence_dir.join("output-schema.json");
+    let dry_run = evidence_dir.join("dry-run.json");
+    let manual_comparison = evidence_dir.join("manual-comparison.json");
+    let static_safety_review = evidence_dir.join("static-safety-review.txt");
+    fs::write(&output_schema, r#"{"type":"object"}"#).unwrap();
+    fs::write(&dry_run, "{bad").unwrap();
+    fs::write(&manual_comparison, r#"{"matches":true}"#).unwrap();
+    fs::write(&static_safety_review, "Read-only adapter review.").unwrap();
+
+    let manifest = workspace_root().join("examples/tools/linux_cpufreq_reader.yaml");
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "tool",
+            "qualify",
+            "--manifest",
+            manifest.to_str().unwrap(),
+            "--tool-version",
+            "0.1.0",
+            "--tool-sha256",
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "--output-schema",
+            output_schema.to_str().unwrap(),
+            "--dry-run-output",
+            dry_run.to_str().unwrap(),
+            "--manual-comparison",
+            manual_comparison.to_str().unwrap(),
+            "--static-safety-review",
+            static_safety_review.to_str().unwrap(),
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("dry-run output evidence must be valid JSON"));
+    assert!(!temp
+        .path()
+        .join("tools/linux_cpufreq_reader.qualification.json")
+        .exists());
+}

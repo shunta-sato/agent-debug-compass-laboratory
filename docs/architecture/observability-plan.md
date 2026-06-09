@@ -29,7 +29,7 @@
 | `experiment.run` | explain matrix planning/execution summary | CLI start to experiment artifacts |
 | `report.operating_point` | explain observed vs controlled operating-point coverage | CLI start to coverage artifact |
 | `report.capability_cost` | explain architecture evidence sufficiency and blocked cost claims | CLI start to capability-cost artifact |
-| `tool.qualify` | explain whether a tool can be evidence | CLI start to qualification report |
+| `tool.qualify` | explain whether an agent-created tool can be evidence | CLI start to evidence artifact copy and qualification report |
 
 ## Correlation Identifiers
 
@@ -170,3 +170,19 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
   current allowlist. For `adc-lab-builtin-cpu-load`, it supports bounded load
   result evidence only; it does not prove production overhead or thermal safety.
 - Artifact path: `artifact://lab/runs/<run_id>/tools/tool_qualification_summary.json`.
+
+- Signal: agent-created tool qualification report.
+- Decision supported: whether a proposed adapter is accepted as a bounded
+  evidence source or remains unqualified.
+- Action owner: lab operator or agent reviewing adapter output.
+- Expected action when degraded: inspect missing checks, collect dry-run/manual
+  comparison/output-schema/static-safety-review/version/hash evidence, or keep
+  the adapter out of evidence claims.
+- Counter-metric: `evidence_accepted=false`, `qualification_scope`, and
+  `limitations` prevent manifest-only or unsafe-scope tools from becoming
+  evidence.
+- Failure mode / misleading interpretation: `qualified` is scoped to the
+  declared non-privileged adapter output; it is not permission to run arbitrary
+  shell, perform control, or make production physical-footprint claims.
+- Artifact path:
+  `artifact://lab/runs/<run_id>/tools/<tool_id>.qualification.json`.
