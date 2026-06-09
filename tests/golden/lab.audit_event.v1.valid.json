@@ -1,0 +1,18 @@
+{
+  "schema_version": "lab.audit_event.v1",
+  "event_id": "EVT-001",
+  "run_id": "LAB-RUN-001",
+  "target_id": "pi4-target55",
+  "actor": {
+    "kind": "agent",
+    "id": "codex"
+  },
+  "operation": "control.apply",
+  "operation_id": "linux.cpufreq.set_governor",
+  "risk_tier": "tier2_privileged_reversible",
+  "approval_ref": "artifact://lab/runs/LAB-RUN-001/approvals/APPROVAL-001.json",
+  "restore_lease_ref": "artifact://lab/runs/LAB-RUN-001/leases/LEASE-001.json",
+  "result": "applied",
+  "policy_version": "default-lab-policy-v1",
+  "time_unix_ms": 1780000000000
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": "lab.load_plan.v1",
+  "load_id": "LOAD-001",
+  "target_id": "pi4-target55",
+  "load_kind": "cpu",
+  "workers": 2,
+  "duration_seconds": 30,
+  "abort_temp_c": 75.0,
+  "created_by": {
+    "kind": "agent",
+    "id": "codex"
+  },
+  "time_unix_ms": 1780000000000
+}

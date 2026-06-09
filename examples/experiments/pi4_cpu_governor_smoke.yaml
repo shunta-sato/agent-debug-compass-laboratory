@@ -1,0 +1,25 @@
+schema_version: lab.experiment_matrix.v1
+matrix_id: MATRIX-PI4-CPU-GOVERNOR-SMOKE
+description: Pi4 CPU governor smoke experiment with controlled governor factor and observed thermal/frequency covariates.
+factors:
+  - name: governor
+    kind: controlled_factor
+    levels:
+      - ondemand
+      - performance
+  - name: cpu_frequency
+    kind: observed_covariate
+    levels:
+      - observed
+  - name: temperature
+    kind: observed_covariate
+    levels:
+      - observed
+  - name: ambient_conditions
+    kind: uncontrolled_confounder
+    levels:
+      - not_controlled
+warmup_seconds: 5
+cooldown_seconds: 5
+repetitions: 1
+order: listed

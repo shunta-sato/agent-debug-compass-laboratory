@@ -1,0 +1,7 @@
+target_id: pi4-target55
+target: ssh://pi4
+target_class: raspberry_pi_4
+role: initial_target
+notes:
+  - Linux target familiarization
+  - CPU, cpufreq, thermal, procfs, sysfs, load, observer-effect experiments

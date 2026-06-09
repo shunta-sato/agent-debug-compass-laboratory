@@ -1,0 +1,21 @@
+{
+  "schema_version": "adc_lab.resource_baseline.summary.v1",
+  "target_id": "target55",
+  "scenario": "bounded_cpu_load_2_workers_10s",
+  "duration_seconds": 10,
+  "evidence_path": "lab/runs/LAB-RUN-target55-load-observer-off/loads/LOAD-1edfd5ff-ce11-4f6c-bc14-3b56ecc0b1b6.result.json",
+  "summary": {
+    "status": "completed",
+    "workers": 2,
+    "abort_temp_c": 75,
+    "abort_reason": null,
+    "max_observed_temp_c": 54.043,
+    "worker_iterations_total": 5990418432
+  },
+  "confidence": "medium",
+  "limits": [
+    "short bounded smoke, not sustained thermal stress",
+    "no battery or power measurement",
+    "no post-load cooldown envelope captured"
+  ]
+}

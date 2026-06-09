@@ -1,0 +1,26 @@
+{
+  "schema_version": "lab.toolchain_inventory.v1",
+  "target_id": "pi4-target55",
+  "software_stack": {
+    "os": "linux",
+    "kernel": "6.x",
+    "arch": "aarch64",
+    "board": "raspberry_pi_4"
+  },
+  "tools": [
+    {
+      "tool_id": "linux.procfs",
+      "category": "observation",
+      "available": true,
+      "privilege": "none",
+      "qualification": "builtin"
+    },
+    {
+      "tool_id": "linux.cpufreq.sysfs",
+      "category": "observation_control",
+      "available": true,
+      "privilege": "sudo_helper",
+      "qualification": "needs_control_test"
+    }
+  ]
+}

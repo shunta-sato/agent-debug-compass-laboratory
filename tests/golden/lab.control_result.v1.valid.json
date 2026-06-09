@@ -1,0 +1,17 @@
+{
+  "schema_version": "lab.control_result.v1",
+  "result_id": "RESULT-001",
+  "plan_id": "PLAN-001",
+  "target_id": "pi4-target55",
+  "operation_id": "linux.cpufreq.set_governor",
+  "risk_tier": "tier2_privileged_reversible",
+  "status": "refused",
+  "refusal": {
+    "reason_code": "approval_required",
+    "message": "tier2 operation requires approval artifact"
+  },
+  "restore_lease": null,
+  "restore_attempted": false,
+  "restore_result": null,
+  "time_unix_ms": 1780000000000
+}

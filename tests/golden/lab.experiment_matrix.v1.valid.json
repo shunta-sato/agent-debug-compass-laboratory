@@ -1,0 +1,21 @@
+{
+  "schema_version": "lab.experiment_matrix.v1",
+  "matrix_id": "MATRIX-001",
+  "description": "Pi4 CPU governor smoke",
+  "factors": [
+    {
+      "name": "governor",
+      "kind": "controlled_factor",
+      "levels": ["ondemand", "performance"]
+    },
+    {
+      "name": "temperature",
+      "kind": "observed_covariate",
+      "levels": ["observed"]
+    }
+  ],
+  "warmup_seconds": 5,
+  "cooldown_seconds": 5,
+  "repetitions": 1,
+  "order": "listed"
+}

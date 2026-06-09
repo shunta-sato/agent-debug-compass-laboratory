@@ -1,0 +1,9 @@
+target_id: pi5-controller
+target: local
+target_class: raspberry_pi_5
+role: controller
+notes:
+  - adc-lab build host
+  - experiment orchestration
+  - target SSH control
+  - report generation

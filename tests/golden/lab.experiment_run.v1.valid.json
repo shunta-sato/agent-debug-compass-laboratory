@@ -1,0 +1,17 @@
+{
+  "schema_version": "lab.experiment_run.v1",
+  "run_id": "LAB-RUN-001",
+  "matrix_id": "MATRIX-001",
+  "target_id": "pi4-target55",
+  "dry_run": true,
+  "trials": [
+    {
+      "trial_id": "TRIAL-001",
+      "factors": {
+        "governor": "performance"
+      },
+      "status": "planned"
+    }
+  ],
+  "time_unix_ms": 1780000000000
+}

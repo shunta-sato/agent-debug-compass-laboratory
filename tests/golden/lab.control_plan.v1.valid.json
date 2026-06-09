@@ -1,0 +1,24 @@
+{
+  "schema_version": "lab.control_plan.v1",
+  "plan_id": "PLAN-001",
+  "run_id": "LAB-RUN-001",
+  "target_id": "pi4-target55",
+  "risk_tier": "tier2_privileged_reversible",
+  "approval_required": true,
+  "restore_required": true,
+  "operation": {
+    "operation_id": "linux.cpufreq.set_governor",
+    "desired_state": {
+      "governor": "performance"
+    }
+  },
+  "bounds": {
+    "duration_seconds_max": 60,
+    "thermal_celsius_abort": 75.0
+  },
+  "created_by": {
+    "kind": "agent",
+    "id": "codex"
+  },
+  "time_unix_ms": 1780000000000
+}

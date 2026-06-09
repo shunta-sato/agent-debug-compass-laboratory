@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lab.capability_cost_model.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "target_id", "capabilities", "cost_model_status", "limitations", "time_unix_ms"],
+  "properties": {
+    "schema_version": { "const": "lab.capability_cost_model.v1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "target_id": { "type": "string", "minLength": 1 },
+    "capabilities": { "type": "array", "items": { "type": "string" } },
+    "cost_model_status": { "type": "string" },
+    "limitations": { "type": "array", "items": { "type": "string" } },
+    "time_unix_ms": { "type": "integer", "minimum": 0 }
+  }
+}

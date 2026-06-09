@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lab.target_inventory.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_id", "target", "collected_by", "time_unix_ms", "software_stack", "hardware", "control_surfaces"],
+  "properties": {
+    "schema_version": { "const": "lab.target_inventory.v1" },
+    "target_id": { "type": "string", "minLength": 1 },
+    "target": { "type": "string", "minLength": 1 },
+    "collected_by": { "type": "string", "minLength": 1 },
+    "time_unix_ms": { "type": "integer", "minimum": 0 },
+    "software_stack": { "$ref": "#/$defs/software_stack" },
+    "hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu_count", "memory_total_kb", "thermal_zones", "cpufreq_policies"],
+      "properties": {
+        "cpu_count": { "type": "integer", "minimum": 1 },
+        "memory_total_kb": { "type": ["integer", "null"], "minimum": 0 },
+        "thermal_zones": { "type": "integer", "minimum": 0 },
+        "cpufreq_policies": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "control_surfaces": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/control_surface" }
+    }
+  },
+  "$defs": {
+    "software_stack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "kernel", "arch", "board"],
+      "properties": {
+        "os": { "type": "string" },
+        "kernel": { "type": "string" },
+        "arch": { "type": "string" },
+        "board": { "type": "string" }
+      }
+    },
+    "control_surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface_id", "available", "requires_privilege"],
+      "properties": {
+        "surface_id": { "type": "string" },
+        "available": { "type": "boolean" },
+        "requires_privilege": { "type": "boolean" }
+      }
+    }
+  }
+}

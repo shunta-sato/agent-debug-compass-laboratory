@@ -1,0 +1,10 @@
+{
+  "schema_version": "lab.tool_qualification.v1",
+  "tool_id": "linux_cpufreq_reader",
+  "status": "agent_created_unqualified",
+  "evidence_accepted": false,
+  "dry_run_required": true,
+  "checks": ["manifest_parsed", "bounds_present"],
+  "limitations": ["not accepted as evidence until dry-run and comparison are recorded"],
+  "time_unix_ms": 1780000000000
+}

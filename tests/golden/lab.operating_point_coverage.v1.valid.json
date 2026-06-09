@@ -1,0 +1,9 @@
+{
+  "schema_version": "lab.operating_point_coverage.v1",
+  "run_id": "LAB-RUN-001",
+  "target_id": "pi4-target55",
+  "covered_points": ["default_dynamic_policy_observed"],
+  "blocked_points": ["all_fixed_cpu_frequencies"],
+  "coverage_status": "provisional",
+  "time_unix_ms": 1780000000000
+}

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lab.control_result.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "result_id", "plan_id", "target_id", "operation_id", "risk_tier", "status", "refusal", "restore_lease", "restore_attempted", "restore_result", "time_unix_ms"],
+  "properties": {
+    "schema_version": { "const": "lab.control_result.v1" },
+    "result_id": { "type": "string", "minLength": 1 },
+    "plan_id": { "type": "string", "minLength": 1 },
+    "target_id": { "type": "string", "minLength": 1 },
+    "operation_id": { "enum": ["linux.cpufreq.set_governor"] },
+    "risk_tier": { "$ref": "#/$defs/risk_tier" },
+    "status": { "enum": ["refused", "dry_run_ok", "applied", "restored", "failed"] },
+    "refusal": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["reason_code", "message"],
+      "properties": {
+        "reason_code": { "enum": ["unsupported_operation", "approval_required", "approval_mismatch", "privileged_apply_requires_target_local_helper", "policy_violation", "invalid_plan", "missing_surface"] },
+        "message": { "type": "string" }
+      }
+    },
+    "restore_lease": { "anyOf": [{ "$ref": "#/$defs/restore_lease" }, { "type": "null" }] },
+    "restore_attempted": { "type": "boolean" },
+    "restore_result": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "message"],
+          "properties": {
+            "status": { "enum": ["succeeded", "failed"] },
+            "message": { "type": "string" }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "time_unix_ms": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "risk_tier": { "enum": ["tier0_read_only_observation", "tier1_low_risk_reversible_non_root", "tier2_privileged_reversible", "tier3_hard_to_restore", "tier4_normally_prohibited"] },
+    "restore_lease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "lease_id", "target_id", "operation_id", "captured_state", "applied_state", "restore_required", "restore_status", "created_by_plan", "time_unix_ms"],
+      "properties": {
+        "schema_version": { "const": "lab.restore_lease.v1" },
+        "lease_id": { "type": "string", "minLength": 1 },
+        "target_id": { "type": "string", "minLength": 1 },
+        "operation_id": { "enum": ["linux.cpufreq.set_governor"] },
+        "captured_state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cpufreq_policies"],
+          "properties": {
+            "cpufreq_policies": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["policy", "governor", "scaling_min_freq", "scaling_max_freq"],
+                "properties": {
+                  "policy": { "type": "string", "minLength": 1 },
+                  "governor": { "enum": ["performance", "ondemand", "powersave", "schedutil", "userspace"] },
+                  "scaling_min_freq": { "type": ["string", "null"] },
+                  "scaling_max_freq": { "type": ["string", "null"] }
+                }
+              }
+            }
+          }
+        },
+        "applied_state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["governor"],
+          "properties": {
+            "governor": { "enum": ["performance", "ondemand", "powersave", "schedutil", "userspace"] }
+          }
+        },
+        "restore_required": { "type": "boolean" },
+        "restore_status": { "enum": ["pending", "restored", "failed", "dry_run"] },
+        "created_by_plan": { "type": "string", "minLength": 1 },
+        "time_unix_ms": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

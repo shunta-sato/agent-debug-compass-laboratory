@@ -1,0 +1,20 @@
+{
+  "schema_version": "lab.claim_evidence_trace.v1",
+  "run_id": "LAB-RUN-001",
+  "target_id": "pi4-target55",
+  "claims": [
+    {
+      "claim": "Frequency variation was observed under target default dynamic policy.",
+      "decision": "supported",
+      "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/observations/observe.json"],
+      "next_evidence_needed": []
+    },
+    {
+      "claim": "adc-lab verified behavior across all fixed CPU frequencies.",
+      "decision": "blocked",
+      "evidence_refs": [],
+      "next_evidence_needed": ["controlled fixed-frequency matrix"]
+    }
+  ],
+  "time_unix_ms": 1780000000000
+}
