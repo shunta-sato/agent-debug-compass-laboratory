@@ -42,6 +42,18 @@ The smoke writes one run directory containing `run_manifest.json`,
 `tools/tool_qualification_summary.json`, `observations/observe.json`, and
 `audit.jsonl`.
 
+Optional Tier 1 bounded CPU load is separate from read-only familiarization.
+Keep it short, set a thermal abort when the target has a thermal surface, and
+use a target-local operator abort marker:
+
+```sh
+adc-lab load cpu --target ssh://pi4 --workers 2 --duration 30s --abort-temp-c 75 --operator-abort-file /tmp/adc-lab-abort
+```
+
+Creating `/tmp/adc-lab-abort` on the target stops the load and records
+`status=aborted` with `abort_reason=operator_abort`. The abort marker path is
+runtime input only and is not serialized into load artifacts.
+
 Privileged control requires an approval artifact and uses the helper. In this
 MVP, privileged apply/restore is local-target only; remote privileged apply is
 deferred until a target-local helper transport is implemented. Do not grant an

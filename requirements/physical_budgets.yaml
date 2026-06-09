@@ -24,13 +24,17 @@ target_classes:
       thermal_rise_celsius_max: null
     burst_budgets:
       burst_sampling_interval_ms_min: 1000
+      cpu_load_safety_monitor_interval_ms: 100
       burst_duration_seconds_max: 300
       burst_requires_trigger_or_marker: true
+      operator_abort_supported_for_cpu_load: true
+      cpu_load_restore_on_abort_status: not_required
 
 degraded_modes:
   battery_low: experimental-only until target policy is characterized
   memory_pressure: bound outputs and fail closed
   thermal_pressure: abort bounded load when configured threshold is reached
+  operator_abort: stop bounded CPU load when target-local abort marker is observed
   storage_pressure: stop writing run artifacts or fail closed
   measurement_unavailable: mark feature experimental or remove production claims
 

@@ -6,6 +6,12 @@
   "workers": 2,
   "duration_seconds": 30,
   "abort_temp_c": 75.0,
+  "safety_monitor": {
+    "sample_interval_ms": 100,
+    "thermal_abort_c": 75.0,
+    "operator_abort_enabled": false,
+    "restore_on_abort": "not_required"
+  },
   "created_by": {
     "kind": "agent",
     "id": "codex"

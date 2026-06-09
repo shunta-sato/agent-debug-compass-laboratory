@@ -12,49 +12,74 @@ Findings: 0
 - `cargo clippy --workspace --all-targets -- -D warnings` - pass.
 - `cargo test --workspace` - pass.
 - `make verify` - pass.
+- Secret/PII/security scan over PR diff and changed files - pass. No API keys,
+  passwords, IP addresses, email addresses, personal names, or security
+  incident details were found in the PR changes. The only PII-pattern review
+  note was existing `target55` demo target label references retained in
+  example-evidence docs.
 
 ## Live Discovery
 
-- Rust toolchain: verified through `make verify` with workspace build, fmt,
-  clippy, tests, contract validation, docs smoke, and command smoke.
+- Rust toolchain: verified through `make verify` with workspace build, fmt
+  check, clippy, tests, contract validation, docs smoke, and command smoke.
 - Repo command wrapper: `Makefile` remains the canonical command surface.
-- Schema/config paths: `schemas/lab.approval_record.v1.schema.json`,
-  `schemas/lab.control_result.v1.schema.json`,
-  `schemas/lab.restore_lease.v1.schema.json`,
-  `schemas/lab.health_check.v1.schema.json`, and matching golden fixtures.
+- Schema/config paths: `schemas/lab.load_plan.v1.schema.json`,
+  `schemas/lab.load_result.v1.schema.json`,
+  `tests/golden/lab.load_plan.v1.valid.json`, and
+  `tests/golden/lab.load_result.v1.valid.json`.
 - Target connection state: no hardware target required for default
-  verification. PR4 tests use generated local plans and `--dry-run` for
-  privileged apply/restore paths.
-- Artifact/log paths expected from PR4 workflow: `approvals/*.json`,
-  `plans/*.result.json`, `leases/*.json`, `health/restore_health_check.json`
-  when restore succeeds, and `audit.jsonl` operations `control.approve`,
-  `control.apply`, `restore`, and `health-check.restore`.
+  verification. PR5 tests run local hardware-free operator-abort and contract
+  paths.
+- Artifact/log paths expected from PR5 workflow: `loads/*.plan.json`,
+  `loads/*.result.json`, `tools/tool_qualification_summary.json`, individual
+  `tools/*.qualification.json`, and `audit.jsonl` operation `load.cpu`.
 
 ## Triggered Branch Evidence
 
 - ExecPlan - present:
-  `plans/20260609-pr4-local-cpufreq-control-mvp.md`.
-- Error handling - present: `docs/architecture/error-handling.md` documents
-  approval generation refusal and post-restore health-check semantics.
-- Observability - present: `docs/architecture/observability-plan.md` includes
-  `control.approve` and `health-check.restore` signals.
+  `plans/20260609-pr5-bounded-load-safety-monitor.md`.
+- Embedded NFR design/gate - present:
+  `docs/nfr/adc-lab-target-runtime.md`,
+  `requirements/nfr/adc-lab-target-runtime.yaml`,
+  `requirements/physical_budgets.yaml`, and
+  `reports/resource/nfr-gate-report.md`.
+- Embedded hot-path review - present:
+  `reports/resource/hot-path-review.md`.
+- Embedded observer-effect review - present:
+  `reports/resource/observer-effect-review.md`.
+- Embedded NFR harness design - present:
+  `docs/testing/resource-harness.md`.
+- Error handling - present:
+  `docs/architecture/error-handling.md`.
+- Observability - present:
+  `docs/architecture/observability-plan.md`.
+- Concurrency/shutdown evidence for existing load worker threads - present:
+  `reports/concurrency/thread-safety-matrix.md`.
 
 ## Exit Criteria Review
 
-- `adc-lab control approve` generates `lab.approval_record.v1` from an existing
-  plan, not from free-form operation input.
-- Approval artifacts are bound to plan id, canonical plan digest, exact
-  operation, bounds, target id, risk tier, restore requirement, and human
-  approver id.
-- Non-local target plans are refused by `control approve`; no approval artifact
-  is written.
-- `control apply --dry-run --approval ...` records bounded approval artifact refs
-  in audit.
-- Successful controller restore writes a read-only `lab.health_check.v1`
-  artifact and `health-check.restore` audit event.
-- Restore dry-run and failed/refused restore do not produce post-restore health
-  evidence.
+- `lab.load_plan.v1` records `safety_monitor` metadata for CPU load plans:
+  monitor interval, thermal abort setting, operator abort enablement, and
+  restore-on-abort policy.
+- `lab.load_result.v1` records `safety_monitor` evidence for CPU load results:
+  sample count, thermal surface availability, operator abort observation, and
+  restore-on-abort status.
+- Operator abort stops CPU load with `status=aborted` and
+  `abort_reason=operator_abort`.
+- Operator abort file paths are runtime-only and are not serialized into
+  `lab.load_plan.v1` or `lab.load_result.v1` artifacts.
+- SSH target runner accepts the same operator abort option and enforces it on
+  the target side through fixed `adc-lab-target load cpu` subcommand wiring.
+- Built-in CPU load qualification is accepted only for bounded load plan/result
+  evidence. It does not support production, battery, flash, latency,
+  low-overhead, sustained thermal, or thermally-safe claims.
 - Default verification remains hardware-free.
-- PR4 adds no remote privileged apply, arbitrary helper override, sudoers
-  change, fixed-frequency sweep, load generation, or destructive experiment
-  behavior.
+- PR5 adds no privileged control, sudo helper behavior, cpufreq write,
+  fixed-frequency sweep, memory pressure, I/O stress, thermal stress, GPU/NPU
+  load, destructive experiment, or production physical-footprint claim.
+
+## Gate Decision
+
+Submit. The change is experimental-only for embedded NFR purposes, all
+production physical-footprint claims remain blocked, and the required contracts,
+tests, docs, and scans are present.

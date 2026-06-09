@@ -6,6 +6,10 @@ Gate decision: experimental-only
 
 - No submit-blocking finding for experimental-only MVP.
 - Target55 short-smoke target characterization and resource reports exist.
+- PR5 CPU load safety monitor records monitor samples, thermal surface
+  availability, operator abort observation, and restore-on-abort status.
+- PR5 operator abort behavior is hardware-free verified; it is not target
+  thermal, battery, flash, latency, or production evidence.
 - Production physical-footprint claims remain blocked until wakeup, battery/power, flash/storage, jitter, sustained thermal, degraded, and recovery evidence exists.
 - `make command-smoke` verifies command wiring only and explicitly reports `resource_metrics_collected=false`; it is not resource evidence.
 
@@ -14,13 +18,13 @@ Gate decision: experimental-only
 | NFR | Budget | Measurement | Result | Evidence |
 | --- | ---: | ---: | --- | --- |
 | Polling / sampling cadence | 1s command-triggered observation | target55 10s observe | measured for short smoke | `lab/runs/LAB-RUN-target55-idle-only-observe/observations/observe.json` |
-| CPU | no always-on default; burst load capped at <=300s and <=available_parallelism workers | idle busy about 0.075%; 2-worker 10s load completed | partial | `examples/demos/target55/baselines/resource/idle.json`; `examples/demos/target55/baselines/resource/nominal_workload.json` |
-| Wakeups | no unbounded default | not measured | unknown | `docs/testing/resource-harness.md` |
+| CPU | no always-on default; burst load capped at <=300s, <=available_parallelism workers, and operator abort | idle busy about 0.075%; 2-worker 10s load completed; PR5 operator abort test passed | partial | `examples/demos/target55/baselines/resource/idle.json`; `examples/demos/target55/baselines/resource/nominal_workload.json`; `crates/adc-lab/tests/cli.rs` |
+| Wakeups | no unbounded default; load safety monitor 100ms only during explicit load | not measured | unknown | `docs/testing/resource-harness.md` |
 | RSS / heap | unknown | not measured directly | unknown | `docs/testing/resource-harness.md` |
 | Storage writes | no continuous target writes | code review | provisional | `reports/resource/hot-path-review.md` |
 | Flash wear | no target write claim | not measured | unknown | `reports/resource/observer-effect-review.md` |
 | Battery | no battery claim | not measured | unknown | `requirements/physical_budgets.yaml` |
-| Thermal | optional abort for load | target55 short load max 54.53C under 75C abort | partial | `examples/demos/target55/reports/operating-envelope/observer_on.json` |
+| Thermal | optional abort for load; result records whether thermal surface was available | target55 short load max 54.53C under 75C abort; PR5 contract records monitor evidence | partial | `examples/demos/target55/reports/operating-envelope/observer_on.json`; `tests/golden/lab.load_result.v1.valid.json` |
 | Latency / jitter | no claim | not measured | unknown | `docs/testing/resource-harness.md` |
 | Observer overhead | no production overhead claim | target55 short smoke iteration delta about -0.05% | partial | `examples/demos/target55/reports/operating-envelope/observer_on.json` |
 
@@ -29,7 +33,7 @@ Gate decision: experimental-only
 | Behavior | Mode | Cadence | Duration bound | Enabled by default? | Result |
 | --- | --- | ---: | ---: | --- | --- |
 | observe sampler | burst | 1s default | command duration | no | measured for target55 short smoke |
-| CPU load | experimental-only burst | worker loop | command duration | no | measured for target55 short smoke |
+| CPU load | experimental-only burst | worker loop plus 100ms safety monitor | command duration, max 300s | no | measured for target55 short smoke; operator abort contract tested |
 | target runner | command-triggered | none while idle | process lifetime | no | target55 smoke passed |
 
 ## Artifact Check
@@ -53,6 +57,7 @@ Gate decision: experimental-only
 | --- | --- | --- | --- |
 | safety-gated lab tooling | README.md | schemas, CLI, audit contracts, target55 smoke | allowed |
 | target55 10s 2-worker CPU load completed below 75C abort | `examples/demos/target55/docs/operating-envelope.md` | `examples/demos/target55/reports/operating-envelope/observer_off.json` | allowed target-specific short-smoke claim |
+| CPU load operator abort produces structured aborted result | `crates/adc-lab/tests/cli.rs` | hardware-free CLI test and `lab.load_result.v1` schema | allowed contract/runtime claim |
 | low overhead | none | short smoke insufficient | blocked if introduced |
 | battery safe | none | none | blocked if introduced |
 | production ready target runtime | none | none | blocked if introduced |

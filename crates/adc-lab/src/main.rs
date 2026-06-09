@@ -168,6 +168,8 @@ struct LoadCpuCommand {
     #[arg(long)]
     abort_temp_c: Option<f64>,
     #[arg(long)]
+    operator_abort_file: Option<PathBuf>,
+    #[arg(long)]
     run_dir: Option<PathBuf>,
     #[arg(long)]
     json: bool,
@@ -520,20 +522,32 @@ fn command_load_cpu(args: LoadCpuCommand) -> Result<()> {
     let duration = parse_duration(&args.duration)?;
     let result = match target.transport {
         TargetTransport::Local => {
-            let plan = new_cpu_load_plan(
+            let plan = new_cpu_load_plan_with_operator_abort(
                 target.target_id.clone(),
                 args.workers,
                 duration,
                 args.abort_temp_c,
+                args.operator_abort_file.is_some(),
             )?;
             let plan_path = run
                 .run_dir
                 .join("loads")
                 .join(format!("{}.plan.json", plan.load_id));
             write_json_artifact(&run, &plan_path, &plan)?;
-            run_cpu_load(&plan)?
+            run_cpu_load_with_options(
+                &plan,
+                &CpuLoadRuntimeOptions {
+                    operator_abort_file: args.operator_abort_file.clone(),
+                },
+            )?
         }
-        TargetTransport::Ssh => load_cpu_ssh(&target, args.workers, duration, args.abort_temp_c)?,
+        TargetTransport::Ssh => load_cpu_ssh(
+            &target,
+            args.workers,
+            duration,
+            args.abort_temp_c,
+            args.operator_abort_file.as_deref(),
+        )?,
     };
     let path = run
         .run_dir
@@ -1110,6 +1124,7 @@ fn load_cpu_ssh(
     workers: usize,
     duration: Duration,
     abort_temp_c: Option<f64>,
+    operator_abort_file: Option<&Path>,
 ) -> Result<LoadResult> {
     let mut command = Command::new("ssh");
     command
@@ -1124,6 +1139,9 @@ fn load_cpu_ssh(
         .arg("--json");
     if let Some(limit) = abort_temp_c {
         command.arg("--abort-temp-c").arg(limit.to_string());
+    }
+    if let Some(path) = operator_abort_file {
+        command.arg("--operator-abort-file").arg(path);
     }
     let output = command.output()?;
     if !output.status.success() {

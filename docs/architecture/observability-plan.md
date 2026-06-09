@@ -24,7 +24,7 @@
 | `control.apply` | explain privileged apply result, refusal, or restore-after-failure outcome | CLI start to helper/core result |
 | `restore` | explain restore result | CLI start to helper/core result |
 | `health-check.restore` | explain read-only post-restore target health | restored result to health artifact |
-| `load.cpu` | explain bounded load outcome and abort reason | CLI start to load result |
+| `load.cpu` | explain bounded load outcome, abort reason, and safety monitor result | CLI start to load result |
 | `experiment.run` | explain matrix trial planning/execution | CLI start to experiment artifacts |
 | `tool.qualify` | explain whether a tool can be evidence | CLI start to qualification report |
 
@@ -83,6 +83,19 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
 - Failure mode / misleading interpretation: health check `ok` is not proof of thermal, battery, load, or production readiness.
 - Artifact path: `artifact://lab/runs/<run_id>/health/restore_health_check.json`.
 
+- Signal: CPU load safety monitor result.
+- Decision supported: whether a Tier 1 CPU load completed or stopped due to an
+  explicit safety boundary.
+- Action owner: lab operator or agent reviewing the run.
+- Expected action when degraded: inspect `abort_reason`, lower duration/worker
+  count, improve cooling, or rerun with a clearer operator abort procedure.
+- Counter-metric: `safety_monitor.thermal_surface_available` and
+  `safety_monitor.operator_abort_observed`; missing thermal surface blocks
+  thermal safety claims.
+- Failure mode / misleading interpretation: a completed bounded load is not a
+  sustained thermal, battery, flash, latency, or production readiness claim.
+- Artifact path: `artifact://lab/runs/<run_id>/loads/<load_id>.result.json`.
+
 - Signal: experiment claim decision.
 - Decision supported: whether matrix artifacts can support a target behavior claim.
 - Action owner: lab operator or agent reviewing the run.
@@ -102,7 +115,11 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
 - Signal: tool qualification summary.
 - Decision supported: which discovered tools may be used as evidence sources in the current run.
 - Action owner: lab operator or agent reviewing evidence.
-- Expected action when degraded: reject claims that depend on unqualified, missing, privileged, external, or load tools and run the later qualification/control/load workflow.
+- Expected action when degraded: reject claims that depend on unqualified,
+  missing, privileged, external, or non-allowlisted load tools and run the
+  later qualification/control workflow.
 - Counter-metric: `evidence_rejected_tool_ids` and `missing_tool_ids`.
-- Failure mode / misleading interpretation: `builtin` means accepted by PR3 read-only policy, not that tool overhead, control behavior, or load safety has been calibrated.
+- Failure mode / misleading interpretation: `builtin` means accepted by the
+  current allowlist. For `adc-lab-builtin-cpu-load`, it supports bounded load
+  result evidence only; it does not prove production overhead or thermal safety.
 - Artifact path: `artifact://lab/runs/<run_id>/tools/tool_qualification_summary.json`.

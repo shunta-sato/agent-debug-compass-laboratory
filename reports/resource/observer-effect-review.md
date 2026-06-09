@@ -2,8 +2,8 @@
 
 ## Observer
 
-- Component: procfs/sysfs observation and run artifact writer.
-- Cadence: 1s default during explicit observation command.
+- Component: procfs/sysfs observation, CPU load safety monitor, and run artifact writer.
+- Cadence: 1s default during explicit observation command; 100ms safety monitor during explicit CPU load.
 - Data captured: CPU ticks, memory availability, cpufreq, thermal readings.
 - Storage path: controller run artifacts; target runner writes only stdout in MVP.
 - Transmission path: local stdout or fixed SSH command stdout.
@@ -13,11 +13,11 @@
 
 | Vector | Risk | Evidence | Mitigation | Status |
 | --- | --- | --- | --- | --- |
-| Scheduler / wakeups | added wakeups during observation | target55 short smoke; wakeups unavailable | bounded duration and 1s default | partial |
+| Scheduler / wakeups | added wakeups during observation and load safety monitor | target55 short smoke; wakeups unavailable; PR5 hardware-free operator-abort tests | bounded duration, 1s observe default, 100ms load monitor only during explicit load | partial |
 | CPU / allocation | per-sample reads and output allocation | target55 observer-on/off load iterations | no always-on mode | partial |
-| Storage writes / flash wear | controller writes artifacts | code review | no target continuous writes | provisional |
+| Storage writes / flash wear | controller writes artifacts; target load checks optional abort marker metadata | code review and PR5 CLI test | no target continuous writes; abort file path is not serialized into artifacts | provisional |
 | Network/radio use | SSH output when remote | target55 SSH smoke | fixed command, bounded output expectation | partial |
-| Thermal behavior | observer may perturb load runs | target55 observer-on/off thermal smoke | keep production thermal claims blocked | partial |
+| Thermal behavior | observer and safety monitor may perturb load runs | target55 observer-on/off thermal smoke; PR5 safety monitor contract | keep production thermal claims blocked | partial |
 | Lock contention / queue pressure | none in MVP observer | code review | no shared queue | provisional |
 | Timing / jitter | not measured | missing target evidence | no timing claim | unknown |
 
@@ -38,6 +38,9 @@
 
 - No submit-blocking observer finding for experimental-only MVP.
 - [EOE-001] `target55` - observer-on/off smoke is short and lacks wakeup/power/jitter surfaces - keep production overhead claims blocked.
+- [EOE-002] PR5 load safety monitor adds a 100ms check during explicit CPU
+  load; this is accepted for experimental burst mode but is not production
+  overhead evidence.
 
 ## Handoff
 
