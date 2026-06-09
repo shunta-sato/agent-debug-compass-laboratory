@@ -1,0 +1,42 @@
+{
+  "schema_version": "lab.privilege_provider_status.v1",
+  "target_id": "local-target",
+  "active_provider_id": "option_a_sudo_helper",
+  "providers": [
+    {
+      "provider_id": "option_a_sudo_helper",
+      "provider_kind": "sudo_helper_option_a",
+      "availability": "active",
+      "transport": "sudo_exec",
+      "endpoint": "/usr/local/libexec/adc-lab-priv-helper",
+      "root_boundary": "root-owned helper invoked through sudo; no shell or arbitrary command input",
+      "operations_allowed": ["linux.cpufreq.set_governor"],
+      "approval_required": true,
+      "audit_required": true,
+      "restore_required": true,
+      "default_enabled": true,
+      "safety_notes": [
+        "controller CLI has no public helper path override",
+        "privileged apply and restore remain local-target only in this MVP"
+      ]
+    },
+    {
+      "provider_id": "option_b_systemd_unix_socket",
+      "provider_kind": "systemd_unix_socket_option_b",
+      "availability": "planned_disabled",
+      "transport": "unix_socket",
+      "endpoint": "/run/adc-lab/privileged.sock",
+      "root_boundary": "planned root-owned provider over a bounded Unix socket; not installed or started in PR10",
+      "operations_allowed": [],
+      "approval_required": true,
+      "audit_required": true,
+      "restore_required": true,
+      "default_enabled": false,
+      "safety_notes": [
+        "no systemd unit, socket listener, or daemon is installed by PR10",
+        "not an active privileged transport and not evidence of remote privileged apply"
+      ]
+    }
+  ],
+  "time_unix_ms": 1780000000000
+}

@@ -26,6 +26,10 @@ MVP behavior:
   randomized order, trial explosion beyond policy, or failed load/observe
   steps instead of treating the trial as completed evidence.
 - Tier 2 cpufreq governor control uses the privileged helper and restore lease, but apply/restore is local-target only in this MVP.
+- PR10 privilege provider status is Tier 0 read-only reporting. It records the
+  fixed Option A helper as active and the future Option B systemd/Unix-socket
+  provider as planned-disabled; it does not enable a daemon, socket, or new
+  privileged transport.
 - Tier 2 approval artifacts are generated from a validated control plan and are local-target only in this MVP.
 - Tier 2 approvals are bound to plan id, plan digest, exact operation, and bounds.
 - Tier 2 control plan bounds are authorization/experiment bounds. The helper

@@ -6,17 +6,17 @@ Findings: 0
 
 ## Checks Run
 
-- `cargo fmt --all` - pass.
-- `cargo test -p adc-lab-core qualification -- --nocapture` - pass.
-- `cargo test -p adc-lab --test cli tool_qualification -- --nocapture` -
+- `cargo fmt --all --check` - pass.
+- `cargo test -p adc-lab-core privilege -- --nocapture` - pass.
+- `cargo test -p adc-lab --test cli privilege_provider -- --nocapture` -
   pass.
 - `make contract` - pass.
 - `make verify` - pass.
 - `git diff --check` - pass.
-- High-confidence secret/PII/security scan over PR diff, PR9 ExecPlan, and new
-  example tool evidence files - pass. No API keys, passwords, IP addresses,
-  email addresses, personal names, or security incident details were found in
-  the PR changes.
+- High-confidence sensitive-data scan over PR added lines and changed file
+  names - pass. No credentials, private keys, contact addresses,
+  network-address literals, or incident-pattern signatures were found in PR10
+  additions.
 
 ## Live Discovery
 
@@ -24,20 +24,21 @@ Findings: 0
   check, clippy, tests, contract validation, docs smoke, and command smoke.
 - Repo command wrapper: `Makefile` remains the canonical command surface.
 - Schema/config paths:
-  `schemas/lab.tool_qualification.v1.schema.json`,
-  `tests/golden/lab.tool_qualification.v1.valid.json`, and
-  `examples/tools/linux_cpufreq_reader.yaml`.
+  `schemas/lab.privilege_provider_status.v1.schema.json` and
+  `tests/golden/lab.privilege_provider_status.v1.valid.json`.
 - Target connection state: no hardware target required for default
-  verification. PR9 tests use local hardware-free evidence files and do not run
-  adapter commands.
-- Artifact/log paths expected from PR9 workflow:
-  `tools/<tool_id>.qualification.json`, copied qualification evidence artifacts,
-  and `audit.jsonl` operation `tool.qualify`.
+  verification. PR10 provider status is controller-side report generation and
+  does not contact, install, or start a privileged provider.
+- Artifact/log paths expected from PR10 workflow:
+  `privilege/privilege_provider_status.json` and `audit.jsonl` operation
+  `privilege.provider_status`.
 
 ## Triggered Branch Evidence
 
 - ExecPlan - present:
-  `plans/20260609-pr9-agent-adapter-qualification-workflow.md`.
+  `plans/20260609-pr10-option-b-privilege-provider.md`.
+- Architecture decision analysis - present:
+  `reports/architecture/option-b-privilege-provider-decision.md`.
 - Function boundary review - present:
   `reports/architecture/function-boundary-review.md`.
 - Error handling - present:
@@ -55,25 +56,20 @@ Findings: 0
 
 ## Exit Criteria Review
 
-- Agent-created manifest-only tools still produce
-  `agent_created_unqualified` and `evidence_accepted=false`.
-- Complete evidence can qualify only non-state-writing, non-privileged
-  observation/probe/report-normalizer/health-check adapters.
-- Control, restore, privileged, state-writing, and load adapters remain
-  unqualified in PR9.
-- Dry-run/manual comparison/output-schema evidence is validated as bounded
-  local input and copied into run artifacts.
-- Qualification reports store artifact refs, not raw local input paths.
-- `tool.qualify` audit records `qualified` or `recorded_unqualified`.
+- Option A sudo helper remains the only active provider.
+- Option B systemd/Unix-socket provider is represented as
+  `planned_disabled`, `default_enabled=false`, and with no allowed operations.
+- `adc-lab privilege provider-status` is Tier 0 read-only reporting. It writes
+  an artifact and audit event, but does not invoke sudo, install systemd units,
+  create sockets, start daemons, or change cpufreq/control behavior.
+- Provider status artifacts use logical `artifact://lab/runs/...` refs.
 - Default verification remains hardware-free.
-- PR9 adds no arbitrary tool execution, shell execution, target probes,
-  privileged control, sudo helper behavior, cpufreq write, load generation,
-  target-local runtime, destructive experiment, benchmark ranking, or production
-  physical-footprint claim.
+- PR10 adds no arbitrary shell, no new helper override, no root daemon, no
+  remote privileged apply, no target-local always-on runtime, no load
+  generation, no destructive experiment, and no production physical-footprint
+  claim.
 
 ## Gate Decision
 
-Submit. The change is controller-side qualification evidence gating for
-agent-created adapters. It allows a narrow qualified observation/probe adapter
-path without broadening runtime, control, or production physical-footprint
-claims.
+Submit. The change is a controller-side provider posture contract/report. It
+makes future Option B review safer without enabling any new privileged runtime.

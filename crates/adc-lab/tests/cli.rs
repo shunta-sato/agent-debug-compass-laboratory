@@ -771,6 +771,57 @@ fn report_operating_point_marks_read_only_run_observational_only() {
 }
 
 #[test]
+fn privilege_provider_status_records_option_b_disabled_and_audit() {
+    let temp = tempfile::tempdir().unwrap();
+    let output = Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "privilege",
+            "provider-status",
+            "--target",
+            "local",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("privilege_provider_status.json"))
+        .stdout(contains("\"active_provider_id\": \"option_a_sudo_helper\""))
+        .stdout(contains("\"availability\": \"planned_disabled\""))
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    let artifact_ref = value["artifact_ref"].as_str().unwrap();
+    assert!(artifact_ref.starts_with("artifact://lab/runs/"));
+    assert!(!artifact_ref.contains(temp.path().to_str().unwrap()));
+
+    let path = temp.path().join("privilege/privilege_provider_status.json");
+    assert!(path.exists());
+    let status: serde_json::Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+    assert_eq!(status["schema_version"], "lab.privilege_provider_status.v1");
+    assert!(status["providers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|provider| {
+            provider["provider_id"] == "option_b_systemd_unix_socket"
+                && provider["availability"] == "planned_disabled"
+                && provider["default_enabled"] == false
+                && provider["operations_allowed"]
+                    .as_array()
+                    .unwrap()
+                    .is_empty()
+        }));
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"privilege.provider_status\""));
+    assert!(audit.contains("\"result\":\"recorded\""));
+}
+
+#[test]
 fn report_operating_point_marks_bounded_matrix_controlled_subset() {
     let temp = tempfile::tempdir().unwrap();
     let matrix = workspace_root().join("examples/experiments/bounded_load_observe_smoke.yaml");

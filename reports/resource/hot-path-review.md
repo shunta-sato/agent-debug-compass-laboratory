@@ -45,6 +45,9 @@
 - [EHP-005] PR9 agent-created adapter qualification validates supplied
   controller-side evidence files only; it does not execute adapters or add a
   target-local hot path.
+- [EHP-006] PR10 privilege provider status reads policy constants and writes a
+  controller-side report only; it does not install or run a systemd socket
+  provider.
 
 ## Handoff
 

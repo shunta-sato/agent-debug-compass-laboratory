@@ -24,6 +24,7 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
 | Operating point coverage report | missing observation/experiment artifacts, blocked trial, failed trial, unsupported factor, or unsafe factor | structured coverage with `observational_only`, `controlled_subset`, `not_controllable`, or `blocked_unsafe`; malformed JSON artifacts are CLI errors |
 | Capability cost model report | missing optional inventory/toolchain/coverage/load artifacts, malformed JSON, or absent accelerator/storage/network evidence | missing optional artifacts become `missing_evidence`/blocked claims; malformed JSON artifacts are CLI errors because evidence cannot be trusted |
 | Agent-created adapter qualification | missing evidence flag, unreadable file, malformed JSON, oversized output, invalid sha256, unsafe adapter scope | CLI validation error before evidence acceptance, or `agent_created_unqualified` report when scope is outside PR9 allowlist |
+| Privilege provider status | invalid target, artifact write failure, or audit write failure | CLI error with context; planned-disabled Option B is report data, not a failure |
 
 ## Caller Contract
 
@@ -75,4 +76,7 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
 - Complete evidence can qualify only non-state-writing, non-privileged
   observation/probe/report-normalizer/health-check adapters in PR9. Control,
   restore, privileged, state-writing, and load adapters remain unqualified.
+- Privilege provider status does not contact or start a provider. Option B
+  planned-disabled is represented as structured report state rather than a
+  recoverable runtime failure.
 - If target physical evidence is unavailable, reports mark claims provisional or blocked.

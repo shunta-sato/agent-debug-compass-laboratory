@@ -52,6 +52,8 @@
 - [EOE-006] PR9 agent-created adapter qualification validates supplied
   controller-side evidence artifacts only; it does not execute adapters or add
   target observer effect.
+- [EOE-007] PR10 privilege provider status is controller-side report generation
+  only; Option B remains planned-disabled and creates no target observer effect.
 
 ## Handoff
 

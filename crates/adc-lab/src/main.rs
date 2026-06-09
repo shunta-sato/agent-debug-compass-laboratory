@@ -47,6 +47,10 @@ enum Commands {
         command: ReportCommand,
     },
     HealthCheck(TargetCommand),
+    Privilege {
+        #[command(subcommand)]
+        command: PrivilegeCommand,
+    },
     Tool {
         #[command(subcommand)]
         command: ToolCommand,
@@ -66,6 +70,12 @@ struct TargetCommand {
 #[derive(Debug, Subcommand)]
 enum ToolchainCommand {
     Discover(TargetCommand),
+}
+
+#[derive(Debug, Subcommand)]
+enum PrivilegeCommand {
+    #[command(name = "provider-status")]
+    ProviderStatus(TargetCommand),
 }
 
 #[derive(Debug, Args)]
@@ -353,6 +363,9 @@ fn main() -> Result<()> {
             ReportCommand::OperatingPoint(args) => command_report_operating_point(args),
         },
         Commands::HealthCheck(args) => command_health_check(args),
+        Commands::Privilege { command } => match command {
+            PrivilegeCommand::ProviderStatus(args) => command_privilege_provider_status(args),
+        },
         Commands::Tool { command } => match command {
             ToolCommand::Qualify(args) => command_tool_qualify(args),
             ToolCommand::QualifyInventory(args) => command_tool_qualify_inventory(args),
@@ -1036,6 +1049,28 @@ fn command_health_check(args: TargetCommand) -> Result<()> {
     let target = TargetSpec::parse(&args.target)?;
     let output = build_health_output(&target);
     print_json(&output)
+}
+
+fn command_privilege_provider_status(args: TargetCommand) -> Result<()> {
+    let target = TargetSpec::parse(&args.target)?;
+    let run = create_or_open_run(args.run_dir)?;
+    let status = privilege_provider_status(target.target_id.clone());
+    let path = run.run_dir.join("privilege/privilege_provider_status.json");
+    write_json_artifact(&run, &path, &status)?;
+    append_audit_event(
+        &run,
+        AuditInput {
+            target_id: status.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "privilege.provider_status".to_string(),
+            operation_id: Some(status.active_provider_id.clone()),
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: "recorded".to_string(),
+        },
+    )?;
+    print_artifact(&run, &path, status)
 }
 
 fn build_health_output(target: &TargetSpec) -> HealthOutput {

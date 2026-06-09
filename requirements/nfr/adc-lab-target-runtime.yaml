@@ -62,6 +62,10 @@ modes:
     agent_adapter_qualification_executes_adapter: false
     agent_adapter_qualification_duration_seconds_max: 30
     agent_adapter_qualification_output_bytes_max: 1048576
+    privilege_provider_status_target_runtime: none
+    option_b_privilege_provider_default_enabled: false
+    option_b_systemd_unit_installed_by_pr10: false
+    option_b_socket_listener_started_by_pr10: false
     cpu_percent_max: null
     wakeups_per_second_added_max: null
     disk_write_bytes_total_max: null
@@ -86,6 +90,7 @@ measurement:
   pr7_operating_point_coverage_verified_by: cargo test -p adc-lab --test cli report_operating_point -- --nocapture
   pr8_capability_cost_model_verified_by: cargo test -p adc-lab-core capability_cost -- --nocapture
   pr9_agent_adapter_qualification_verified_by: cargo test -p adc-lab --test cli tool_qualification -- --nocapture
+  pr10_privilege_provider_status_verified_by: cargo test -p adc-lab --test cli privilege_provider -- --nocapture
   baseline_path: examples/demos/target55/baselines/resource/idle.json
   report_path: examples/demos/target55/reports/target-characterization.json
   missing_evidence:

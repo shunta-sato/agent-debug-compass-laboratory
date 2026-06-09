@@ -23,6 +23,9 @@ Gate decision: experimental-only
 - PR9 agent-created adapter qualification is hardware-free verified as
   controller-side evidence gating; it does not execute adapters or add target
   physical measurement evidence.
+- PR10 privilege provider status is hardware-free verified as controller-side
+  policy posture reporting; it does not install or start a root provider,
+  systemd unit, or Unix socket.
 - Production physical-footprint claims remain blocked until wakeup, battery/power, flash/storage, jitter, sustained thermal, degraded, and recovery evidence exists.
 - `make command-smoke` verifies command wiring only and explicitly reports `resource_metrics_collected=false`; it is not resource evidence.
 
@@ -51,6 +54,7 @@ Gate decision: experimental-only
 | operating-point coverage report | controller-side report | none on target | command lifetime | no | PR7 coverage classification tests passed |
 | capability-cost model report | controller-side report | none on target | command lifetime | no | PR8 capability evidence packet tests passed |
 | agent-created adapter qualification report | controller-side report | none on target | command lifetime | no | PR9 adapter qualification tests passed |
+| privilege provider status report | controller-side report | none on target | command lifetime | no | PR10 provider status tests passed |
 | target runner | command-triggered | none while idle | process lifetime | no | target55 smoke passed |
 
 ## Artifact Check
@@ -79,6 +83,7 @@ Gate decision: experimental-only
 | PR7 operating-point coverage separates observed variation from controlled subset evidence | `crates/adc-lab/tests/cli.rs` | hardware-free CLI tests and `lab.operating_point_coverage.v1` schema | allowed contract/report claim |
 | PR8 capability cost model blocks offload and production architecture claims without cost evidence | `crates/adc-lab-core/src/report.rs` | hardware-free core/CLI tests and `lab.capability_cost_model.v1` schema | allowed contract/report claim |
 | PR9 agent-created observation adapter can become qualified only with bounded evidence artifacts | `crates/adc-lab-core/src/qualification.rs` | hardware-free core/CLI tests and `lab.tool_qualification.v1` schema | allowed contract/report claim |
+| PR10 Option B provider is planned-disabled and not active | `crates/adc-lab-core/src/privilege.rs` | hardware-free core/CLI tests and `lab.privilege_provider_status.v1` schema | allowed contract/report claim |
 | low overhead | none | short smoke insufficient | blocked if introduced |
 | battery safe | none | none | blocked if introduced |
 | production ready target runtime | none | none | blocked if introduced |
@@ -102,6 +107,9 @@ Gate decision: experimental-only
   qualified report is evidence-source gating only and does not prove target
   overhead, thermal safety, battery safety, flash safety, or production
   readiness.
+- Option B privilege provider is not installed or started in PR10. Provider
+  status evidence is not proof of helper ownership, socket hardening, daemon
+  footprint, or remote privileged apply readiness.
 
 ## Handoff To Quality Gate
 

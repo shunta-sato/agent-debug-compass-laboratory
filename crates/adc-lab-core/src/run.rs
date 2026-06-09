@@ -93,6 +93,7 @@ pub fn create_or_open_run(run_dir: Option<PathBuf>) -> LabResult<RunContext> {
         "experiments",
         "reports",
         "tools",
+        "privilege",
     ] {
         let path = run_dir.join(child);
         std::fs::create_dir_all(&path).with_path(path)?;

@@ -18,6 +18,8 @@ The project is separate from Agent Debug Compass Flight Recorder. Flight Recorde
 - Controller CLI: `adc-lab`
 - Non-root target runner: `adc-lab-target`
 - Option A privileged helper: `adc-lab-priv-helper`
+- Option B systemd/Unix-socket privilege provider: planned and disabled by
+  default; PR10 reports provider status only and does not install a daemon.
 - Core contracts and schemas in `schemas/`
 - Run artifacts in `lab/runs/LAB-RUN-*`
 - Audit log in every evidence-producing run
@@ -38,6 +40,7 @@ adc-lab inventory --target local
 adc-lab toolchain discover --target local
 adc-lab tool qualify-inventory --inventory lab/runs/LAB-RUN-.../toolchain/toolchain_inventory.json
 adc-lab tool qualify --manifest examples/tools/linux_cpufreq_reader.yaml --tool-version 0.1.0 --tool-sha256 sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --output-schema examples/tools/linux_cpufreq_reader.output_schema.json --dry-run-output examples/tools/linux_cpufreq_reader.dry_run.json --manual-comparison examples/tools/linux_cpufreq_reader.manual_comparison.json --static-safety-review examples/tools/linux_cpufreq_reader.static_safety_review.txt
+adc-lab privilege provider-status --target local
 adc-lab observe --target local --duration 5s --signals cpu,freq,thermal,memory
 adc-lab familiarize read-only --target local --duration 5s --signals cpu,freq,thermal,memory
 
