@@ -24,6 +24,15 @@ fn single_plan_path(run_dir: &std::path::Path) -> PathBuf {
         .unwrap()
 }
 
+fn single_approval_path(run_dir: &std::path::Path) -> PathBuf {
+    fs::read_dir(run_dir.join("approvals"))
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|path| path.extension().and_then(|ext| ext.to_str()) == Some("json"))
+        .unwrap()
+}
+
 #[test]
 fn cli_help_mentions_adc_lab() {
     Command::cargo_bin("adc-lab")
@@ -231,6 +240,146 @@ fn control_apply_audit_records_approval_ref() {
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"approval_ref\":\"artifact://lab/runs/"));
     assert!(audit.contains("/approvals/APPROVAL-001.json\""));
+}
+
+#[test]
+fn control_approve_generates_plan_bound_approval_for_dry_run_apply() {
+    let temp = tempfile::tempdir().unwrap();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "plan",
+            "--target",
+            "local",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--duration-seconds-max",
+            "45",
+            "--thermal-celsius-abort",
+            "70",
+            "cpu.governor",
+            "--set",
+            "performance",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"artifact_ref\""));
+    let plan_path = single_plan_path(temp.path());
+    let plan: ControlPlan = serde_json::from_slice(&fs::read(&plan_path).unwrap()).unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "approve",
+            "--plan",
+            plan_path.to_str().unwrap(),
+            "--approved-by",
+            "operator",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"schema_version\": \"lab.approval_record.v1\""));
+
+    let approval_path = single_approval_path(temp.path());
+    let approval: ApprovalRecord =
+        serde_json::from_slice(&fs::read(&approval_path).unwrap()).unwrap();
+    assert_eq!(approval.approved_plan_id, plan.plan_id);
+    assert_eq!(
+        approval.approved_plan_digest,
+        canonical_plan_digest(&plan).unwrap()
+    );
+    assert_eq!(approval.approved_operation, plan.operation);
+    assert_eq!(approval.bounds.duration_seconds_max, 45);
+    assert_eq!(approval.bounds.thermal_celsius_abort, Some(70.0));
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "apply",
+            "--plan",
+            plan_path.to_str().unwrap(),
+            "--approval",
+            approval_path.to_str().unwrap(),
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"status\": \"dry_run_ok\""));
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"control.approve\""));
+    assert!(audit.contains("\"operation\":\"control.apply\""));
+    assert!(audit.contains("\"approval_ref\":\"artifact://lab/runs/"));
+}
+
+#[test]
+fn control_approve_refuses_remote_target_plan() {
+    let temp = tempfile::tempdir().unwrap();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "plan",
+            "--target",
+            "ssh://pi4-demo",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "cpu.governor",
+            "--set",
+            "performance",
+        ])
+        .assert()
+        .success();
+    let plan_path = single_plan_path(temp.path());
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "approve",
+            "--plan",
+            plan_path.to_str().unwrap(),
+            "--approved-by",
+            "operator",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("control approval is local-target only"));
+    let approval_files = fs::read_dir(temp.path().join("approvals"))
+        .unwrap()
+        .flatten()
+        .count();
+    assert_eq!(approval_files, 0);
+}
+
+#[test]
+fn restore_dry_run_does_not_write_restore_health_check() {
+    let temp = tempfile::tempdir().unwrap();
+    let fixture = workspace_root().join("tests/golden/lab.restore_lease.v1.valid.json");
+    let mut lease: serde_json::Value = serde_json::from_slice(&fs::read(fixture).unwrap()).unwrap();
+    lease["target_id"] = serde_json::json!("local-target");
+    let lease_path = temp.path().join("local-lease.json");
+    fs::write(&lease_path, serde_json::to_vec_pretty(&lease).unwrap()).unwrap();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "restore",
+            "--lease",
+            lease_path.to_str().unwrap(),
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"status\": \"dry_run_ok\""));
+    assert!(!temp
+        .path()
+        .join("health/restore_health_check.json")
+        .exists());
 }
 
 fn matching_approval(plan: &ControlPlan) -> ApprovalRecord {

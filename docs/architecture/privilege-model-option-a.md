@@ -25,6 +25,7 @@ linux.cpufreq.set_governor
 Tier 2 control requires:
 
 - control plan
+- approval artifact generated from the plan
 - approval record bound to plan id, canonical plan digest, exact operation, and bounds
 - pre-state capture
 - restore lease
@@ -46,6 +47,7 @@ Helper path boundary:
 MVP target binding:
 
 - `adc-lab control plan --target ssh://...` may create a remote-target plan for review.
+- `adc-lab control approve` refuses non-`local-target` plans in this MVP.
 - `adc-lab control apply` and `adc-lab restore` refuse any plan or lease whose `target_id` is not `local-target`.
 - Remote privileged apply is intentionally deferred until the controller can invoke a target-local helper over an explicit, audited transport.
 
@@ -53,5 +55,8 @@ Failure recovery:
 
 - If apply or verify fails after pre-state capture, helper/core attempts immediate restore.
 - The returned `lab.control_result.v1` records `restore_attempted`, `restore_result`, and a restore lease with the resulting restore status.
+- When a restore completes successfully through the controller, `adc-lab` records a
+  read-only post-restore health-check artifact and audit event. This health
+  check is diagnostic evidence only; it does not change the restore result.
 
 The default install keeps normal sudo password prompting. NOPASSWD sudoers is a future lab-machine-only operator decision, not an MVP assumption.
