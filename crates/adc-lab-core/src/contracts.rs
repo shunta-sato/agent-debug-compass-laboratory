@@ -61,6 +61,57 @@ pub enum PrivilegeLevel {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub enum PrivilegeProviderKind {
+    SudoHelperOptionA,
+    SystemdUnixSocketOptionB,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PrivilegeProviderAvailability {
+    Active,
+    Installed,
+    PlannedDisabled,
+    Missing,
+    Disabled,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PrivilegeProviderTransport {
+    SudoExec,
+    UnixSocket,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PrivilegeProviderDescriptor {
+    pub provider_id: String,
+    pub provider_kind: PrivilegeProviderKind,
+    pub availability: PrivilegeProviderAvailability,
+    pub transport: PrivilegeProviderTransport,
+    pub endpoint: String,
+    pub root_boundary: String,
+    pub operations_allowed: Vec<String>,
+    pub approval_required: bool,
+    pub audit_required: bool,
+    pub restore_required: bool,
+    pub default_enabled: bool,
+    pub safety_notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PrivilegeProviderStatus {
+    pub schema_version: String,
+    pub target_id: String,
+    pub active_provider_id: String,
+    pub providers: Vec<PrivilegeProviderDescriptor>,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum QualificationStatus {
     Builtin,
     NeedsControlTest,

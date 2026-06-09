@@ -30,6 +30,7 @@
 | `report.operating_point` | explain observed vs controlled operating-point coverage | CLI start to coverage artifact |
 | `report.capability_cost` | explain architecture evidence sufficiency and blocked cost claims | CLI start to capability-cost artifact |
 | `tool.qualify` | explain whether an agent-created tool can be evidence | CLI start to evidence artifact copy and qualification report |
+| `privilege.provider_status` | explain which privilege provider is active or disabled | CLI start to provider status artifact |
 
 ## Correlation Identifiers
 
@@ -186,3 +187,19 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
   shell, perform control, or make production physical-footprint claims.
 - Artifact path:
   `artifact://lab/runs/<run_id>/tools/<tool_id>.qualification.json`.
+
+- Signal: privilege provider status.
+- Decision supported: whether a run used the active Option A provider posture
+  and whether Option B was merely planned-disabled.
+- Action owner: lab operator or agent reviewing privileged-control readiness.
+- Expected action when degraded: keep remote privileged apply and Option B
+  claims blocked until a later provider implementation, hardening, audit, and
+  physical-footprint evidence exist.
+- Counter-metric: `providers[].default_enabled=false` and empty
+  `operations_allowed` for Option B prevent planned design from becoming an
+  active transport claim.
+- Failure mode / misleading interpretation: provider status does not prove the
+  helper is installed, root-owned, or safe to use; it reports current adc-lab
+  policy posture only.
+- Artifact path:
+  `artifact://lab/runs/<run_id>/privilege/privilege_provider_status.json`.

@@ -2,6 +2,10 @@
 
 MVP privilege model: sudo wrapper helper.
 
+Option A remains the only active privileged provider in PR10. Option B is
+represented only as a planned-disabled provider in
+`lab.privilege_provider_status.v1`.
+
 Root-owned install path:
 
 ```text
@@ -53,6 +57,13 @@ Helper path boundary:
 - controller CLI invokes only `/usr/local/libexec/adc-lab-priv-helper`
 - public `--helper` override is not exposed in the MVP
 - test/dev helper execution uses the helper binary directly, without going through controller `sudo`
+
+Provider status boundary:
+
+- `adc-lab privilege provider-status` is Tier 0 read-only reporting.
+- It records Option A as active and Option B as planned-disabled.
+- It does not install a systemd unit, create a Unix socket, start a daemon, or
+  change apply/restore behavior.
 
 MVP target binding:
 

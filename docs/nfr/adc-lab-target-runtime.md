@@ -24,6 +24,10 @@
 - PR9 agent-created adapter qualification: controller-side evidence validation
   only. It copies supplied dry-run/comparison/schema/review artifacts into the
   run and does not execute adapter commands or add target-local runtime.
+- PR10 privilege provider status: controller-side report generation only. It
+  records Option A as active and Option B as planned-disabled; it does not
+  install a systemd unit, create a Unix socket, start a daemon, or contact a
+  privileged provider.
 - Measurement surfaces available in the demo: target55 procfs CPU/memory, sysfs thermal, sysfs cpufreq read surface. Demo artifacts live under `examples/demos/target55/`.
 - Measurement surfaces unavailable: wakeups, storage writes, battery/power, latency/jitter, sustained thermal recovery.
 
@@ -54,6 +58,7 @@
 | `adc-lab report operating-point` | controller-side report | none on target | command lifetime | no | PR7 hardware-free coverage classification tests |
 | capability-cost model in `adc-lab report operating-point` | controller-side report | none on target | command lifetime | no | PR8 hardware-free capability-cost model tests |
 | `adc-lab tool qualify --manifest ...` with evidence files | controller-side qualification report | none on target | command lifetime | no | PR9 hardware-free adapter qualification tests |
+| `adc-lab privilege provider-status` | controller-side report | none on target | command lifetime | no | PR10 hardware-free provider status tests |
 | `adc-lab-target` | command-triggered | none while idle | process lifetime | no daemon | demo target55 smoke passed |
 
 ## Degraded-Mode Policy
@@ -86,6 +91,9 @@
 - PR9 adapter qualification verification is hardware-free in core/CLI tests. It
   proves evidence gating for agent-created observation/probe adapters only; it
   does not execute adapters or provide target physical-footprint measurements.
+- PR10 privilege provider status verification is hardware-free in core/CLI
+  tests. It proves provider posture reporting only; it does not install or run
+  a target-local root provider.
 - Demo evidence pack: `examples/demos/target55/`.
 - Demo baseline: `examples/demos/target55/baselines/resource/`.
 - Demo report path: `examples/demos/target55/reports/operating-envelope/`, `examples/demos/target55/reports/target-characterization.json`.

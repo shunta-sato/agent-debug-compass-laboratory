@@ -40,7 +40,7 @@ fn contract_validation_schema_fixtures_validate() {
         checked += 1;
     }
 
-    assert!(checked >= 17, "expected all MVP schemas to be checked");
+    assert!(checked >= 21, "expected all MVP schemas to be checked");
 }
 
 #[test]
@@ -138,6 +138,22 @@ fn contract_validation_tool_qualification_requires_agent_adapter_evidence_fields
     assert!(
         validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
         "tool qualification must expose qualification scope"
+    );
+}
+
+#[test]
+fn contract_validation_privilege_provider_rejects_unknown_availability() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.privilege_provider_status.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.privilege_provider_status.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["providers"][1]["availability"] = serde_json::json!("enabled_by_default");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "privilege provider availability must stay in the schema enum"
     );
 }
 

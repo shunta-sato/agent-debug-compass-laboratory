@@ -1,50 +1,54 @@
-# Function Boundary Review: PR9 Agent Adapter Qualification
+# Function Boundary Review: PR10 Option B Privilege Provider Status
 
 ## Scope
 
 Changed functions/helpers:
 
-- `qualify_tool_with_evidence`, `validate_agent_tool_evidence`,
-  `agent_adapter_scope_is_qualifiable`, and related policy helpers in
-  `crates/adc-lab-core/src/qualification.rs`.
-- `command_tool_qualify`, `build_pending_tool_qualification_evidence`,
-  evidence readers, and evidence artifact persistence helpers in
-  `crates/adc-lab/src/main.rs`.
-- `ToolQualification` and `ToolQualificationEvidence` contracts in
-  `crates/adc-lab-core/src/contracts.rs` and
-  `crates/adc-lab-core/src/qualification.rs`.
+- `privilege_provider_status` in `crates/adc-lab-core/src/privilege.rs`.
+- `option_a_provider` and `option_b_provider` in
+  `crates/adc-lab-core/src/privilege.rs`.
+- `command_privilege_provider_status` in `crates/adc-lab/src/main.rs`.
+- `PrivilegeProviderStatus` and related provider DTOs in
+  `crates/adc-lab-core/src/contracts.rs`.
 
 ## Semantic Neighbors
 
 | Function / Type | Neighbor classification | Decision |
 | --- | --- | --- |
-| `qualify_tool` | manifest-only compatibility wrapper | keep as wrapper around `qualify_tool_with_evidence` |
-| `qualify_tool_with_evidence` | main policy boundary for agent-created tools | split from inventory qualification so agent evidence rules do not leak into builtin policy |
-| `validate_agent_tool_evidence` | evidence-field validation boundary | keep pure core validation for refs, sha, bounds, and version |
-| `agent_adapter_scope_is_qualifiable` | scope allowlist policy | keep explicit and conservative; no generic adapter framework yet |
-| `qualify_tool_info` | discovered toolchain inventory qualification | keep parallel because builtin/external inventory policy differs from agent-created evidence policy |
-| `build_pending_tool_qualification_evidence` | CLI boundary for local evidence files | keep in CLI because it reads filesystem inputs and writes run artifacts |
-| evidence file readers | filesystem/format validation | keep separate by JSON vs text error contracts |
-| `ToolQualificationEvidence` | core input DTO, not an artifact contract | keep in `qualification.rs`; report artifact remains `ToolQualification` |
+| `build_health_output` | parallel read-only status report | keep parallel because health probes current target surfaces while provider status reports policy posture |
+| `validate_priv_helper_path` | Option A helper path policy | keep in control module because it gates privileged execution, not read-only provider reporting |
+| `command_health_check` | parallel CLI status command | keep separate; no provider artifact/audit semantics |
+| `persist_control_result` | privileged operation audit boundary | keep separate; provider status is Tier 0 and does not produce control results |
+| `privilege_provider_status` | new pure core builder | keep in new `privilege` module so future provider transport code does not leak into CLI command dispatch |
 
 ## Decisions
 
-- No arbitrary adapter execution is added. PR9 validates supplied files and
-  records artifact-backed evidence only.
-- No merge with `qualify_tool_info`. Inventory qualification and agent-created
-  adapter qualification have different sources, side effects, and error
-  contracts.
-- `ToolQualification` remains the single report artifact. Optional evidence
-  fields are explicit nulls for builtin/unqualified cases.
-- CLI owns local path handling and artifact copying. Core owns policy decisions
-  over logical refs and manifest fields.
-- Control/load/privileged/state-writing adapters are deliberately kept
-  unqualified in PR9.
-- Ledger update not required: no long-lived sibling abstraction, staged adapter,
-  or intentional duplicate implementation remains.
+- Keep provider posture building in `adc-lab-core`, not inline in the CLI.
+- Keep Option A execution validation in `control.rs`; provider status only
+  describes policy and does not decide whether a helper path may run.
+- Keep Option B as a descriptor with `planned_disabled` availability and empty
+  operation allowlist. Do not add a staged socket adapter in PR10.
+- The CLI command owns target parsing, run artifact writes, and audit emission.
+- Ledger update not required: no replaced abstraction, intentional duplication,
+  or staged adapter remains. The new module is a narrow contract/report
+  boundary.
+
+## Boundary Decisions
+
+| Boundary | Action | Rationale |
+| --- | --- | --- |
+| Provider status DTOs | keep | typed contract is required for schema/golden validation |
+| `privilege_provider_status` | keep | pure builder, deterministic except timestamp, no filesystem side effects |
+| Option A/Option B descriptor helpers | keep | split keeps provider-specific constants readable without generic flags |
+| CLI provider status command | keep | artifact/audit side effects belong at CLI boundary with existing run context |
 
 ## Verification
 
-- `cargo test -p adc-lab-core qualification -- --nocapture`: pass.
-- `cargo test -p adc-lab --test cli tool_qualification -- --nocapture`: pass.
-- Full workspace verification is recorded in `reports/quality-gate.md`.
+Planned commands:
+
+- `cargo test -p adc-lab-core privilege -- --nocapture`
+- `cargo test -p adc-lab --test cli privilege_provider -- --nocapture`
+- `make contract`
+- `make verify`
+
+Final results are recorded in `reports/quality-gate.md`.

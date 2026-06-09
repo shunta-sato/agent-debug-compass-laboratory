@@ -49,6 +49,10 @@ target_classes:
       agent_adapter_qualification_executes_adapter: false
       agent_adapter_qualification_duration_seconds_max: 30
       agent_adapter_qualification_output_bytes_max: 1048576
+      privilege_provider_status_target_runtime: none
+      option_b_privilege_provider_default_enabled: false
+      option_b_systemd_unit_installed_by_pr10: false
+      option_b_socket_listener_started_by_pr10: false
 
 degraded_modes:
   battery_low: experimental-only until target policy is characterized
