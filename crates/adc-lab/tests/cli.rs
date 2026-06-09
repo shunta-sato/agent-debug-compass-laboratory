@@ -102,7 +102,7 @@ fn control_apply_refuses_remote_plan_without_invoking_helper() {
             "control",
             "plan",
             "--target",
-            "ssh://target55",
+            "ssh://pi4-demo",
             "--run-dir",
             temp.path().to_str().unwrap(),
             "cpu.governor",
@@ -262,7 +262,7 @@ fn ssh_runner_rejects_shell_fragment_env() {
     Command::cargo_bin("adc-lab")
         .unwrap()
         .env("ADC_LAB_TARGET_RUNNER", "sh -c adc-lab-target")
-        .args(["inventory", "--target", "ssh://target55"])
+        .args(["inventory", "--target", "ssh://pi4-demo"])
         .assert()
         .failure()
         .stderr(contains("fixed adc-lab-target path"));
@@ -338,6 +338,7 @@ fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
         .stdout(contains("\"pack_status\": \"observational_read_only\""))
         .stdout(contains("\"run_manifest_ref\""))
         .stdout(contains("\"familiarization_pack_ref\""))
+        .stdout(contains("tool qualification summary was generated"))
         .get_output()
         .stdout
         .clone();
@@ -366,6 +367,10 @@ fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
         .path()
         .join("toolchain/toolchain_inventory.json")
         .exists());
+    assert!(temp
+        .path()
+        .join("tools/tool_qualification_summary.json")
+        .exists());
     assert!(temp.path().join("observations/observe.json").exists());
 
     let manifest: serde_json::Value =
@@ -382,6 +387,13 @@ fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
     )
     .unwrap();
     assert!(trace["claims"].as_array().unwrap().iter().any(|claim| {
+        claim["decision"] == "supported"
+            && claim["claim"]
+                .as_str()
+                .unwrap()
+                .contains("tool qualification summary")
+    }));
+    assert!(trace["claims"].as_array().unwrap().iter().any(|claim| {
         claim["decision"] == "blocked"
             && claim["claim"]
                 .as_str()
@@ -394,12 +406,84 @@ fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
         "inventory",
         "toolchain.discover",
         "observe",
+        "tool.qualify_inventory",
         "report.claim_trace",
         "run_manifest.write",
         "report.pack",
     ] {
         assert!(audit.contains(&format!("\"operation\":\"{operation}\"")));
     }
+}
+
+#[test]
+fn tool_qualify_inventory_accepts_builtin_readonly_and_rejects_unqualified_tools() {
+    let temp = tempfile::tempdir().unwrap();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "toolchain",
+            "discover",
+            "--target",
+            "local",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    let inventory_path = temp.path().join("toolchain/toolchain_inventory.json");
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "tool",
+            "qualify-inventory",
+            "--inventory",
+            inventory_path.to_str().unwrap(),
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(contains("tool_qualification_summary.json"));
+
+    let summary: serde_json::Value = serde_json::from_slice(
+        &fs::read(temp.path().join("tools/tool_qualification_summary.json")).unwrap(),
+    )
+    .unwrap();
+    assert!(summary["evidence_accepted_tool_ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|tool| tool == "linux.procfs"));
+    assert!(summary["evidence_rejected_tool_ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|tool| tool == "adc-lab-builtin-cpu-load"));
+
+    let procfs_report: serde_json::Value = serde_json::from_slice(
+        &fs::read(temp.path().join("tools/linux-procfs.qualification.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(procfs_report["status"], "builtin");
+    assert_eq!(procfs_report["evidence_accepted"], true);
+
+    let load_report: serde_json::Value = serde_json::from_slice(
+        &fs::read(
+            temp.path()
+                .join("tools/adc-lab-builtin-cpu-load.qualification.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(load_report["evidence_accepted"], false);
+    assert!(load_report["reason"]
+        .as_str()
+        .unwrap()
+        .contains("bounded load"));
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"tool.qualify_inventory\""));
 }
 
 #[test]

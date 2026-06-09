@@ -1,10 +1,16 @@
 {
   "schema_version": "lab.tool_qualification.v1",
   "tool_id": "linux_cpufreq_reader",
+  "category": "observation",
+  "privilege": "none",
+  "source": "agent_created",
+  "available": false,
   "status": "agent_created_unqualified",
   "evidence_accepted": false,
   "dry_run_required": true,
+  "evidence_refs": [],
   "checks": ["manifest_parsed", "bounds_present"],
   "limitations": ["not accepted as evidence until dry-run and comparison are recorded"],
+  "reason": "agent-created tool manifest lacks qualification evidence",
   "time_unix_ms": 1780000000000
 }

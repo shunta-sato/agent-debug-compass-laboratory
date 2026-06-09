@@ -220,12 +220,23 @@ struct ReportPackCommand {
 #[derive(Debug, Subcommand)]
 enum ToolCommand {
     Qualify(ToolQualifyCommand),
+    QualifyInventory(ToolQualifyInventoryCommand),
 }
 
 #[derive(Debug, Args)]
 struct ToolQualifyCommand {
     #[arg(long)]
     manifest: PathBuf,
+    #[arg(long)]
+    run_dir: Option<PathBuf>,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
+struct ToolQualifyInventoryCommand {
+    #[arg(long)]
+    inventory: PathBuf,
     #[arg(long)]
     run_dir: Option<PathBuf>,
     #[arg(long)]
@@ -289,6 +300,7 @@ fn main() -> Result<()> {
         Commands::HealthCheck(args) => command_health_check(args),
         Commands::Tool { command } => match command {
             ToolCommand::Qualify(args) => command_tool_qualify(args),
+            ToolCommand::QualifyInventory(args) => command_tool_qualify_inventory(args),
         },
     }
 }
@@ -540,7 +552,8 @@ fn command_familiarize_read_only(args: FamiliarizeReadOnlyCommand) -> Result<()>
     };
 
     persist_inventory(&run, &target)?;
-    persist_toolchain(&run, &target)?;
+    let (toolchain, _, toolchain_ref) = persist_toolchain(&run, &target)?;
+    persist_toolchain_qualifications(&run, &toolchain, Some(toolchain_ref))?;
     persist_observation(&run, &target, duration, interval, signals)?;
     let (_, _, claim_trace_ref) = persist_read_only_claim_trace(&run, target.target_id.clone())?;
     let ended_at = now_unix_ms();
@@ -644,6 +657,17 @@ fn command_tool_qualify(args: ToolQualifyCommand) -> Result<()> {
     print_artifact(&run, &path, report)
 }
 
+fn command_tool_qualify_inventory(args: ToolQualifyInventoryCommand) -> Result<()> {
+    let run = create_or_open_run(
+        args.run_dir
+            .or_else(|| infer_run_dir_from_artifact(&args.inventory)),
+    )?;
+    let inventory: ToolchainInventory = read_json(&args.inventory)?;
+    let inventory_ref = run.artifact_uri(&args.inventory).ok();
+    let (summary, path, _) = persist_toolchain_qualifications(&run, &inventory, inventory_ref)?;
+    print_artifact(&run, &path, summary)
+}
+
 fn persist_inventory(
     run: &RunContext,
     target: &TargetSpec,
@@ -688,6 +712,41 @@ fn persist_toolchain(
         },
     )?;
     Ok((inventory, path, artifact_ref))
+}
+
+fn persist_toolchain_qualifications(
+    run: &RunContext,
+    inventory: &ToolchainInventory,
+    inventory_ref: Option<String>,
+) -> Result<(ToolQualificationSummary, PathBuf, String)> {
+    let reports = qualify_toolchain_inventory(inventory, inventory_ref);
+    let mut reports_with_refs = Vec::new();
+    for report in reports {
+        let file_name = format!(
+            "{}.qualification.json",
+            safe_artifact_id(&report.tool_id, "TOOL")
+        );
+        let path = run.run_dir.join("tools").join(file_name);
+        let artifact_ref = write_json_artifact(run, &path, &report)?;
+        reports_with_refs.push((report, artifact_ref));
+    }
+    let summary = summarize_tool_qualifications(inventory.target_id.clone(), &reports_with_refs);
+    let path = run.run_dir.join("tools/tool_qualification_summary.json");
+    let artifact_ref = write_json_artifact(run, &path, &summary)?;
+    append_audit_event(
+        run,
+        AuditInput {
+            target_id: inventory.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "tool.qualify_inventory".to_string(),
+            operation_id: None,
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: "recorded".to_string(),
+        },
+    )?;
+    Ok((summary, path, artifact_ref))
 }
 
 fn persist_observation(
@@ -875,6 +934,16 @@ fn infer_run_dir(path: &Path) -> Option<PathBuf> {
         return parent.parent().map(Path::to_path_buf);
     }
     None
+}
+
+fn infer_run_dir_from_artifact(path: &Path) -> Option<PathBuf> {
+    let parent = path.parent()?;
+    match parent.file_name().and_then(|name| name.to_str()) {
+        Some("inventory" | "toolchain" | "observations" | "reports" | "tools") => {
+            parent.parent().map(Path::to_path_buf)
+        }
+        _ => None,
+    }
 }
 
 fn invoke_helper_apply(plan: &Path, approval: Option<&Path>) -> Result<ControlResult> {

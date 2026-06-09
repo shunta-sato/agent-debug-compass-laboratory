@@ -33,6 +33,7 @@ Target-specific live-run artifacts that are useful as examples live under `examp
 ```sh
 adc-lab inventory --target local
 adc-lab toolchain discover --target local
+adc-lab tool qualify-inventory --inventory lab/runs/LAB-RUN-.../toolchain/toolchain_inventory.json
 adc-lab observe --target local --duration 5s --signals cpu,freq,thermal,memory
 adc-lab familiarize read-only --target local --duration 5s --signals cpu,freq,thermal,memory
 

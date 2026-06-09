@@ -71,6 +71,15 @@ pub enum QualificationStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolSource {
+    Builtin,
+    External,
+    AgentCreated,
+    Missing,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SoftwareStack {
     pub os: String,
@@ -463,11 +472,29 @@ pub struct RunManifest {
 pub struct ToolQualification {
     pub schema_version: String,
     pub tool_id: String,
+    pub category: ToolCategory,
+    pub privilege: PrivilegeLevel,
+    pub source: ToolSource,
+    pub available: bool,
     pub status: QualificationStatus,
     pub evidence_accepted: bool,
     pub dry_run_required: bool,
+    pub evidence_refs: Vec<String>,
     pub checks: Vec<String>,
     pub limitations: Vec<String>,
+    pub reason: String,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ToolQualificationSummary {
+    pub schema_version: String,
+    pub target_id: String,
+    pub qualification_refs: Vec<String>,
+    pub evidence_accepted_tool_ids: Vec<String>,
+    pub evidence_rejected_tool_ids: Vec<String>,
+    pub missing_tool_ids: Vec<String>,
     pub time_unix_ms: u64,
 }
 

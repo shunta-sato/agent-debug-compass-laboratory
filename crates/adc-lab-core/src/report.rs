@@ -8,7 +8,12 @@ use std::fs;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 
-const READ_ONLY_REQUIRED_AUDIT_OPS: &[&str] = &["inventory", "toolchain.discover", "observe"];
+const READ_ONLY_REQUIRED_AUDIT_OPS: &[&str] = &[
+    "inventory",
+    "toolchain.discover",
+    "tool.qualify_inventory",
+    "observe",
+];
 
 pub fn pack_run(run_dir: impl AsRef<Path>, target_id: String) -> LabResult<FamiliarizationPack> {
     let run_dir = run_dir.as_ref();
@@ -17,6 +22,8 @@ pub fn pack_run(run_dir: impl AsRef<Path>, target_id: String) -> LabResult<Famil
         artifact_ref_if_exists(run_dir, &run_id, "inventory/target_inventory.json")?;
     let toolchain_inventory_ref =
         artifact_ref_if_exists(run_dir, &run_id, "toolchain/toolchain_inventory.json")?;
+    let tool_qualification_summary_ref =
+        artifact_ref_if_exists(run_dir, &run_id, "tools/tool_qualification_summary.json")?;
     let observation_ref = artifact_ref_if_exists(run_dir, &run_id, "observations/observe.json")?;
     let artifact_refs = collect_artifact_refs(run_dir, &run_id)?;
     let audit_event_count = count_audit_events(run_dir.join("audit.jsonl"))?;
@@ -41,6 +48,7 @@ pub fn pack_run(run_dir: impl AsRef<Path>, target_id: String) -> LabResult<Famil
         supported_claims: supported_read_only_claims(
             target_inventory_ref.as_ref(),
             toolchain_inventory_ref.as_ref(),
+            tool_qualification_summary_ref.as_ref(),
             observation_ref.as_ref(),
         ),
         blocked_claims: blocked_read_only_claims(),
@@ -62,6 +70,8 @@ pub fn read_only_claim_trace(
         artifact_ref_if_exists(run_dir, &run_id, "inventory/target_inventory.json")?;
     let toolchain_inventory_ref =
         artifact_ref_if_exists(run_dir, &run_id, "toolchain/toolchain_inventory.json")?;
+    let tool_qualification_summary_ref =
+        artifact_ref_if_exists(run_dir, &run_id, "tools/tool_qualification_summary.json")?;
     let observation_ref = artifact_ref_if_exists(run_dir, &run_id, "observations/observe.json")?;
 
     Ok(ClaimEvidenceTrace {
@@ -78,6 +88,11 @@ pub fn read_only_claim_trace(
                 "toolchain availability was observed through read-only discovery",
                 toolchain_inventory_ref,
                 "read-only toolchain inventory",
+            ),
+            claim_entry(
+                "tool qualification summary was generated for discovered toolchain",
+                tool_qualification_summary_ref,
+                "tool qualification summary",
             ),
             ClaimTraceEntry {
                 claim: "passive resource signals were sampled under the current target policy"
@@ -244,6 +259,11 @@ fn known_run_artifacts(run_dir: &Path, run_id: &str) -> LabResult<Vec<RunArtifac
             "reports/claim_evidence_trace.json",
             "lab.claim_evidence_trace.v1",
         ),
+        (
+            "tool_qualification_summary",
+            "tools/tool_qualification_summary.json",
+            "lab.tool_qualification_summary.v1",
+        ),
         ("audit_log", "audit.jsonl", "lab.audit_event.v1"),
     ] {
         if let Some(artifact_ref) = artifact_ref_if_exists(run_dir, run_id, relative_path)? {
@@ -271,6 +291,10 @@ fn read_only_data_quality_missing(run_dir: &Path, run_id: &str) -> LabResult<Vec
         (
             "passive observation artifact missing",
             "observations/observe.json",
+        ),
+        (
+            "tool qualification summary artifact missing",
+            "tools/tool_qualification_summary.json",
         ),
     ] {
         if artifact_ref_if_exists(run_dir, run_id, relative_path)?.is_none() {
@@ -335,6 +359,7 @@ fn claim_entry(
 fn supported_read_only_claims(
     target_inventory_ref: Option<&String>,
     toolchain_inventory_ref: Option<&String>,
+    tool_qualification_summary_ref: Option<&String>,
     observation_ref: Option<&String>,
 ) -> Vec<String> {
     let mut claims = Vec::new();
@@ -343,6 +368,9 @@ fn supported_read_only_claims(
     }
     if toolchain_inventory_ref.is_some() {
         claims.push("toolchain availability was collected through read-only discovery".to_string());
+    }
+    if tool_qualification_summary_ref.is_some() {
+        claims.push("tool qualification summary was generated".to_string());
     }
     if observation_ref.is_some() {
         claims.push("observed covariates were sampled under the current target policy".to_string());

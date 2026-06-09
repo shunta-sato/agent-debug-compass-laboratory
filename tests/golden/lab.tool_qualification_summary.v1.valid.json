@@ -1,0 +1,11 @@
+{
+  "schema_version": "lab.tool_qualification_summary.v1",
+  "target_id": "pi4-demo",
+  "qualification_refs": [
+    "artifact://lab/runs/LAB-RUN-001/tools/linux-procfs.qualification.json"
+  ],
+  "evidence_accepted_tool_ids": ["linux.procfs"],
+  "evidence_rejected_tool_ids": ["linux.cpufreq.sysfs"],
+  "missing_tool_ids": ["stress-ng"],
+  "time_unix_ms": 1780000000000
+}

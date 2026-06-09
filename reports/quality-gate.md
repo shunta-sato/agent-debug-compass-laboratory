@@ -6,31 +6,33 @@ Findings: 0
 
 ## Checks Run
 
-- `make contract` - pass.
+- `cargo fmt --all` - pass.
+- `cargo test -p adc-lab-core contract_validation -- --nocapture` - pass.
+- `cargo test -p adc-lab --tests -- --nocapture` - pass.
 - `cargo test --workspace` - pass.
 - `make verify` - pass.
-- `TARGET=local DURATION=0s RUN_DIR=<temp>/LAB-RUN-readonly-script-smoke scripts/targets/pi5-to-pi4-readonly-familiarization.sh` - pass; emitted run manifest ref, familiarization pack ref, and `observational_read_only` status.
 
 ## Live Discovery
 
 - Rust toolchain: verified through `make verify` with workspace build, fmt, clippy, tests, contract validation, docs smoke, and command smoke.
 - Repo command wrapper: `Makefile` remains the canonical command surface.
-- Schema/config paths: `schemas/lab.run_manifest.v1.schema.json`, `schemas/lab.familiarization_pack.v1.schema.json`, `tests/golden/*.valid.json`.
-- Target connection state: no hardware target required for default verification. Pi5-to-Pi4 read-only smoke is documented and runnable only when `TARGET` is provided.
-- Artifact/log paths expected from read-only familiarization: `run_manifest.json`, `reports/familiarization_pack.json`, `reports/claim_evidence_trace.json`, `inventory/target_inventory.json`, `toolchain/toolchain_inventory.json`, `observations/observe.json`, and `audit.jsonl`.
+- Schema/config paths: `schemas/lab.tool_qualification.v1.schema.json`, `schemas/lab.tool_qualification_summary.v1.schema.json`, `tests/golden/lab.tool_qualification*.valid.json`.
+- Target connection state: no hardware target required for default verification. PR3 uses local toolchain inventory generation in tests and does not require Pi4/Pi5 target access.
+- Artifact/log paths expected from qualification: `tools/<tool-id>.qualification.json`, `tools/tool_qualification_summary.json`, and `audit.jsonl` operation `tool.qualify_inventory`.
 
 ## Triggered Branch Evidence
 
-- ExecPlan - present: `plans/20260609-pr2-run-manifest-readonly-familiarization.md`.
-- Observability - present: `docs/architecture/observability-plan.md` updated with `familiarize.read_only`, `report.claim_trace`, `run_manifest.write`, and `report.pack` audit signals.
+- ExecPlan - present: `plans/20260609-pr3-toolchain-qualification-v1.md`.
+- Observability - present: `docs/architecture/observability-plan.md` includes `tool.qualify_inventory` and the tool qualification summary signal.
 
 ## Exit Criteria Review
 
-- `lab.run_manifest.v1` exists with strict minimal schema and golden fixture.
-- `lab.familiarization_pack.v1` now records `pack_status`, supported claims, blocked claims, and next evidence needed.
-- `adc-lab familiarize read-only` generates a single audited read-only run with manifest, pack, claim trace, inventory, toolchain inventory, and passive observation.
-- Artifact references in generated value objects use bounded `artifact://lab/runs/...` refs.
-- Audit events are emitted for inventory, toolchain discovery, observe, claim trace generation, run manifest write, and pack generation.
-- Claim trace blocks fixed-frequency, load, thermal-safety, battery/flash-safety, low-overhead, and production-readiness claims.
+- `lab.tool_qualification.v1` records category, privilege, source, availability, evidence refs, reason, checks, limitations, and evidence acceptance.
+- `lab.tool_qualification_summary.v1` records qualification refs plus accepted, rejected, and missing tool ids.
+- `adc-lab tool qualify-inventory` qualifies a discovered `lab.toolchain_inventory.v1` without executing external tools.
+- `adc-lab familiarize read-only` now emits tool qualification reports before claim trace, run manifest, and familiarization pack generation.
+- Built-in read-only non-privileged tools can be accepted as evidence; control, load, external, missing, and agent-created manifest-only tools are not evidence by default.
+- Claim trace and run manifest expose missing tool qualification summary/audit evidence instead of silently accepting unqualified tools.
+- All run artifact refs remain bounded `artifact://lab/runs/...` refs.
 - Default verification remains hardware-free.
-- PR2 adds no privileged control, sudo apply, cpufreq write, CPU load generation, or destructive experiment behavior.
+- PR3 adds no privileged control, cpufreq write, load generation, external tool execution, or destructive experiment behavior.
