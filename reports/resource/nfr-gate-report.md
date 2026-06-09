@@ -31,6 +31,9 @@ Gate decision: experimental-only
   observation, load, helper apply, SSH commands, or destructive experiments.
 - PR11 profiles keep target-selection and production physical-footprint claims
   blocked with `selection_ready=false`.
+- PR11 CI/CD release binary foundation is hardware-free build/package
+  infrastructure. It provides checksum/provenance/binary identity evidence
+  only and does not execute target commands or support resource/NFR claims.
 - Production physical-footprint claims remain blocked until wakeup, battery/power, flash/storage, jitter, sustained thermal, degraded, and recovery evidence exists.
 - `make command-smoke` verifies command wiring only and explicitly reports `resource_metrics_collected=false`; it is not resource evidence.
 
@@ -61,6 +64,7 @@ Gate decision: experimental-only
 | agent-created adapter qualification report | controller-side report | none on target | command lifetime | no | PR9 adapter qualification tests passed |
 | privilege provider status report | controller-side report | none on target | command lifetime | no | PR10 provider status tests passed |
 | target capability profile report | controller-side report | none on target | command lifetime | no | PR11 profile generation tests passed |
+| release binary package workflow | build/package integrity | none on target | workflow duration | no | PR11 workflow/package tests |
 | target runner | command-triggered | none while idle | process lifetime | no | target55 smoke passed |
 
 ## Artifact Check
@@ -93,6 +97,7 @@ Gate decision: experimental-only
 | PR9 agent-created observation adapter can become qualified only with bounded evidence artifacts | `crates/adc-lab-core/src/qualification.rs` | hardware-free core/CLI tests and `lab.tool_qualification.v1` schema | allowed contract/report claim |
 | PR10 Option B provider is planned-disabled and not active | `crates/adc-lab-core/src/privilege.rs` | hardware-free core/CLI tests and `lab.privilege_provider_status.v1` schema | allowed contract/report claim |
 | PR11 target capability profile links workload requirements to existing run evidence | `crates/adc-lab-core/src/capability_profile.rs` | hardware-free core/CLI tests and `lab.workload_profile.v1` / `lab.target_capability_profile.v1` schemas | allowed contract/report claim |
+| PR11 release binaries expose build identity and checksummed tarballs | `.github/workflows/release.yml`; `scripts/release/package-release.sh`; `schemas/lab.release_manifest.v1.schema.json` | hardware-free package smoke, schema fixture, and version command tests | allowed build/package integrity claim |
 | Pi4 is sufficient or Pi5 is required for a workload | none | no same-suite comparison or suitability decision evidence | blocked if introduced |
 | low overhead | none | short smoke insufficient | blocked if introduced |
 | battery safe | none | none | blocked if introduced |
@@ -123,6 +128,8 @@ Gate decision: experimental-only
 - PR11 target capability profiles are not comparison reports or suitability
   decisions. They normalize existing evidence for a workload id and keep
   `selection_ready=false`.
+- PR11 release assets are not target measurement artifacts. They must be
+  referenced by later runs as binary identity/provenance only.
 
 ## Handoff To Quality Gate
 

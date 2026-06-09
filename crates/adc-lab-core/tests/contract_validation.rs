@@ -40,7 +40,7 @@ fn contract_validation_schema_fixtures_validate() {
         checked += 1;
     }
 
-    assert!(checked >= 23, "expected all MVP schemas to be checked");
+    assert!(checked >= 24, "expected all MVP schemas to be checked");
 }
 
 #[test]
@@ -208,6 +208,25 @@ fn contract_validation_target_capability_profile_requires_selection_ready_field(
     );
 }
 
+#[test]
+fn contract_validation_release_manifest_rejects_missing_binary_sha() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.release_manifest.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.release_manifest.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["binaries"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("sha256");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "release manifest must record binary checksums"
+    );
+}
+
 fn validate_schema(
     root: &serde_json::Value,
     schema: &serde_json::Value,
@@ -334,6 +353,36 @@ fn validate_schema(
     }
 
     Ok(())
+}
+
+#[test]
+fn contract_validation_ci_workflow_runs_make_verify_with_read_only_contents() {
+    let root = workspace_root();
+    let workflow = fs::read_to_string(root.join(".github/workflows/ci.yml")).unwrap();
+    assert!(workflow.contains("pull_request:"));
+    assert!(workflow.contains("branches:"));
+    assert!(workflow.contains("- main"));
+    assert!(workflow.contains("workflow_dispatch:"));
+    assert!(workflow.contains("permissions:\n  contents: read"));
+    assert!(workflow.contains("run: make verify"));
+}
+
+#[test]
+fn contract_validation_release_workflow_publishes_checksummed_assets_with_scoped_permissions() {
+    let root = workspace_root();
+    let workflow = fs::read_to_string(root.join(".github/workflows/release.yml")).unwrap();
+    assert!(workflow.contains("tags:"));
+    assert!(workflow.contains("'v*'"));
+    assert!(workflow.contains("aarch64-unknown-linux-gnu"));
+    assert!(workflow.contains("x86_64-unknown-linux-gnu"));
+    assert!(workflow.contains("contents: write"));
+    assert!(workflow.contains("id-token: write"));
+    assert!(workflow.contains("attestations: write"));
+    assert!(workflow.contains("sha256sum -c SHA256SUMS"));
+    assert!(workflow.contains("gh release create"));
+    assert!(workflow.contains("actions/upload-artifact@v4"));
+    assert!(workflow.contains("actions/download-artifact@v4"));
+    assert!(workflow.contains("actions/attest-build-provenance@v2"));
 }
 
 #[test]

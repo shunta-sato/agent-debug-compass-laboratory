@@ -22,6 +22,8 @@ The project is separate from Agent Debug Compass Flight Recorder. Flight Recorde
   default; PR10 reports provider status only and does not install a daemon.
 - Core contracts and schemas in `schemas/`
 - Run artifacts in `lab/runs/LAB-RUN-*`
+- CI runs the canonical `make verify` gate. Release workflow builds
+  checksummed binary tarballs for Pi4/Pi5 aarch64 and x86_64 developer hosts.
 - Audit log in every evidence-producing run
 - Privileged apply/restore is local-target only in this MVP. Remote read-only inventory, observe, and non-root load are supported; remote privileged helper transport is deferred.
 - Privileged helper invocation uses the fixed `/usr/local/libexec/adc-lab-priv-helper` path; there is no public `--helper` override in the controller CLI.
@@ -100,3 +102,20 @@ make verify
 ```
 
 This runs format, lint, tests, strict minimal schema fixture validation, contract validation, docs smoke, and command wiring smoke. The smoke command does not by itself support resource/NFR claims.
+
+## Release Binaries
+
+For same-binary Pi4/Pi5 measurements, install from GitHub Releases and verify
+checksums before running target commands:
+
+```sh
+sha256sum -c SHA256SUMS
+tar -xzf adc-lab-v0.1.0-linux-aarch64.tar.gz
+bin/adc-lab --version
+bin/adc-lab-target --version
+cat release-manifest.json
+```
+
+Release artifacts prove build/package integrity only. They do not support
+resource, NFR, Pi4/Pi5 comparison, suitability, or production-readiness claims.
+See `docs/getting-started/install-release-binaries.md`.

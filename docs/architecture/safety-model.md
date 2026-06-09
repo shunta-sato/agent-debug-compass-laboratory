@@ -34,6 +34,9 @@ MVP behavior:
   reads existing run artifacts for a supplied workload profile and writes a
   controller-side report; it does not execute observe, load, helper apply, SSH,
   or destructive experiments.
+- PR11 CI/CD release binary foundation is build/package infrastructure. It
+  creates binary identity, checksum, and provenance artifacts only; it is not a
+  target operation and cannot support resource/NFR or target-selection claims.
 - Tier 2 approval artifacts are generated from a validated control plan and are local-target only in this MVP.
 - Tier 2 approvals are bound to plan id, plan digest, exact operation, and bounds.
 - Tier 2 control plan bounds are authorization/experiment bounds. The helper

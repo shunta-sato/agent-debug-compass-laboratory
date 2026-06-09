@@ -46,6 +46,7 @@ docs-smoke:
 	test -f README.md
 	test -f docs/architecture/privilege-model-option-a.md
 	test -f docs/architecture/safety-model.md
+	test -f docs/getting-started/install-release-binaries.md
 	test -f reports/resource/nfr-gate-report.md
 
 command-smoke:

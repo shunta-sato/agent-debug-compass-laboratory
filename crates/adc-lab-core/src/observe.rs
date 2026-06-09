@@ -87,7 +87,7 @@ pub fn observe_local(
 }
 
 pub fn sample_local(sample_index: usize, signals: &[Signal]) -> LabResult<ObservationSample> {
-    let need = |signal: Signal| signals.iter().any(|s| *s == signal);
+    let need = |signal: Signal| signals.contains(&signal);
     let (cpu_total_ticks, cpu_idle_ticks) = if need(Signal::Cpu) {
         cpu_ticks().unwrap_or((0, 0))
     } else {

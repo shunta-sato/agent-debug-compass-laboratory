@@ -1,67 +1,68 @@
-# Function Boundary Review: PR11 Workload And Target Capability Profiles
+# Function Boundary Review: PR11 CI/CD Release Binary Foundation
 
 ## Scope
 
 Changed functions/helpers:
 
-- `target_capability_profile` in
-  `crates/adc-lab-core/src/capability_profile.rs`.
-- `validate_workload_profile`, artifact readers, result summarizers, and claim
-  builders in `crates/adc-lab-core/src/capability_profile.rs`.
-- `command_report_capability_profile` in `crates/adc-lab/src/main.rs`.
-- `WorkloadProfile`, `TargetCapabilityProfile`, and related DTOs in
+- `build_info` in `crates/adc-lab-core/src/build_info.rs`.
+- `print_version_if_requested` in each binary entrypoint.
+- `current_git_sha` in `crates/adc-lab-core/build.rs`.
+- `scripts/release/package-release.sh` packaging functions:
+  `validate_token`, `copy_binary`, and `copy_required_file`.
+- `BuildInfo`, `ReleaseManifest`, and `ReleaseBinaryManifest` DTOs in
   `crates/adc-lab-core/src/contracts.rs`.
 
 ## Semantic Neighbors
 
 | Function / Type | Neighbor classification | Decision |
 | --- | --- | --- |
-| `capability_cost_model` | parallel architecture-evidence model | keep parallel because cost model classifies architecture options, while capability profile binds a target to a workload |
-| `operating_point_coverage` | parallel claim-boundary report | keep separate because operating-point coverage owns factor/level coverage, not workload requirements |
-| `pack_run` and `run_manifest` | parallel run-summary report | keep separate because familiarization pack summarizes read-only evidence, not workload-specific capability |
-| `collect_artifact_refs` in `report.rs` | same artifact-ref concept, different private module scope | keep small local reader in `capability_profile.rs`; no public utility extraction until more report builders need the same traversal semantics |
-| `command_report_operating_point` | parallel CLI report command | keep separate; capability profile has a workload input and a different audit operation |
+| Existing CLI `print_json` helpers | same output mechanism | keep local; version output reuses each binary's existing JSON printer |
+| `AuditEvent` and run manifests | parallel evidence identity | keep separate; build identity is binary/release metadata, not run audit |
+| Existing schema DTOs | same contract pattern | add narrow DTOs with `serde(deny_unknown_fields)` |
+| `scripts/install-helper.sh` | parallel install script | keep separate; release packaging is distribution-time, helper install is operator-time |
 
 ## Decisions
 
-- Keep workload/profile generation in a new `capability_profile` core module
-  instead of extending `report.rs`. The new concept is a target-selection
-  foundation layer, not an operating-point or architecture-cost report.
-- Keep `capability_cost_model` unchanged. It remains architecture evidence
-  classification and does not own workload requirements.
-- Keep `selection_ready` as an explicit field on target capability profiles.
-  PR11 generator sets it to `false`.
-- Keep missing evidence as a profile state instead of a CLI error. Malformed
-  JSON artifacts remain validation errors.
-- Ledger update not required: no replaced abstraction, intentional duplication,
-  or staged adapter remains. The local artifact traversal is narrow and can be
-  refactored later if another report reuses it.
+- Add one shared `build_info(name)` core function. It owns stable JSON fields
+  and avoids three binaries drifting in version output shape.
+- Keep `print_version_if_requested` small and local in each binary. It is
+  entrypoint behavior, and extracting a CLI pre-parser would add indirection
+  before more flags share the behavior.
+- Keep release packaging in a shell script instead of Rust. The workflow needs
+  filesystem packaging, tar, and checksum orchestration; a Rust binary would
+  add a new distribution surface before it is justified.
+- Keep release manifest DTOs in `contracts.rs` because they are Agent-facing
+  contract data and have matching JSON schema/golden fixtures.
+- Ledger update not required: no abstraction was replaced, no staged adapter
+  remains, and local duplicated pre-parse functions are intentionally tiny.
 
 ## Boundary Decisions
 
 | Boundary | Action | Rationale |
 | --- | --- | --- |
-| Workload DTOs | keep | workload identity and requirements need schema/golden validation |
-| Target capability DTOs | keep | target evidence and blocked claims need schema/golden validation |
-| `target_capability_profile` | keep | pure-ish builder with filesystem reads, no target execution side effects |
-| Artifact reader helpers | keep local | avoids broad shared helper extraction before semantics settle |
-| CLI profile command | keep | artifact write and audit side effects belong at CLI/run boundary |
+| `build_info(name)` | keep | single owner for version/git/target/profile JSON fields |
+| Binary pre-parse version handler | keep local | avoids broader CLI abstraction while preserving top-level `--version` |
+| Build script metadata capture | keep | Cargo build script is the right boundary for target/profile/git env |
+| Release packaging shell functions | keep | packaging side effects are script-local and fail before tarball publication |
+| Release manifest DTOs | keep | schema-backed contract for release provenance inside tarballs |
 
 ## Error Behavior
 
-- Invalid workload profile schema version, empty identity, zero duration, or
-  empty measurement requirements returns a validation error.
-- Missing run artifacts produce an explicit `no_evidence` or
-  `exploratory_partial` profile with `selection_ready=false`.
-- Malformed run artifacts return validation errors and do not produce a profile.
+- If git metadata is unavailable during local builds, `git_sha` becomes
+  `unknown`; release workflow sets `ADC_LAB_GIT_SHA` explicitly.
+- Package script fails before tarball creation when a required binary or
+  release file is missing.
+- Package script rejects unexpected metadata token shapes before writing a
+  manifest.
+- GitHub release workflow validates tag shape before build or publish.
 
 ## Verification
 
-Planned commands:
+Planned and/or required commands:
 
-- `cargo test -p adc-lab-core capability_profile -- --nocapture`
-- `cargo test -p adc-lab --test cli report_capability_profile -- --nocapture`
+- `cargo test -p adc-lab --test cli version_commands_emit_build_info_json -- --nocapture`
 - `make contract`
+- local release package smoke after `make build-release`
 - `make verify`
 
-Final results are recorded in `reports/quality-gate.md`.
+Final command results are recorded in `reports/quality-gate.md`.

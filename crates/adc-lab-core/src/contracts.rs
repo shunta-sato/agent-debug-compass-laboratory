@@ -4,6 +4,33 @@ use std::collections::BTreeMap;
 pub const POLICY_VERSION: &str = "default-lab-policy-v1";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BuildInfo {
+    pub name: String,
+    pub version: String,
+    pub git_sha: String,
+    pub target_triple: String,
+    pub build_profile: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReleaseBinaryManifest {
+    pub name: String,
+    pub sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ReleaseManifest {
+    pub schema_version: String,
+    pub version: String,
+    pub git_sha: String,
+    pub target_triple: String,
+    pub binaries: Vec<ReleaseBinaryManifest>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ActorKind {
     Agent,

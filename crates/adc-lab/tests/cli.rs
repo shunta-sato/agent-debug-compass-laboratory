@@ -57,6 +57,41 @@ fn cli_help_mentions_adc_lab() {
 }
 
 #[test]
+fn version_commands_emit_build_info_json() {
+    assert_build_info("adc-lab");
+    assert_build_info("adc-lab-target");
+    assert_build_info("adc-lab-priv-helper");
+}
+
+fn assert_build_info(binary: &str) {
+    let output = if binary == "adc-lab" {
+        Command::cargo_bin(binary)
+            .unwrap()
+            .arg("--version")
+            .output()
+            .unwrap()
+    } else {
+        Command::new("cargo")
+            .args(["run", "-q", "-p", binary, "--", "--version"])
+            .output()
+            .unwrap()
+    };
+    assert!(
+        output.status.success(),
+        "{binary} --version failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["name"], binary);
+    for field in ["version", "git_sha", "target_triple", "build_profile"] {
+        assert!(
+            json[field].as_str().is_some_and(|value| !value.is_empty()),
+            "{binary} missing non-empty {field}: {json}"
+        );
+    }
+}
+
+#[test]
 fn inventory_local_writes_artifact() {
     let temp = tempfile::tempdir().unwrap();
     Command::cargo_bin("adc-lab")
