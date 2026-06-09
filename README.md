@@ -38,7 +38,8 @@ adc-lab observe --target local --duration 5s --signals cpu,freq,thermal,memory
 adc-lab familiarize read-only --target local --duration 5s --signals cpu,freq,thermal,memory
 
 adc-lab control plan --target local cpu.governor --set performance
-adc-lab control apply --plan lab/runs/LAB-RUN-.../plans/PLAN-....json --dry-run
+adc-lab control approve --plan lab/runs/LAB-RUN-.../plans/PLAN-....json --approved-by operator
+adc-lab control apply --plan lab/runs/LAB-RUN-.../plans/PLAN-....json --approval lab/runs/LAB-RUN-.../approvals/APPROVAL-....json --dry-run
 adc-lab restore --lease lab/runs/LAB-RUN-.../leases/LEASE-....json --dry-run
 
 adc-lab load cpu --target local --workers 2 --duration 5s --abort-temp-c 75

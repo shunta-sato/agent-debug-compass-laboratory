@@ -1,0 +1,7 @@
+{
+  "schema_version": "lab.health_check.v1",
+  "target_id": "local-target",
+  "status": "ok",
+  "inventory_available": true,
+  "toolchain_available": true
+}

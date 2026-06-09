@@ -85,6 +85,7 @@ struct ObserveCommand {
 #[derive(Debug, Subcommand)]
 enum ControlCommand {
     Plan(ControlPlanCommand),
+    Approve(ControlApproveCommand),
     Apply(ControlApplyCommand),
 }
 
@@ -100,6 +101,20 @@ struct ControlPlanCommand {
     duration_seconds_max: u64,
     #[arg(long)]
     thermal_celsius_abort: Option<f64>,
+}
+
+#[derive(Debug, Args)]
+struct ControlApproveCommand {
+    #[arg(long)]
+    plan: PathBuf,
+    #[arg(long)]
+    approved_by: String,
+    #[arg(long)]
+    operation_summary: Option<String>,
+    #[arg(long)]
+    run_dir: Option<PathBuf>,
+    #[arg(long)]
+    json: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -281,6 +296,7 @@ fn main() -> Result<()> {
         Commands::Observe(args) => command_observe(args),
         Commands::Control { command } => match command {
             ControlCommand::Plan(args) => command_control_plan(args),
+            ControlCommand::Approve(args) => command_control_approve(args),
             ControlCommand::Apply(args) => command_control_apply(args),
         },
         Commands::Restore(args) => command_restore(args),
@@ -420,6 +436,39 @@ fn command_control_plan(args: ControlPlanCommand) -> Result<()> {
     print_artifact(&run, &path, plan)
 }
 
+fn command_control_approve(args: ControlApproveCommand) -> Result<()> {
+    let plan: ControlPlan = read_json(&args.plan)?;
+    if plan.target_id != LOCAL_TARGET_ID {
+        anyhow::bail!(
+            "control approval is local-target only in this MVP; refused target_id={}",
+            plan.target_id
+        );
+    }
+    let run = create_or_open_run(args.run_dir.or_else(|| infer_run_dir(&args.plan)))?;
+    let summary = args.operation_summary.unwrap_or_else(|| {
+        format!(
+            "Approve {} for target {}",
+            plan.operation.operation_id, plan.target_id
+        )
+    });
+    let approval = new_approval_record(&plan, args.approved_by, summary)?;
+    let (path, artifact_ref) = write_approval_record(&run, &approval)?;
+    append_audit_event(
+        &run,
+        AuditInput {
+            target_id: approval.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "control.approve".to_string(),
+            operation_id: Some(approval.approved_operation.operation_id.clone()),
+            risk_tier: approval.risk_tier.clone(),
+            approval_ref: Some(artifact_ref),
+            restore_lease_ref: None,
+            result: "approved".to_string(),
+        },
+    )?;
+    print_artifact(&run, &path, approval)
+}
+
 fn command_control_apply(args: ControlApplyCommand) -> Result<()> {
     let plan: ControlPlan = read_json(&args.plan)?;
     let run = create_or_open_run(args.run_dir.or_else(|| infer_run_dir(&args.plan)))?;
@@ -459,6 +508,9 @@ fn command_restore(args: RestoreCommand) -> Result<()> {
         invoke_helper_restore(&args.lease)?
     };
     persist_control_result(&run, &result, None)?;
+    if result.status == ControlResultStatus::Restored && result.target_id == LOCAL_TARGET_ID {
+        persist_restore_health_check(&run)?;
+    }
     print_json(&result)
 }
 
@@ -616,11 +668,16 @@ fn command_report_operating_point(args: ReportPackCommand) -> Result<()> {
 
 fn command_health_check(args: TargetCommand) -> Result<()> {
     let target = TargetSpec::parse(&args.target)?;
-    let inventory_available = collect_inventory(&target).is_ok();
-    let toolchain_available = discover_toolchain(&target).is_ok();
-    let output = HealthOutput {
+    let output = build_health_output(&target);
+    print_json(&output)
+}
+
+fn build_health_output(target: &TargetSpec) -> HealthOutput {
+    let inventory_available = collect_inventory(target).is_ok();
+    let toolchain_available = discover_toolchain(target).is_ok();
+    HealthOutput {
         schema_version: "lab.health_check.v1".to_string(),
-        target_id: target.target_id,
+        target_id: target.target_id.clone(),
         status: if inventory_available && toolchain_available {
             "ok".to_string()
         } else {
@@ -628,8 +685,7 @@ fn command_health_check(args: TargetCommand) -> Result<()> {
         },
         inventory_available,
         toolchain_available,
-    };
-    print_json(&output)
+    }
 }
 
 fn command_tool_qualify(args: ToolQualifyCommand) -> Result<()> {
@@ -899,13 +955,40 @@ fn persist_control_result(
 }
 
 fn persist_approval_record(run: &RunContext, approval: &ApprovalRecord) -> Result<String> {
+    let (_, artifact_ref) = write_approval_record(run, approval)?;
+    Ok(artifact_ref)
+}
+
+fn write_approval_record(run: &RunContext, approval: &ApprovalRecord) -> Result<(PathBuf, String)> {
     let file_name = format!(
         "{}.json",
         safe_artifact_id(&approval.approval_id, "APPROVAL")
     );
     let path = run.run_dir.join("approvals").join(file_name);
     write_json_pretty(&path, approval)?;
-    Ok(run.artifact_uri(&path)?)
+    let artifact_ref = run.artifact_uri(&path)?;
+    Ok((path, artifact_ref))
+}
+
+fn persist_restore_health_check(run: &RunContext) -> Result<()> {
+    let target = TargetSpec::parse("local")?;
+    let output = build_health_output(&target);
+    let path = run.run_dir.join("health/restore_health_check.json");
+    write_json_artifact(run, &path, &output)?;
+    append_audit_event(
+        run,
+        AuditInput {
+            target_id: output.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "health-check.restore".to_string(),
+            operation_id: None,
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: output.status,
+        },
+    )?;
+    Ok(())
 }
 
 fn safe_artifact_id(value: &str, fallback: &str) -> String {

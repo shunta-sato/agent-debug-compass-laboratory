@@ -1,8 +1,8 @@
 use crate::contracts::{
-    Actor, AppliedState, ApprovalRecord, CapturedState, ControlOperation, ControlPlan,
-    ControlResult, ControlResultStatus, CpufreqDesiredState, CpufreqPolicyState, OperationBounds,
-    Refusal, RefusalCode, RestoreAttempt, RestoreAttemptStatus, RestoreLease, RestoreStatus,
-    RiskTier,
+    Actor, ActorKind, AppliedState, ApprovalBounds, ApprovalRecord, CapturedState,
+    ControlOperation, ControlPlan, ControlResult, ControlResultStatus, CpufreqDesiredState,
+    CpufreqPolicyState, OperationBounds, Refusal, RefusalCode, RestoreAttempt,
+    RestoreAttemptStatus, RestoreLease, RestoreStatus, RiskTier,
 };
 use crate::error::{IoPathExt, LabResult};
 use crate::ids::{new_id, now_unix_ms};
@@ -72,6 +72,47 @@ pub fn validate_control_plan(plan: &ControlPlan) -> Result<(), Refusal> {
         ));
     }
     Ok(())
+}
+
+pub fn new_approval_record(
+    plan: &ControlPlan,
+    approved_by_id: String,
+    operation_summary: String,
+) -> LabResult<ApprovalRecord> {
+    if approved_by_id.trim().is_empty() {
+        return Err(LabError::Validation(
+            "approved_by id is required".to_string(),
+        ));
+    }
+    if operation_summary.trim().is_empty() {
+        return Err(LabError::Validation(
+            "operation summary is required".to_string(),
+        ));
+    }
+    if let Err(refusal) = validate_control_plan(plan) {
+        return Err(LabError::Policy(refusal.message));
+    }
+    Ok(ApprovalRecord {
+        schema_version: "lab.approval_record.v1".to_string(),
+        approval_id: new_id("APPROVAL"),
+        target_id: plan.target_id.clone(),
+        risk_tier: plan.risk_tier.clone(),
+        operation_summary,
+        approved_plan_id: plan.plan_id.clone(),
+        approved_plan_digest: canonical_plan_digest(plan)?,
+        approved_operation: plan.operation.clone(),
+        approved_by: Actor {
+            kind: ActorKind::Human,
+            id: approved_by_id,
+        },
+        bounds: ApprovalBounds {
+            duration_seconds_max: plan.bounds.duration_seconds_max,
+            thermal_celsius_abort: plan.bounds.thermal_celsius_abort,
+        },
+        restore_required: plan.restore_required,
+        approved_actions: vec![plan.operation.operation_id.clone()],
+        time_unix_ms: now_unix_ms(),
+    })
 }
 
 pub fn approval_matches(plan: &ControlPlan, approval: &ApprovalRecord) -> Result<(), Refusal> {

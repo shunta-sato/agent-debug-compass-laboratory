@@ -20,8 +20,10 @@
 | `report.pack` | explain familiarization pack generation | CLI start to pack artifact |
 | `tool.qualify_inventory` | explain discovered tool evidence acceptance/rejection | CLI start to qualification summary artifact |
 | `control.plan` | explain planned state change | CLI start to plan artifact |
+| `control.approve` | explain operator approval artifact generation | CLI start to approval artifact |
 | `control.apply` | explain privileged apply result, refusal, or restore-after-failure outcome | CLI start to helper/core result |
 | `restore` | explain restore result | CLI start to helper/core result |
+| `health-check.restore` | explain read-only post-restore target health | restored result to health artifact |
 | `load.cpu` | explain bounded load outcome and abort reason | CLI start to load result |
 | `experiment.run` | explain matrix trial planning/execution | CLI start to experiment artifacts |
 | `tool.qualify` | explain whether a tool can be evidence | CLI start to qualification report |
@@ -47,6 +49,10 @@ submitted. The controller copies the approval into the run directory and stores
 only the bounded logical ref (`artifact://lab/runs/<run_id>/approvals/...`) in
 the audit event.
 
+Controller-generated approval artifacts emit `control.approve`. Successful
+controller restores emit a follow-up `health-check.restore` audit event after
+the restore result is persisted.
+
 ## Metrics And Traces
 
 No metrics or tracing backend is added in MVP to avoid implying production observability or target-local overhead. Run artifacts provide reproducible evidence for lab use.
@@ -68,6 +74,14 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
 - Counter-metric: restore lease status.
 - Failure mode / misleading interpretation: restore success after failed apply does not make the apply successful.
 - Artifact path: `artifact://lab/runs/<run_id>/plans/<result_id>.result.json`.
+
+- Signal: post-restore health check.
+- Decision supported: whether basic read-only inventory and toolchain discovery still work after a successful restore.
+- Action owner: lab operator.
+- Expected action when degraded: inspect the restore result and target manually before accepting further control experiments.
+- Counter-metric: restore `ControlResult.status`; health-check degradation does not rewrite the restore result.
+- Failure mode / misleading interpretation: health check `ok` is not proof of thermal, battery, load, or production readiness.
+- Artifact path: `artifact://lab/runs/<run_id>/health/restore_health_check.json`.
 
 - Signal: experiment claim decision.
 - Decision supported: whether matrix artifacts can support a target behavior claim.
