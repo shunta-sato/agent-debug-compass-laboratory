@@ -15,6 +15,15 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
+fn single_plan_path(run_dir: &std::path::Path) -> PathBuf {
+    fs::read_dir(run_dir.join("plans"))
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|path| path.extension().and_then(|ext| ext.to_str()) == Some("json"))
+        .unwrap()
+}
+
 #[test]
 fn cli_help_mentions_adc_lab() {
     Command::cargo_bin("adc-lab")
@@ -48,7 +57,7 @@ fn inventory_local_writes_artifact() {
 #[test]
 fn control_plan_and_helper_dry_run_refusal_are_structured() {
     let temp = tempfile::tempdir().unwrap();
-    let output = Command::cargo_bin("adc-lab")
+    Command::cargo_bin("adc-lab")
         .unwrap()
         .args([
             "control",
@@ -63,11 +72,8 @@ fn control_plan_and_helper_dry_run_refusal_are_structured() {
         ])
         .assert()
         .success()
-        .get_output()
-        .stdout
-        .clone();
-    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let plan_path = value["artifact_path"].as_str().unwrap();
+        .stdout(contains("\"artifact_ref\""));
+    let plan_path = single_plan_path(temp.path());
 
     Command::new("cargo")
         .args([
@@ -78,7 +84,7 @@ fn control_plan_and_helper_dry_run_refusal_are_structured() {
             "--",
             "apply",
             "--plan",
-            plan_path,
+            plan_path.to_str().unwrap(),
             "--dry-run",
         ])
         .assert()
@@ -90,7 +96,7 @@ fn control_plan_and_helper_dry_run_refusal_are_structured() {
 #[test]
 fn control_apply_refuses_remote_plan_without_invoking_helper() {
     let temp = tempfile::tempdir().unwrap();
-    let output = Command::cargo_bin("adc-lab")
+    Command::cargo_bin("adc-lab")
         .unwrap()
         .args([
             "control",
@@ -105,15 +111,12 @@ fn control_apply_refuses_remote_plan_without_invoking_helper() {
         ])
         .assert()
         .success()
-        .get_output()
-        .stdout
-        .clone();
-    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let plan_path = value["artifact_path"].as_str().unwrap();
+        .stdout(contains("\"artifact_ref\""));
+    let plan_path = single_plan_path(temp.path());
 
     Command::cargo_bin("adc-lab")
         .unwrap()
-        .args(["control", "apply", "--plan", plan_path])
+        .args(["control", "apply", "--plan", plan_path.to_str().unwrap()])
         .assert()
         .success()
         .stdout(contains("\"status\": \"refused\""))
@@ -125,7 +128,7 @@ fn control_apply_refuses_remote_plan_without_invoking_helper() {
 #[test]
 fn control_apply_has_no_public_helper_override() {
     let temp = tempfile::tempdir().unwrap();
-    let output = Command::cargo_bin("adc-lab")
+    Command::cargo_bin("adc-lab")
         .unwrap()
         .args([
             "control",
@@ -140,12 +143,9 @@ fn control_apply_has_no_public_helper_override() {
         ])
         .assert()
         .success()
-        .get_output()
-        .stdout
-        .clone();
-    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let plan_path = value["artifact_path"].as_str().unwrap();
-    let plan: ControlPlan = serde_json::from_slice(&fs::read(plan_path).unwrap()).unwrap();
+        .stdout(contains("\"artifact_ref\""));
+    let plan_path = single_plan_path(temp.path());
+    let plan: ControlPlan = serde_json::from_slice(&fs::read(&plan_path).unwrap()).unwrap();
     let approval_path = temp.path().join("approval.json");
     fs::write(
         &approval_path,
@@ -159,7 +159,7 @@ fn control_apply_has_no_public_helper_override() {
             "control",
             "apply",
             "--plan",
-            plan_path,
+            plan_path.to_str().unwrap(),
             "--approval",
             approval_path.to_str().unwrap(),
             "--helper",
@@ -189,7 +189,7 @@ fn restore_has_no_public_helper_override() {
 #[test]
 fn control_apply_audit_records_approval_ref() {
     let temp = tempfile::tempdir().unwrap();
-    let output = Command::cargo_bin("adc-lab")
+    Command::cargo_bin("adc-lab")
         .unwrap()
         .args([
             "control",
@@ -204,12 +204,9 @@ fn control_apply_audit_records_approval_ref() {
         ])
         .assert()
         .success()
-        .get_output()
-        .stdout
-        .clone();
-    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let plan_path = value["artifact_path"].as_str().unwrap();
-    let plan: ControlPlan = serde_json::from_slice(&fs::read(plan_path).unwrap()).unwrap();
+        .stdout(contains("\"artifact_ref\""));
+    let plan_path = single_plan_path(temp.path());
+    let plan: ControlPlan = serde_json::from_slice(&fs::read(&plan_path).unwrap()).unwrap();
     let approval_path = temp.path().join("approval.json");
     fs::write(
         &approval_path,
@@ -223,7 +220,7 @@ fn control_apply_audit_records_approval_ref() {
             "control",
             "apply",
             "--plan",
-            plan_path,
+            plan_path.to_str().unwrap(),
             "--approval",
             approval_path.to_str().unwrap(),
             "--dry-run",
@@ -318,6 +315,91 @@ fn experiment_dry_run_and_report_pack_work() {
         .as_str()
         .unwrap()
         .contains(temp.path().to_str().unwrap())));
+}
+
+#[test]
+fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
+    let temp = tempfile::tempdir().unwrap();
+    let output = Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "familiarize",
+            "read-only",
+            "--target",
+            "local",
+            "--duration",
+            "0s",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"pack_status\": \"observational_read_only\""))
+        .stdout(contains("\"run_manifest_ref\""))
+        .stdout(contains("\"familiarization_pack_ref\""))
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert!(value["run_manifest_ref"]
+        .as_str()
+        .unwrap()
+        .starts_with("artifact://lab/runs/"));
+    assert!(value["familiarization_pack_ref"]
+        .as_str()
+        .unwrap()
+        .starts_with("artifact://lab/runs/"));
+
+    assert!(temp.path().join("run_manifest.json").exists());
+    assert!(temp
+        .path()
+        .join("reports/familiarization_pack.json")
+        .exists());
+    assert!(temp
+        .path()
+        .join("reports/claim_evidence_trace.json")
+        .exists());
+    assert!(temp.path().join("inventory/target_inventory.json").exists());
+    assert!(temp
+        .path()
+        .join("toolchain/toolchain_inventory.json")
+        .exists());
+    assert!(temp.path().join("observations/observe.json").exists());
+
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(temp.path().join("run_manifest.json")).unwrap()).unwrap();
+    assert_eq!(manifest["mode"], "read_only_familiarization");
+    assert!(manifest["data_quality"]["missing"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item == "no controlled operating point experiment was run"));
+
+    let trace: serde_json::Value = serde_json::from_slice(
+        &fs::read(temp.path().join("reports/claim_evidence_trace.json")).unwrap(),
+    )
+    .unwrap();
+    assert!(trace["claims"].as_array().unwrap().iter().any(|claim| {
+        claim["decision"] == "blocked"
+            && claim["claim"]
+                .as_str()
+                .unwrap()
+                .contains("fixed CPU frequency")
+    }));
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    for operation in [
+        "inventory",
+        "toolchain.discover",
+        "observe",
+        "report.claim_trace",
+        "run_manifest.write",
+        "report.pack",
+    ] {
+        assert!(audit.contains(&format!("\"operation\":\"{operation}\"")));
+    }
 }
 
 #[test]

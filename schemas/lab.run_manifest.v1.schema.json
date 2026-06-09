@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lab.run_manifest.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "target_id", "target", "mode", "started_at_unix_ms", "ended_at_unix_ms", "adc_lab_version", "artifacts", "audit_ref", "claim_trace_ref", "data_quality"],
+  "properties": {
+    "schema_version": { "const": "lab.run_manifest.v1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "target_id": { "type": "string", "minLength": 1 },
+    "target": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["read_only_familiarization"] },
+    "started_at_unix_ms": { "type": "integer", "minimum": 0 },
+    "ended_at_unix_ms": { "type": "integer", "minimum": 0 },
+    "adc_lab_version": { "type": "string", "minLength": 1 },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "ref", "schema_version"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "ref": { "type": "string", "minLength": 1 },
+          "schema_version": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "audit_ref": { "type": "string", "minLength": 1 },
+    "claim_trace_ref": { "type": ["string", "null"] },
+    "data_quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["missing"],
+      "properties": {
+        "missing": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

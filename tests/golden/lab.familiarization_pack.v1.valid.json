@@ -2,7 +2,17 @@
   "schema_version": "lab.familiarization_pack.v1",
   "run_id": "LAB-RUN-001",
   "target_id": "pi4-target55",
+  "pack_status": "observational_read_only",
   "artifact_refs": ["artifact://lab/runs/LAB-RUN-001/audit.jsonl"],
+  "supported_claims": [
+    "target inventory was collected through read-only surfaces"
+  ],
+  "blocked_claims": [
+    "fixed CPU frequency behavior was not verified"
+  ],
+  "next_evidence_needed": [
+    "controlled operating point matrix"
+  ],
   "audit_event_count": 1,
   "restore_status": "pending_or_recorded",
   "claim_trace_ref": "artifact://lab/runs/LAB-RUN-001/reports/claim_evidence_trace.json",

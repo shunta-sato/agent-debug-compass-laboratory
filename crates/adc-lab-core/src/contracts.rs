@@ -428,6 +428,38 @@ pub struct ClaimEvidenceTrace {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct RunArtifactRef {
+    pub name: String,
+    #[serde(rename = "ref")]
+    pub artifact_ref: String,
+    pub schema_version: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RunDataQuality {
+    pub missing: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RunManifest {
+    pub schema_version: String,
+    pub run_id: String,
+    pub target_id: String,
+    pub target: String,
+    pub mode: String,
+    pub started_at_unix_ms: u64,
+    pub ended_at_unix_ms: u64,
+    pub adc_lab_version: String,
+    pub artifacts: Vec<RunArtifactRef>,
+    pub audit_ref: String,
+    pub claim_trace_ref: Option<String>,
+    pub data_quality: RunDataQuality,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ToolQualification {
     pub schema_version: String,
     pub tool_id: String,
@@ -469,7 +501,11 @@ pub struct FamiliarizationPack {
     pub schema_version: String,
     pub run_id: String,
     pub target_id: String,
+    pub pack_status: String,
     pub artifact_refs: Vec<String>,
+    pub supported_claims: Vec<String>,
+    pub blocked_claims: Vec<String>,
+    pub next_evidence_needed: Vec<String>,
     pub audit_event_count: usize,
     pub restore_status: String,
     pub claim_trace_ref: Option<String>,
