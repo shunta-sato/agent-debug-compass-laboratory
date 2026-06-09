@@ -13,6 +13,9 @@ Gate decision: experimental-only
 - PR6 real matrix runner behavior is hardware-free verified for the
   `cpu_load_workers` allowlist and blocked unsupported controlled factors; it
   is not privileged operating-point or production physical-footprint evidence.
+- PR7 operating-point coverage is hardware-free verified for read-only
+  observational runs and PR6 bounded matrices; it is claim-boundary evidence,
+  not new target physical measurement.
 - Production physical-footprint claims remain blocked until wakeup, battery/power, flash/storage, jitter, sustained thermal, degraded, and recovery evidence exists.
 - `make command-smoke` verifies command wiring only and explicitly reports `resource_metrics_collected=false`; it is not resource evidence.
 
@@ -38,6 +41,7 @@ Gate decision: experimental-only
 | observe sampler | burst | 1s default | command duration | no | measured for target55 short smoke |
 | CPU load | experimental-only burst | worker loop plus 100ms safety monitor | command duration, max 300s | no | measured for target55 short smoke; operator abort contract tested |
 | experiment matrix runner | experimental-only burst | listed trial sequence | warmup <=60s, cooldown <=60s, repetitions <=10, expanded trials <=64 | no | PR6 local real-run and blocked-factor tests passed |
+| operating-point coverage report | controller-side report | none on target | command lifetime | no | PR7 coverage classification tests passed |
 | target runner | command-triggered | none while idle | process lifetime | no | target55 smoke passed |
 
 ## Artifact Check
@@ -63,6 +67,7 @@ Gate decision: experimental-only
 | target55 10s 2-worker CPU load completed below 75C abort | `examples/demos/target55/docs/operating-envelope.md` | `examples/demos/target55/reports/operating-envelope/observer_off.json` | allowed target-specific short-smoke claim |
 | CPU load operator abort produces structured aborted result | `crates/adc-lab/tests/cli.rs` | hardware-free CLI test and `lab.load_result.v1` schema | allowed contract/runtime claim |
 | PR6 matrix runner completes supported `cpu_load_workers` trials and blocks unsupported governor factor | `crates/adc-lab/tests/cli.rs` | hardware-free CLI tests and `lab.experiment_run.v1` schema | allowed contract/runtime claim |
+| PR7 operating-point coverage separates observed variation from controlled subset evidence | `crates/adc-lab/tests/cli.rs` | hardware-free CLI tests and `lab.operating_point_coverage.v1` schema | allowed contract/report claim |
 | low overhead | none | short smoke insufficient | blocked if introduced |
 | battery safe | none | none | blocked if introduced |
 | production ready target runtime | none | none | blocked if introduced |
@@ -76,6 +81,9 @@ Gate decision: experimental-only
 - Tier 3 experiments are not implemented beyond policy/docs.
 - Matrix runner does not execute privileged governor or fixed-frequency
   controlled factors in PR6.
+- Operating-point coverage can report `controlled_subset` for bounded
+  `cpu_load_workers` evidence, but fixed-frequency and governor coverage remain
+  blocked until privileged control is wired into trials.
 
 ## Handoff To Quality Gate
 

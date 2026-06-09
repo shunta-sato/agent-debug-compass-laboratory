@@ -1,9 +1,12 @@
 use crate::contracts::{
-    CapabilityCostModel, ClaimDecision, ClaimEvidenceTrace, ClaimTraceEntry, FamiliarizationPack,
-    OperatingPointCoverage, RunArtifactRef, RunDataQuality, RunManifest,
+    CapabilityCostModel, ClaimDecision, ClaimEvidenceTrace, ClaimTraceEntry, ExperimentRun,
+    ExperimentTrial, FamiliarizationPack, OperatingPointBlockedPoint, OperatingPointClaimBoundary,
+    OperatingPointCoverage, OperatingPointCoveragePoint, OperatingPointCoverageStatus,
+    OperatingPointEvidenceClass, RunArtifactRef, RunDataQuality, RunManifest,
 };
 use crate::ids::now_unix_ms;
 use crate::{artifact_uri_for_run, LabResult};
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
@@ -164,16 +167,309 @@ pub fn run_manifest(
     })
 }
 
-pub fn operating_point_coverage(run_id: String, target_id: String) -> OperatingPointCoverage {
-    OperatingPointCoverage {
+pub fn operating_point_coverage(
+    run_dir: impl AsRef<Path>,
+    target_id: String,
+) -> LabResult<OperatingPointCoverage> {
+    let run_dir = run_dir.as_ref();
+    let run_id = run_id_from_dir(run_dir);
+    let observation_ref = artifact_ref_if_exists(run_dir, &run_id, "observations/observe.json")?;
+    let experiment_ref =
+        artifact_ref_if_exists(run_dir, &run_id, "experiments/experiment_run.json")?;
+    let experiment_run =
+        read_experiment_run_if_exists(run_dir.join("experiments/experiment_run.json"))?;
+
+    let mut observed_points = Vec::new();
+    if let Some(ref artifact_ref) = observation_ref {
+        observed_points.push(OperatingPointCoveragePoint {
+            factor_id: "default_policy_frequency".to_string(),
+            level: "observed_current_policy".to_string(),
+            coverage_status: OperatingPointCoverageStatus::ObservationalOnly,
+            evidence_class: OperatingPointEvidenceClass::PassiveObservation,
+            evidence_refs: vec![artifact_ref.clone()],
+            claim_boundary:
+                "Frequency/resource signals were passively observed under the current target policy; this is not a controlled sweep."
+                    .to_string(),
+        });
+    }
+
+    let mut controlled_points = Vec::new();
+    let mut controlled_keys = BTreeSet::new();
+    let mut blocked_points = Vec::new();
+    if let Some(experiment) = experiment_run.as_ref() {
+        for trial in &experiment.trials {
+            if trial.status == "completed" {
+                add_completed_trial_points(
+                    trial,
+                    experiment_ref.as_ref(),
+                    &mut controlled_keys,
+                    &mut controlled_points,
+                );
+            } else if trial.status == "blocked"
+                || trial.status == "failed"
+                || trial.status == "not_implemented"
+            {
+                add_blocked_trial_points(trial, &mut blocked_points);
+            }
+        }
+    }
+
+    ensure_fixed_frequency_blocked(&mut blocked_points);
+    let coverage_status = coverage_status(&observed_points, &controlled_points, &blocked_points);
+    let claim_boundaries = operating_point_claim_boundaries(
+        &run_id,
+        observation_ref,
+        experiment_ref,
+        &coverage_status,
+        &controlled_points,
+        &blocked_points,
+    );
+
+    Ok(OperatingPointCoverage {
         schema_version: "lab.operating_point_coverage.v1".to_string(),
         run_id,
         target_id,
-        covered_points: vec!["default_dynamic_policy_observed_or_planned".to_string()],
-        blocked_points: vec!["all_fixed_cpu_frequencies".to_string()],
-        coverage_status: "provisional".to_string(),
+        coverage_status,
+        observed_points,
+        controlled_points,
+        blocked_points,
+        claim_boundaries,
         time_unix_ms: now_unix_ms(),
+    })
+}
+
+fn read_experiment_run_if_exists(path: PathBuf) -> LabResult<Option<ExperimentRun>> {
+    if !path.exists() {
+        return Ok(None);
     }
+    let bytes = fs::read(&path)?;
+    let experiment = serde_json::from_slice(&bytes).map_err(|error| {
+        crate::LabError::Validation(format!(
+            "failed to parse experiment run artifact {}: {error}",
+            path.display()
+        ))
+    })?;
+    Ok(Some(experiment))
+}
+
+fn add_completed_trial_points(
+    trial: &ExperimentTrial,
+    experiment_ref: Option<&String>,
+    controlled_keys: &mut BTreeSet<(String, String)>,
+    controlled_points: &mut Vec<OperatingPointCoveragePoint>,
+) {
+    for (factor_id, level) in &trial.factors {
+        if factor_id != "cpu_load_workers" {
+            continue;
+        }
+        let key = (factor_id.clone(), level.clone());
+        if !controlled_keys.insert(key) {
+            continue;
+        }
+        let mut evidence_refs = Vec::new();
+        if let Some(reference) = experiment_ref {
+            evidence_refs.push(reference.clone());
+        }
+        evidence_refs.extend(trial.artifact_refs.clone());
+        controlled_points.push(OperatingPointCoveragePoint {
+            factor_id: factor_id.clone(),
+            level: level.clone(),
+            coverage_status: OperatingPointCoverageStatus::ControlledSubset,
+            evidence_class: OperatingPointEvidenceClass::BoundedLoad,
+            evidence_refs,
+            claim_boundary:
+                "Workload intensity was controlled for this bounded trial; CPU frequency remains observed under current policy unless privileged frequency-control evidence exists."
+                    .to_string(),
+        });
+    }
+}
+
+fn add_blocked_trial_points(
+    trial: &ExperimentTrial,
+    blocked_points: &mut Vec<OperatingPointBlockedPoint>,
+) {
+    for (factor_id, level) in &trial.factors {
+        if factor_id == "cpu_load_workers" && trial.status != "failed" {
+            continue;
+        }
+        let coverage_status = blocked_status_for_factor(factor_id);
+        blocked_points.push(OperatingPointBlockedPoint {
+            factor_id: factor_id.clone(),
+            requested_level: Some(level.clone()),
+            coverage_status,
+            reason: trial
+                .failure
+                .clone()
+                .unwrap_or_else(|| format!("trial ended with status {}", trial.status)),
+            next_evidence_needed: next_evidence_for_blocked_factor(factor_id),
+        });
+    }
+}
+
+fn ensure_fixed_frequency_blocked(blocked_points: &mut Vec<OperatingPointBlockedPoint>) {
+    if blocked_points
+        .iter()
+        .any(|point| point.factor_id == "fixed_cpu_frequency")
+    {
+        return;
+    }
+    blocked_points.push(OperatingPointBlockedPoint {
+        factor_id: "fixed_cpu_frequency".to_string(),
+        requested_level: Some("all_fixed_cpu_frequencies".to_string()),
+        coverage_status: OperatingPointCoverageStatus::NotControllable,
+        reason: "observed frequency variation is not a controlled fixed-frequency sweep"
+            .to_string(),
+        next_evidence_needed: vec![
+            "approved privileged frequency control".to_string(),
+            "controlled operating point matrix with fixed-frequency levels".to_string(),
+            "restore verification for every controlled point".to_string(),
+        ],
+    });
+}
+
+fn blocked_status_for_factor(factor_id: &str) -> OperatingPointCoverageStatus {
+    if is_safety_blocked_factor(factor_id) {
+        OperatingPointCoverageStatus::BlockedUnsafe
+    } else {
+        OperatingPointCoverageStatus::NotControllable
+    }
+}
+
+fn is_safety_blocked_factor(factor_id: &str) -> bool {
+    [
+        "thermal_stress",
+        "battery_drain",
+        "filesystem_pressure",
+        "storage_pressure",
+        "watchdog_reboot",
+        "memory_pressure_near_oom",
+    ]
+    .iter()
+    .any(|needle| factor_id.contains(needle))
+}
+
+fn next_evidence_for_blocked_factor(factor_id: &str) -> Vec<String> {
+    if is_safety_blocked_factor(factor_id) {
+        return vec![
+            "explicit risk boundary".to_string(),
+            "operator approval".to_string(),
+            "abort condition and recovery plan".to_string(),
+        ];
+    }
+    if factor_id == "governor" || factor_id == "fixed_cpu_frequency" {
+        return vec![
+            "approved privileged control plan".to_string(),
+            "plan/apply/restore integration in matrix runner".to_string(),
+            "restore verification evidence".to_string(),
+        ];
+    }
+    vec!["implemented controlled-factor runner support".to_string()]
+}
+
+fn coverage_status(
+    observed_points: &[OperatingPointCoveragePoint],
+    controlled_points: &[OperatingPointCoveragePoint],
+    blocked_points: &[OperatingPointBlockedPoint],
+) -> OperatingPointCoverageStatus {
+    if blocked_points
+        .iter()
+        .any(|point| point.coverage_status == OperatingPointCoverageStatus::BlockedUnsafe)
+    {
+        OperatingPointCoverageStatus::BlockedUnsafe
+    } else if !controlled_points.is_empty() {
+        OperatingPointCoverageStatus::ControlledSubset
+    } else if !observed_points.is_empty() {
+        OperatingPointCoverageStatus::ObservationalOnly
+    } else {
+        OperatingPointCoverageStatus::NotControllable
+    }
+}
+
+fn operating_point_claim_boundaries(
+    run_id: &str,
+    observation_ref: Option<String>,
+    experiment_ref: Option<String>,
+    coverage_status: &OperatingPointCoverageStatus,
+    controlled_points: &[OperatingPointCoveragePoint],
+    blocked_points: &[OperatingPointBlockedPoint],
+) -> Vec<OperatingPointClaimBoundary> {
+    let coverage_ref =
+        format!("artifact://lab/runs/{run_id}/reports/operating_point_coverage.json");
+    let mut boundaries = Vec::new();
+    boundaries.push(OperatingPointClaimBoundary {
+        claim: "frequency/resource variation was observed under the current target policy"
+            .to_string(),
+        decision: if observation_ref.is_some() {
+            ClaimDecision::Provisional
+        } else {
+            ClaimDecision::Blocked
+        },
+        evidence_refs: observation_ref.into_iter().collect(),
+        next_evidence_needed: vec![
+            "controlled operating point matrix for stronger operating-point claims".to_string(),
+        ],
+    });
+    boundaries.push(OperatingPointClaimBoundary {
+        claim: "bounded workload operating points were measured for completed trials".to_string(),
+        decision: if controlled_points.is_empty() {
+            ClaimDecision::Blocked
+        } else {
+            ClaimDecision::Supported
+        },
+        evidence_refs: experiment_ref
+            .into_iter()
+            .chain([coverage_ref.clone()])
+            .collect(),
+        next_evidence_needed: if controlled_points.is_empty() {
+            vec!["execute a supported controlled workload matrix".to_string()]
+        } else {
+            vec!["add privileged control wiring for CPU frequency/governor factors".to_string()]
+        },
+    });
+    boundaries.push(OperatingPointClaimBoundary {
+        claim: "adc-lab verified behavior across all fixed CPU frequencies".to_string(),
+        decision: ClaimDecision::Blocked,
+        evidence_refs: Vec::new(),
+        next_evidence_needed: vec![
+            "controlled fixed-frequency matrix".to_string(),
+            "approved privileged frequency control".to_string(),
+            "restore verification per point".to_string(),
+        ],
+    });
+    boundaries.push(OperatingPointClaimBoundary {
+        claim: "coverage status supports production physical-footprint conclusions".to_string(),
+        decision: ClaimDecision::Blocked,
+        evidence_refs: vec![coverage_ref],
+        next_evidence_needed: vec![
+            "target-specific sustained thermal evidence".to_string(),
+            "observer-effect calibration".to_string(),
+            "battery, flash, wakeup, and latency budgets".to_string(),
+        ],
+    });
+    if *coverage_status == OperatingPointCoverageStatus::BlockedUnsafe {
+        boundaries.push(OperatingPointClaimBoundary {
+            claim: "unsafe or degradation-inducing operating points were executed".to_string(),
+            decision: ClaimDecision::Blocked,
+            evidence_refs: Vec::new(),
+            next_evidence_needed: vec![
+                "explicit Tier 3 approval and recovery plan before execution".to_string(),
+            ],
+        });
+    }
+    if !blocked_points.is_empty() {
+        boundaries.push(OperatingPointClaimBoundary {
+            claim: format!(
+                "{} operating point(s) are blocked and cannot support claims",
+                blocked_points.len()
+            ),
+            decision: ClaimDecision::Blocked,
+            evidence_refs: Vec::new(),
+            next_evidence_needed: vec![
+                "inspect blocked_points reasons and collect the listed next evidence".to_string(),
+            ],
+        });
+    }
+    boundaries
 }
 
 pub fn capability_cost_model(run_id: String, target_id: String) -> CapabilityCostModel {
@@ -513,5 +809,124 @@ mod tests {
             .data_quality
             .missing
             .contains(&"no controlled operating point experiment was run".to_string()));
+    }
+
+    #[test]
+    fn contract_validation_operating_point_coverage_separates_passive_observation() {
+        let temp = tempfile::tempdir().unwrap();
+        let run_dir = temp.path().join("LAB-RUN-001");
+        fs::create_dir_all(run_dir.join("observations")).unwrap();
+        fs::write(run_dir.join("observations/observe.json"), "{}").unwrap();
+
+        let coverage = operating_point_coverage(&run_dir, "local-target".to_string()).unwrap();
+        assert_eq!(
+            coverage.coverage_status,
+            OperatingPointCoverageStatus::ObservationalOnly
+        );
+        assert_eq!(coverage.observed_points.len(), 1);
+        assert!(coverage.controlled_points.is_empty());
+        assert!(coverage
+            .blocked_points
+            .iter()
+            .any(|point| point.factor_id == "fixed_cpu_frequency"));
+        assert!(coverage
+            .claim_boundaries
+            .iter()
+            .any(|boundary| boundary.claim.contains("fixed CPU frequencies")
+                && boundary.decision == ClaimDecision::Blocked));
+    }
+
+    #[test]
+    fn contract_validation_operating_point_coverage_records_controlled_subset() {
+        let temp = tempfile::tempdir().unwrap();
+        let run_dir = temp.path().join("LAB-RUN-001");
+        fs::create_dir_all(run_dir.join("experiments")).unwrap();
+        fs::write(
+            run_dir.join("experiments/experiment_run.json"),
+            serde_json::json!({
+                "schema_version": "lab.experiment_run.v1",
+                "run_id": "LAB-RUN-001",
+                "matrix_id": "MATRIX-LOAD",
+                "target_id": "local-target",
+                "dry_run": false,
+                "trials": [
+                    {
+                        "trial_id": "TRIAL-001",
+                        "factors": { "cpu_load_workers": "1" },
+                        "status": "completed",
+                        "artifact_refs": [
+                            "artifact://lab/runs/LAB-RUN-001/experiments/trials/TRIAL-001/load_result.json",
+                            "artifact://lab/runs/LAB-RUN-001/experiments/trials/TRIAL-001/observation.json"
+                        ],
+                        "failure": null,
+                        "started_at_unix_ms": 1,
+                        "ended_at_unix_ms": 2
+                    }
+                ],
+                "time_unix_ms": 3
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let coverage = operating_point_coverage(&run_dir, "local-target".to_string()).unwrap();
+        assert_eq!(
+            coverage.coverage_status,
+            OperatingPointCoverageStatus::ControlledSubset
+        );
+        assert!(coverage.observed_points.is_empty());
+        assert_eq!(coverage.controlled_points.len(), 1);
+        assert_eq!(coverage.controlled_points[0].factor_id, "cpu_load_workers");
+        assert_eq!(
+            coverage.controlled_points[0].coverage_status,
+            OperatingPointCoverageStatus::ControlledSubset
+        );
+        assert!(coverage
+            .claim_boundaries
+            .iter()
+            .any(|boundary| boundary.claim.contains("bounded workload")
+                && boundary.decision == ClaimDecision::Supported));
+    }
+
+    #[test]
+    fn contract_validation_operating_point_coverage_records_blocked_factor() {
+        let temp = tempfile::tempdir().unwrap();
+        let run_dir = temp.path().join("LAB-RUN-001");
+        fs::create_dir_all(run_dir.join("experiments")).unwrap();
+        fs::write(
+            run_dir.join("experiments/experiment_run.json"),
+            serde_json::json!({
+                "schema_version": "lab.experiment_run.v1",
+                "run_id": "LAB-RUN-001",
+                "matrix_id": "MATRIX-GOVERNOR",
+                "target_id": "local-target",
+                "dry_run": false,
+                "trials": [
+                    {
+                        "trial_id": "TRIAL-001",
+                        "factors": { "governor": "performance" },
+                        "status": "blocked",
+                        "artifact_refs": [],
+                        "failure": "controlled factor 'governor' is not supported by PR6 real runner",
+                        "started_at_unix_ms": 1,
+                        "ended_at_unix_ms": 2
+                    }
+                ],
+                "time_unix_ms": 3
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let coverage = operating_point_coverage(&run_dir, "local-target".to_string()).unwrap();
+        assert_eq!(
+            coverage.coverage_status,
+            OperatingPointCoverageStatus::NotControllable
+        );
+        assert!(coverage
+            .blocked_points
+            .iter()
+            .any(|point| point.factor_id == "governor"
+                && point.coverage_status == OperatingPointCoverageStatus::NotControllable));
     }
 }

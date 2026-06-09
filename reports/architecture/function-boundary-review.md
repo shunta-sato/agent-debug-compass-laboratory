@@ -1,57 +1,53 @@
-# Function Boundary Review: PR6 Real Experiment Matrix Runner
+# Function Boundary Review: PR7 Controlled Operating Point Coverage
 
 ## Scope
 
 Changed functions/helpers:
 
-- `apply_control_plan`, `approval_matches`, `restore_lease`, `restore_refused_result`, `failed_result_with_restore_attempt`, `canonical_plan_digest` in `crates/adc-lab-core/src/control.rs`.
-- `validate_priv_helper_path`, `validate_restore_lease`, `validate_policy_segment`, `validate_governor_value`, `validate_optional_frequency`, `verify_restored_state`, `restore_failed_result` in `crates/adc-lab-core/src/control.rs`.
-- `artifact_uri_for_run`, `RunContext::artifact_uri` in `crates/adc-lab-core/src/run.rs`.
-- `collect_artifact_refs`, `collect_files` in `crates/adc-lab-core/src/report.rs`.
-- `ssh_runner_program`, `validate_ssh_runner_program`, `is_safe_ssh_endpoint` in `crates/adc-lab-core/src/target.rs`.
-- `run_experiment_matrix` in `crates/adc-lab-core/src/experiment.rs`.
-- `expand_factors`, `validate_experiment_matrix_bounds` in `crates/adc-lab-core/src/experiment.rs`.
-- `qualify_tool` in `crates/adc-lab-core/src/qualification.rs`.
-- `new_cpu_load_plan` in `crates/adc-lab-core/src/load.rs`.
-- `command_control_apply`, `command_restore`, `persist_control_result`, `persist_approval_record`, `safe_artifact_id`, `invoke_helper_apply`, `invoke_helper_restore`, `observe_ssh`, `load_cpu_ssh` in `crates/adc-lab/src/main.rs`.
-- `execute_experiment_matrix`, `execute_supported_experiment_trial`, `blocked_trial_reason`, `real_experiment_claim_trace`, `experiment_run_result` in `crates/adc-lab/src/main.rs`.
+- `operating_point_coverage`, `read_experiment_run_if_exists`,
+  `add_completed_trial_points`, `add_blocked_trial_points`,
+  `ensure_fixed_frequency_blocked`, `blocked_status_for_factor`,
+  `is_safety_blocked_factor`, `next_evidence_for_blocked_factor`,
+  `coverage_status`, and `operating_point_claim_boundaries` in
+  `crates/adc-lab-core/src/report.rs`.
+- `command_report_operating_point` in `crates/adc-lab/src/main.rs`.
+- `OperatingPointCoverage`, `OperatingPointCoverageStatus`,
+  `OperatingPointEvidenceClass`, `OperatingPointCoveragePoint`,
+  `OperatingPointBlockedPoint`, and `OperatingPointClaimBoundary` in
+  `crates/adc-lab-core/src/contracts.rs`.
 
 ## Semantic Neighbors
 
-| Function | Neighbor classification | Decision |
+| Function / Type | Neighbor classification | Decision |
 | --- | --- | --- |
-| `apply_control_plan` / `restore_lease` | same control domain; typed state-changing boundary | keep and extend in place |
-| `approval_matches` / `canonical_plan_digest` | same approval policy domain | keep parallel helper; no generic digest util |
-| `validate_restore_lease` helpers | restore input validation domain | split by invariant so path/governor/frequency failures stay precise |
-| `validate_priv_helper_path` | controller-internal sudo boundary | keep in core so fixed helper path validation stays outside shell invocation |
-| `artifact_uri_for_run` / `collect_artifact_refs` | same artifact-ref domain; one owns URI normalization, one owns run traversal | split responsibilities |
-| `ssh_runner_program` / `validate_ssh_runner_program` | same target transport domain | split validation from environment lookup |
-| `is_safe_ssh_endpoint` | target transport input grammar | keep local to target parsing; no generic URL parser |
-| `run_experiment_matrix` | matrix planning and claim trace domain | keep dry-run and unsupported non-dry planning semantics in core |
-| `expand_factors` / `validate_experiment_matrix_bounds` | shared matrix policy domain | keep in core so CLI and contract tests use the same bounds |
-| `execute_experiment_matrix` | controller-side real execution boundary | keep in CLI until supported trial execution outgrows the controller command surface |
-| `execute_supported_experiment_trial` | per-trial bounded load/observe orchestration | split from matrix expansion so completion depends on real artifacts and audit |
-| `blocked_trial_reason` | trial policy classification | keep explicit instead of folding unsupported factors into execution errors |
-| `real_experiment_claim_trace` | claim boundary for executed matrix subset | keep separate from dry-run trace so supported claims require completed trial artifacts |
-| `qualify_tool` | tool qualification contract | keep manifest-only path unqualified until evidence workflow exists |
-| `new_cpu_load_plan` | same bounded load policy domain | keep policy in plan constructor |
-| CLI apply/restore guards | call-site side-effect boundary before sudo | keep guard at controller boundary plus core/helper guard |
+| `operating_point_coverage` | same report domain as `pack_run`, `read_only_claim_trace`, `run_manifest` | keep in `report.rs`; it interprets existing run artifacts |
+| `read_experiment_run_if_exists` | parallel to `artifact_ref_if_exists`; different responsibility because it parses trusted schema JSON | keep split to preserve parse-error context |
+| `add_completed_trial_points` | same coverage-building domain as blocked-point helpers | split from top-level builder so controlled evidence rules are readable |
+| `add_blocked_trial_points` | parallel concept to completed trial points, but opposite outcome semantics | keep parallel because blocked/failure evidence rules will diverge |
+| `ensure_fixed_frequency_blocked` | fixed invariant for claim boundary | keep explicit instead of deriving from generic factor names |
+| `blocked_status_for_factor` / `is_safety_blocked_factor` | same classification domain | keep small helpers; no generic policy module until more statuses exist |
+| `next_evidence_for_blocked_factor` | same blocked-point domain | keep explicit so operator-facing next evidence stays close to reason classification |
+| `coverage_status` | top-level status reduction | keep pure helper for testable precedence |
+| `operating_point_claim_boundaries` | claim trace neighbor but coverage-specific evidence semantics | keep separate from `read_only_claim_trace` and experiment claim trace |
+| `command_report_operating_point` | CLI side-effect boundary | keep artifact writes and audit in CLI, keep classification in core |
+| Coverage DTOs | contract domain | keep in `contracts.rs`; no separate module until contract family grows |
 
 ## Decisions
 
-- No merge into generic `util` or `policy` module. The invariants are domain-specific and clearer where they sit.
-- No destructive refactor. Existing call sites were migrated coherently without temporary compatibility shims.
-- Ledger update not required: no abstraction replacement, intentional duplication, or staged adapter was introduced.
-- Public helper override is removed from the controller CLI. Helper path validation remains in core as a guard on the fixed controller-internal helper path without moving `sudo` side effects into core.
-- Restore lease validation is split into small invariant checks rather than a broad generic validator because each refusal message is an operator-facing safety boundary.
-- Experiment matrix core remains a planner. Real execution lives in the CLI
-  orchestration boundary and supports only listed-order `cpu_load_workers`
-  trials with bounded load and passive observe artifacts.
-- Unsupported controlled factors, randomized order, and failed trial steps
-  become blocked or failed trial outcomes. They do not become supported claims.
+- No merge into a generic evidence or policy utility. Coverage classification,
+  blocked-point reasons, and claim boundaries are domain-specific.
+- No replacement or staged migration. The previous skeleton shape is replaced
+  in one coherent schema/runtime update with tests.
+- `operating_point_coverage` remains read/report-only. It does not execute
+  target commands, control operations, or loads.
+- CLI owns artifact persistence and `report.operating_point` audit; core owns
+  artifact interpretation.
+- Ledger update not required: no long-lived sibling abstraction, staged adapter,
+  or intentional duplicate implementation remains.
 
 ## Verification
 
-- `cargo test -p adc-lab --test cli experiment_real_run -- --nocapture`: pass
-  after adding the real matrix runner subset tests.
+- `cargo test -p adc-lab-core operating_point -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli report_operating_point -- --nocapture`:
+  pass.
 - Full workspace verification is recorded in `reports/quality-gate.md`.

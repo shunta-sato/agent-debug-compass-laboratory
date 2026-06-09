@@ -545,10 +545,62 @@ pub struct OperatingPointCoverage {
     pub schema_version: String,
     pub run_id: String,
     pub target_id: String,
-    pub covered_points: Vec<String>,
-    pub blocked_points: Vec<String>,
-    pub coverage_status: String,
+    pub coverage_status: OperatingPointCoverageStatus,
+    pub observed_points: Vec<OperatingPointCoveragePoint>,
+    pub controlled_points: Vec<OperatingPointCoveragePoint>,
+    pub blocked_points: Vec<OperatingPointBlockedPoint>,
+    pub claim_boundaries: Vec<OperatingPointClaimBoundary>,
     pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OperatingPointCoverageStatus {
+    ObservationalOnly,
+    ControlledSubset,
+    ControlledFull,
+    NotControllable,
+    BlockedUnsafe,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OperatingPointEvidenceClass {
+    PassiveObservation,
+    BoundedLoad,
+    PrivilegedControl,
+    MissingEvidence,
+    SafetyBlocked,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct OperatingPointCoveragePoint {
+    pub factor_id: String,
+    pub level: String,
+    pub coverage_status: OperatingPointCoverageStatus,
+    pub evidence_class: OperatingPointEvidenceClass,
+    pub evidence_refs: Vec<String>,
+    pub claim_boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct OperatingPointBlockedPoint {
+    pub factor_id: String,
+    pub requested_level: Option<String>,
+    pub coverage_status: OperatingPointCoverageStatus,
+    pub reason: String,
+    pub next_evidence_needed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct OperatingPointClaimBoundary {
+    pub claim: String,
+    pub decision: ClaimDecision,
+    pub evidence_refs: Vec<String>,
+    pub next_evidence_needed: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

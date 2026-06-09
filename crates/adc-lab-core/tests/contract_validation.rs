@@ -90,6 +90,22 @@ fn contract_validation_experiment_run_accepts_not_implemented_status() {
         .unwrap_or_else(|err| panic!("not_implemented experiment run should validate: {err}"));
 }
 
+#[test]
+fn contract_validation_operating_point_coverage_rejects_legacy_provisional_status() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.operating_point_coverage.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.operating_point_coverage.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["coverage_status"] = serde_json::json!("provisional");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "operating point coverage must use explicit PR7 coverage statuses"
+    );
+}
+
 fn validate_schema(
     root: &serde_json::Value,
     schema: &serde_json::Value,

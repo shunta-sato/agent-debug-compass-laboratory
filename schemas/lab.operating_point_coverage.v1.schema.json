@@ -3,14 +3,63 @@
   "$id": "lab.operating_point_coverage.v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "run_id", "target_id", "covered_points", "blocked_points", "coverage_status", "time_unix_ms"],
+  "required": ["schema_version", "run_id", "target_id", "coverage_status", "observed_points", "controlled_points", "blocked_points", "claim_boundaries", "time_unix_ms"],
   "properties": {
     "schema_version": { "const": "lab.operating_point_coverage.v1" },
     "run_id": { "type": "string", "minLength": 1 },
     "target_id": { "type": "string", "minLength": 1 },
-    "covered_points": { "type": "array", "items": { "type": "string" } },
-    "blocked_points": { "type": "array", "items": { "type": "string" } },
-    "coverage_status": { "enum": ["supported", "provisional", "blocked"] },
+    "coverage_status": { "$ref": "#/$defs/coverage_status" },
+    "observed_points": { "type": "array", "items": { "$ref": "#/$defs/coverage_point" } },
+    "controlled_points": { "type": "array", "items": { "$ref": "#/$defs/coverage_point" } },
+    "blocked_points": { "type": "array", "items": { "$ref": "#/$defs/blocked_point" } },
+    "claim_boundaries": { "type": "array", "items": { "$ref": "#/$defs/claim_boundary" } },
     "time_unix_ms": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "coverage_status": {
+      "enum": ["observational_only", "controlled_subset", "controlled_full", "not_controllable", "blocked_unsafe"]
+    },
+    "evidence_class": {
+      "enum": ["passive_observation", "bounded_load", "privileged_control", "missing_evidence", "safety_blocked"]
+    },
+    "claim_decision": {
+      "enum": ["supported", "blocked", "provisional"]
+    },
+    "coverage_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["factor_id", "level", "coverage_status", "evidence_class", "evidence_refs", "claim_boundary"],
+      "properties": {
+        "factor_id": { "type": "string", "minLength": 1 },
+        "level": { "type": "string", "minLength": 1 },
+        "coverage_status": { "$ref": "#/$defs/coverage_status" },
+        "evidence_class": { "$ref": "#/$defs/evidence_class" },
+        "evidence_refs": { "type": "array", "items": { "type": "string" } },
+        "claim_boundary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "blocked_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["factor_id", "requested_level", "coverage_status", "reason", "next_evidence_needed"],
+      "properties": {
+        "factor_id": { "type": "string", "minLength": 1 },
+        "requested_level": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+        "coverage_status": { "$ref": "#/$defs/coverage_status" },
+        "reason": { "type": "string", "minLength": 1 },
+        "next_evidence_needed": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim", "decision", "evidence_refs", "next_evidence_needed"],
+      "properties": {
+        "claim": { "type": "string", "minLength": 1 },
+        "decision": { "$ref": "#/$defs/claim_decision" },
+        "evidence_refs": { "type": "array", "items": { "type": "string" } },
+        "next_evidence_needed": { "type": "array", "items": { "type": "string" } }
+      }
+    }
   }
 }

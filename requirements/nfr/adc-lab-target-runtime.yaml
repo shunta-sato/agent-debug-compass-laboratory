@@ -44,6 +44,13 @@ modes:
     experiment_runner_cooldown_seconds_max: 60
     experiment_runner_repetitions_max: 10
     experiment_runner_expanded_trials_max: 64
+    operating_point_coverage_report_target_runtime: none
+    operating_point_coverage_statuses:
+      - observational_only
+      - controlled_subset
+      - controlled_full
+      - not_controllable
+      - blocked_unsafe
     cpu_percent_max: null
     wakeups_per_second_added_max: null
     disk_write_bytes_total_max: null
@@ -65,6 +72,7 @@ measurement:
   command_smoke_resource_metrics_collected: false
   pr5_operator_abort_contract_verified_by: cargo test -p adc-lab --test cli load_cpu_operator_abort_records_safety_monitor_without_abort_path
   pr6_matrix_runner_contract_verified_by: cargo test -p adc-lab --test cli experiment_real_run -- --nocapture
+  pr7_operating_point_coverage_verified_by: cargo test -p adc-lab --test cli report_operating_point -- --nocapture
   baseline_path: examples/demos/target55/baselines/resource/idle.json
   report_path: examples/demos/target55/reports/target-characterization.json
   missing_evidence:

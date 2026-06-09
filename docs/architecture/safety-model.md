@@ -34,5 +34,9 @@ MVP behavior:
 - Tier 2 controlled factors such as governor or fixed frequency remain blocked
   in experiment matrices until privileged plan/apply/restore is wired into
   trial execution.
+- Operating point coverage reporting is Tier 0. It reads existing artifacts and
+  classifies claim boundaries; it does not execute new target operations.
+- Coverage statuses are safety-gated: unsupported controlled points become
+  `not_controllable`, and degradation-inducing points become `blocked_unsafe`.
 - Tier 3 is documentation-only in this MVP.
 - Tier 4 is prohibited by normal `adc-lab` approval.

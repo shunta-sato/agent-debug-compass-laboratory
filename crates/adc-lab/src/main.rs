@@ -966,12 +966,28 @@ fn command_report_operating_point(args: ReportPackCommand) -> Result<()> {
         .and_then(|name| name.to_str())
         .unwrap_or("LAB-RUN-unknown")
         .to_string();
-    let coverage = operating_point_coverage(run_id.clone(), args.target_id.clone());
+    let coverage = operating_point_coverage(&run.run_dir, args.target_id.clone())?;
     let cost = capability_cost_model(run_id, args.target_id);
     let coverage_path = run.run_dir.join("reports/operating_point_coverage.json");
     let cost_path = run.run_dir.join("reports/capability_cost_model.json");
     let coverage_ref = write_json_artifact(&run, &coverage_path, &coverage)?;
     let cost_ref = write_json_artifact(&run, &cost_path, &cost)?;
+    append_audit_event(
+        &run,
+        AuditInput {
+            target_id: coverage.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "report.operating_point".to_string(),
+            operation_id: None,
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: serde_json::to_string(&coverage.coverage_status)
+                .unwrap_or_else(|_| "unknown".to_string())
+                .trim_matches('"')
+                .to_string(),
+        },
+    )?;
     print_json(&serde_json::json!({
         "operating_point_coverage_ref": coverage_ref,
         "capability_cost_model_ref": cost_ref,
