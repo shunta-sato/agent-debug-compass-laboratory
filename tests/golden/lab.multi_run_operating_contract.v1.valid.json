@@ -1,0 +1,54 @@
+{
+  "schema_version": "lab.multi_run_operating_contract.v1",
+  "contract_id": "MULTI-CONTRACT-pi4-reference-v1",
+  "target_id": "target55",
+  "target_class": "raspberry_pi_4",
+  "pack_status": "platform_operating_contract_candidate",
+  "contract_status": "measured_partial",
+  "run_set_ref": "artifact://lab/runs/LAB-RUN-primary/reports/run_set_manifest.json",
+  "source_runs": [
+    {
+      "run_id": "LAB-RUN-primary",
+      "run_dir": "lab/runs/LAB-RUN-primary",
+      "role": "primary",
+      "evidence_refs": ["artifact://lab/runs/LAB-RUN-primary/pressure/cpu_pressure.result.json"],
+      "operations_summary": {
+        "cpu_pressure": "measured_partial"
+      }
+    }
+  ],
+  "rules": [
+    {
+      "rule_id": "cpu.sustained_all_core_requires_thermal_margin",
+      "category": "degraded_mode_trigger",
+      "statement": "Sustained all-core CPU work must be bounded or degraded unless thermal soak evidence passes.",
+      "rule_source": "evidence_needed_rule",
+      "derivation": "Aggregated CPU pressure evidence exists, but sustained soak and recovery evidence are still missing.",
+      "evidence_refs": ["artifact://lab/runs/LAB-RUN-primary/pressure/cpu_pressure.result.json"],
+      "confidence": "low",
+      "allowed_design": ["bounded burst"],
+      "blocked_design": ["unbounded default all-core loop"]
+    }
+  ],
+  "boundaries": [
+    {
+      "boundary_id": "compute_thermal",
+      "statement": "Compute and thermal evidence is aggregated across runs but still bounded by measured conditions.",
+      "status": "measured_partial",
+      "evidence_refs": ["artifact://lab/runs/LAB-RUN-primary/pressure/cpu_pressure.result.json"],
+      "next_evidence_needed": [
+        {
+          "reason": "cooldown curve missing",
+          "needed_probe": "thermal recovery probe",
+          "blocking_missing_evidence": ["cooldown/recovery curve"],
+          "next_action": "run recovery phase",
+          "owner_surface": "operator_approval"
+        }
+      ]
+    }
+  ],
+  "unknowns": ["memory/cache/storage coupling remains unmeasured"],
+  "next_evidence_needed": ["run composite memory-storage-jitter probe"],
+  "evidence_refs": ["artifact://lab/runs/LAB-RUN-primary/pressure/cpu_pressure.result.json"],
+  "time_unix_ms": 1780000000000
+}

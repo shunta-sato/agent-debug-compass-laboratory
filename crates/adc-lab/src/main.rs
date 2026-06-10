@@ -81,6 +81,11 @@ enum ToolchainCommand {
 enum PrivilegeCommand {
     #[command(name = "provider-status")]
     ProviderStatus(TargetCommand),
+    Doctor(TargetCommand),
+    #[command(name = "install-plan")]
+    InstallPlan(PrivilegeInstallPlanCommand),
+    #[command(name = "uninstall-plan")]
+    UninstallPlan(TargetCommand),
 }
 
 #[derive(Debug, Args)]
@@ -312,10 +317,24 @@ struct TargetCapabilityProfileCommand {
 struct OperatingContractCommand {
     #[arg(long)]
     run: PathBuf,
+    #[arg(long = "include-run")]
+    include_runs: Vec<PathBuf>,
     #[arg(long, default_value = "unknown-target")]
     target_id: String,
     #[arg(long, default_value = "unknown-target-class")]
     target_class: String,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
+struct PrivilegeInstallPlanCommand {
+    #[arg(long, default_value = "local")]
+    target: String,
+    #[arg(long)]
+    helper_bin: Option<PathBuf>,
+    #[arg(long)]
+    run_dir: Option<PathBuf>,
     #[arg(long)]
     json: bool,
 }
@@ -437,6 +456,9 @@ fn main() -> Result<()> {
         Commands::HealthCheck(args) => command_health_check(args),
         Commands::Privilege { command } => match command {
             PrivilegeCommand::ProviderStatus(args) => command_privilege_provider_status(args),
+            PrivilegeCommand::Doctor(args) => command_privilege_doctor(args),
+            PrivilegeCommand::InstallPlan(args) => command_privilege_install_plan(args),
+            PrivilegeCommand::UninstallPlan(args) => command_privilege_uninstall_plan(args),
         },
         Commands::Tool { command } => match command {
             ToolCommand::Qualify(args) => command_tool_qualify(args),
@@ -1194,6 +1216,33 @@ fn command_report_operating_contract(args: OperatingContractCommand) -> Result<(
         target_operating_contract_for_run(&run.run_dir, args.target_id.clone(), args.target_class)?;
     let contract_path = run.run_dir.join("reports/target_operating_contract.json");
     let contract_ref = write_json_artifact(&run, &contract_path, &contract)?;
+    let mut run_set_ref = None;
+    let mut multi_run_contract_ref = None;
+    let mut multi_run_contract = None;
+    if !args.include_runs.is_empty() {
+        let run_set = run_set_manifest_for_runs(
+            &run.run_dir,
+            &args.include_runs,
+            args.target_id.clone(),
+            contract.target_class.clone(),
+        )?;
+        let run_set_path = run.run_dir.join("reports/run_set_manifest.json");
+        let written_run_set_ref = write_json_artifact(&run, &run_set_path, &run_set)?;
+        let multi = multi_run_operating_contract_for_runs(
+            &run.run_dir,
+            &args.include_runs,
+            args.target_id.clone(),
+            contract.target_class.clone(),
+            Some(written_run_set_ref.clone()),
+        )?;
+        let multi_path = run
+            .run_dir
+            .join("reports/multi_run_operating_contract.json");
+        let written_multi_ref = write_json_artifact(&run, &multi_path, &multi)?;
+        run_set_ref = Some(written_run_set_ref);
+        multi_run_contract_ref = Some(written_multi_ref);
+        multi_run_contract = Some(multi);
+    }
     let inventory_status = if inventory
         .mechanisms
         .iter()
@@ -1235,12 +1284,39 @@ fn command_report_operating_contract(args: OperatingContractCommand) -> Result<(
             },
         )?;
     }
+    if let Some(multi) = multi_run_contract.as_ref() {
+        for (operation, result) in [
+            ("report.run_set_manifest", "recorded".to_string()),
+            (
+                "report.multi_run_operating_contract",
+                serde_json::to_string(&multi.contract_status)
+                    .unwrap_or_else(|_| "unknown".to_string()),
+            ),
+        ] {
+            append_audit_event(
+                &run,
+                AuditInput {
+                    target_id: args.target_id.clone(),
+                    actor: Actor::codex(),
+                    operation: operation.to_string(),
+                    operation_id: None,
+                    risk_tier: RiskTier::Tier0ReadOnlyObservation,
+                    approval_ref: None,
+                    restore_lease_ref: None,
+                    result: result.trim_matches('"').to_string(),
+                },
+            )?;
+        }
+    }
 
     print_json(&serde_json::json!({
         "platform_mechanism_inventory_ref": inventory_ref,
         "boundary_probe_plan_ref": plan_ref,
         "resource_coupling_report_ref": coupling_ref,
         "target_operating_contract_ref": contract_ref,
+        "run_set_manifest_ref": run_set_ref,
+        "multi_run_operating_contract_ref": multi_run_contract_ref,
+        "multi_run_operating_contract": multi_run_contract,
         "target_operating_contract": contract
     }))
 }
@@ -1308,6 +1384,76 @@ fn command_privilege_provider_status(args: TargetCommand) -> Result<()> {
         },
     )?;
     print_artifact(&run, &path, status)
+}
+
+fn command_privilege_doctor(args: TargetCommand) -> Result<()> {
+    let target = TargetSpec::parse(&args.target)?;
+    let run = create_or_open_run(args.run_dir)?;
+    let local_target = matches!(target.transport, TargetTransport::Local);
+    let report = privilege_doctor(target.target_id.clone(), local_target);
+    let path = run.run_dir.join("privilege/privilege_doctor.json");
+    write_json_artifact(&run, &path, &report)?;
+    append_audit_event(
+        &run,
+        AuditInput {
+            target_id: report.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "privilege.doctor".to_string(),
+            operation_id: None,
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: serde_json::to_string(&report.status)
+                .unwrap_or_else(|_| "\"unknown\"".to_string())
+                .trim_matches('"')
+                .to_string(),
+        },
+    )?;
+    print_artifact(&run, &path, report)
+}
+
+fn command_privilege_install_plan(args: PrivilegeInstallPlanCommand) -> Result<()> {
+    let target = TargetSpec::parse(&args.target)?;
+    let run = create_or_open_run(args.run_dir)?;
+    let plan = privilege_install_plan(target.target_id.clone(), args.helper_bin.as_deref());
+    let path = run.run_dir.join("privilege/privilege_install_plan.json");
+    write_json_artifact(&run, &path, &plan)?;
+    append_audit_event(
+        &run,
+        AuditInput {
+            target_id: plan.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "privilege.install_plan".to_string(),
+            operation_id: Some(plan.plan_id.clone()),
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: "instruction_only".to_string(),
+        },
+    )?;
+    print_artifact(&run, &path, plan)
+}
+
+fn command_privilege_uninstall_plan(args: TargetCommand) -> Result<()> {
+    let target = TargetSpec::parse(&args.target)?;
+    let run = create_or_open_run(args.run_dir)?;
+    let plan = privilege_uninstall_plan(target.target_id.clone());
+    let path = run.run_dir.join("privilege/privilege_uninstall_plan.json");
+    write_json_artifact(&run, &path, &plan)?;
+    append_audit_event(
+        &run,
+        AuditInput {
+            target_id: plan.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "privilege.uninstall_plan".to_string(),
+            operation_id: Some(plan.plan_id.clone()),
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: "instruction_only".to_string(),
+        },
+    )?;
+    print_artifact(&run, &path, plan)
 }
 
 fn build_health_output(target: &TargetSpec) -> HealthOutput {

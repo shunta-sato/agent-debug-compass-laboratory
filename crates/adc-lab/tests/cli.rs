@@ -591,6 +591,99 @@ fn report_operating_contract_writes_contract_artifacts() {
     assert!(audit.contains("\"operation\":\"report.target_operating_contract\""));
 }
 
+#[test]
+fn report_operating_contract_accepts_include_run_and_writes_run_set() {
+    let primary = tempfile::tempdir().unwrap();
+    let included = tempfile::tempdir().unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "pressure",
+            "run",
+            "--target",
+            "local",
+            "--kind",
+            "latency_jitter",
+            "--duration",
+            "1ms",
+            "--run-dir",
+            primary.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "pressure",
+            "run",
+            "--target",
+            "local",
+            "--kind",
+            "observer_pressure",
+            "--duration",
+            "1ms",
+            "--run-dir",
+            included.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "operating-contract",
+            "--run",
+            primary.path().to_str().unwrap(),
+            "--include-run",
+            included.path().to_str().unwrap(),
+            "--target-id",
+            "local-target",
+            "--target-class",
+            "raspberry_pi_4",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("run_set_manifest_ref"))
+        .stdout(contains("multi_run_operating_contract_ref"));
+
+    let run_set_path = primary.path().join("reports/run_set_manifest.json");
+    let multi_path = primary
+        .path()
+        .join("reports/multi_run_operating_contract.json");
+    assert!(run_set_path.exists());
+    assert!(multi_path.exists());
+
+    let run_set: serde_json::Value =
+        serde_json::from_slice(&fs::read(run_set_path).unwrap()).unwrap();
+    assert_eq!(run_set["schema_version"], "lab.run_set_manifest.v1");
+    assert_eq!(run_set["runs"].as_array().unwrap().len(), 2);
+    assert!(run_set["evidence_refs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|reference| reference.as_str().unwrap().contains("observer_pressure")));
+
+    let multi: serde_json::Value = serde_json::from_slice(&fs::read(multi_path).unwrap()).unwrap();
+    assert_eq!(
+        multi["schema_version"],
+        "lab.multi_run_operating_contract.v1"
+    );
+    assert!(multi["evidence_refs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|reference| reference.as_str().unwrap().contains("observer_pressure")));
+
+    let audit = fs::read_to_string(primary.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"report.run_set_manifest\""));
+    assert!(audit.contains("\"operation\":\"report.multi_run_operating_contract\""));
+}
+
 fn matching_approval(plan: &ControlPlan) -> ApprovalRecord {
     ApprovalRecord {
         schema_version: "lab.approval_record.v1".to_string(),
@@ -1120,6 +1213,107 @@ fn privilege_provider_status_records_option_b_disabled_and_audit() {
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"privilege.provider_status\""));
     assert!(audit.contains("\"result\":\"recorded\""));
+}
+
+#[test]
+fn privilege_doctor_writes_noninteractive_readiness_report() {
+    let temp = tempfile::tempdir().unwrap();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "privilege",
+            "doctor",
+            "--target",
+            "local",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("privilege_doctor.json"))
+        .stdout(contains("\"schema_version\": \"lab.privilege_doctor.v1\""));
+
+    let path = temp.path().join("privilege/privilege_doctor.json");
+    assert!(path.exists());
+    let report: serde_json::Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+    assert_eq!(report["schema_version"], "lab.privilege_doctor.v1");
+    assert!(report["sudo_non_interactive_available"].is_boolean());
+    assert!(report["next_action"]
+        .as_str()
+        .is_some_and(|value| !value.is_empty()));
+    assert!(report["checks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|check| check["check_id"] == "sudo.non_interactive"));
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"privilege.doctor\""));
+}
+
+#[test]
+fn privilege_setup_plans_are_instruction_only_artifacts() {
+    let temp = tempfile::tempdir().unwrap();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "privilege",
+            "install-plan",
+            "--target",
+            "local",
+            "--helper-bin",
+            "./target/release/adc-lab-priv-helper",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("privilege_install_plan.json"))
+        .stdout(contains("\"plan_kind\": \"install\""));
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "privilege",
+            "uninstall-plan",
+            "--target",
+            "local",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("privilege_uninstall_plan.json"))
+        .stdout(contains("\"plan_kind\": \"uninstall\""));
+
+    let install: serde_json::Value = serde_json::from_slice(
+        &fs::read(temp.path().join("privilege/privilege_install_plan.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(install["schema_version"], "lab.privilege_setup_plan.v1");
+    assert!(install["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|command| command.as_str().unwrap().contains("sudo install")));
+
+    let uninstall: serde_json::Value = serde_json::from_slice(
+        &fs::read(temp.path().join("privilege/privilege_uninstall_plan.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(uninstall["schema_version"], "lab.privilege_setup_plan.v1");
+    assert!(uninstall["warnings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|warning| warning.as_str().unwrap().contains("instructions only")));
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"privilege.install_plan\""));
+    assert!(audit.contains("\"operation\":\"privilege.uninstall_plan\""));
+    assert!(audit.contains("\"result\":\"instruction_only\""));
 }
 
 #[test]

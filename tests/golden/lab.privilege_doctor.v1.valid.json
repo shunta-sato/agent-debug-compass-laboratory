@@ -1,0 +1,21 @@
+{
+  "schema_version": "lab.privilege_doctor.v1",
+  "target_id": "local-target",
+  "helper_path": "/usr/local/libexec/adc-lab-priv-helper",
+  "helper_installed": true,
+  "root_owned": true,
+  "world_writable": false,
+  "sudo_non_interactive_available": true,
+  "helper_version": "0.1.13",
+  "status": "ready",
+  "checks": [
+    {
+      "check_id": "helper.exists",
+      "status": "pass",
+      "summary": "helper path exists",
+      "evidence": ["/usr/local/libexec/adc-lab-priv-helper"]
+    }
+  ],
+  "next_action": "privileged helper is ready for non-interactive typed apply/restore",
+  "time_unix_ms": 1780000000000
+}
