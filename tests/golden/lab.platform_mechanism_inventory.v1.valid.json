@@ -1,0 +1,18 @@
+{
+  "schema_version": "lab.platform_mechanism_inventory.v1",
+  "target_id": "raspberry_pi_4_target55",
+  "target_class": "raspberry_pi_4",
+  "mechanisms": [
+    {
+      "domain": "compute",
+      "mechanism_id": "cpu.cpufreq_governor",
+      "description": "CPU governor and frequency policy surface",
+      "visibility_status": "measured_partial",
+      "control_status": "not_controllable",
+      "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/inventory/target_inventory.json"],
+      "reason": "cpufreq policy is visible; fixed-frequency control is not established by this artifact"
+    }
+  ],
+  "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/inventory/target_inventory.json"],
+  "time_unix_ms": 1780000000000
+}

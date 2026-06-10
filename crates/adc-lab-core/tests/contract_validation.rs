@@ -209,6 +209,38 @@ fn contract_validation_target_capability_profile_requires_selection_ready_field(
 }
 
 #[test]
+fn contract_validation_resource_pressure_rejects_unsupported_status() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.resource_pressure_result.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.resource_pressure_result.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["status"] = serde_json::json!("unsupported_by_adc_lab");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "resource pressure results must classify surfaces explicitly instead of using unsupported_by_adc_lab"
+    );
+}
+
+#[test]
+fn contract_validation_operating_contract_rejects_unsupported_boundary_status() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.target_operating_contract.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.target_operating_contract.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["boundaries"][0]["status"] = serde_json::json!("unsupported_by_adc_lab");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "target operating contract boundaries must not use unsupported_by_adc_lab"
+    );
+}
+
+#[test]
 fn contract_validation_release_manifest_rejects_missing_binary_sha() {
     let root = workspace_root();
     let schema_path = root.join("schemas/lab.release_manifest.v1.schema.json");

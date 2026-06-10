@@ -1,0 +1,28 @@
+{
+  "schema_version": "lab.target_operating_contract.v1",
+  "target_id": "raspberry_pi_4_target55",
+  "target_class": "raspberry_pi_4",
+  "contract_status": "measured_partial",
+  "rules": [
+    {
+      "rule_id": "cpu.sustained_all_core_requires_thermal_margin",
+      "category": "degraded_mode_trigger",
+      "statement": "Sustained all-core CPU work must be bounded or degraded unless thermal soak evidence passes.",
+      "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/pressure/cpu_pressure.result.json"],
+      "confidence": "medium",
+      "allowed_design": ["bounded burst", "thermal degrade policy"],
+      "blocked_design": ["unbounded default all-core loop"]
+    }
+  ],
+  "boundaries": [
+    {
+      "boundary_id": "compute_thermal",
+      "statement": "Compute and thermal claims are bounded to measured load durations.",
+      "status": "measured_partial",
+      "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/pressure/cpu_pressure.result.json"]
+    }
+  ],
+  "unknowns": [],
+  "next_evidence_needed": ["run Pi5 reference target with the same contract suite"],
+  "time_unix_ms": 1780000000000
+}

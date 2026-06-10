@@ -493,6 +493,102 @@ fn load_cpu_operator_abort_records_safety_monitor_without_abort_path() {
     assert!(audit.contains("\"result\":\"aborted\""));
 }
 
+#[test]
+fn pressure_run_local_writes_typed_artifact_and_audit() {
+    let temp = tempfile::tempdir().unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "pressure",
+            "run",
+            "--target",
+            "local",
+            "--kind",
+            "latency_jitter",
+            "--duration",
+            "1ms",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains(
+            "\"schema_version\": \"lab.resource_pressure_result.v1\"",
+        ))
+        .stdout(contains("\"pressure_kind\": \"latency_jitter\""));
+
+    let pressure_files = fs::read_dir(temp.path().join("pressure"))
+        .unwrap()
+        .flatten()
+        .filter(|entry| {
+            entry
+                .path()
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(".result.json"))
+        })
+        .count();
+    assert_eq!(pressure_files, 1);
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"pressure.run\""));
+}
+
+#[test]
+fn report_operating_contract_writes_contract_artifacts() {
+    let temp = tempfile::tempdir().unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "pressure",
+            "run",
+            "--target",
+            "local",
+            "--kind",
+            "latency_jitter",
+            "--duration",
+            "1ms",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "operating-contract",
+            "--run",
+            temp.path().to_str().unwrap(),
+            "--target-id",
+            "local-target",
+            "--target-class",
+            "raspberry_pi_4",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("target_operating_contract_ref"))
+        .stdout(contains(
+            "\"schema_version\": \"lab.target_operating_contract.v1\"",
+        ));
+
+    for path in [
+        "reports/platform_mechanism_inventory.json",
+        "reports/boundary_probe_plan.json",
+        "reports/resource_coupling_report.json",
+        "reports/target_operating_contract.json",
+    ] {
+        assert!(temp.path().join(path).exists(), "missing {path}");
+    }
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"report.target_operating_contract\""));
+}
+
 fn matching_approval(plan: &ControlPlan) -> ApprovalRecord {
     ApprovalRecord {
         schema_version: "lab.approval_record.v1".to_string(),

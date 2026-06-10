@@ -4,10 +4,12 @@
 
 - Entry point: `adc-lab observe`, `adc-lab-target observe`, `adc-lab load cpu`,
   `adc-lab experiment run`, `adc-lab report operating-point`,
-  `adc-lab report capability-profile`.
+  `adc-lab report capability-profile`, `adc-lab pressure run`,
+  `adc-lab-target pressure run`, `adc-lab report operating-contract`.
 - Cadence or trigger: command-triggered; observation default interval is 1s; CPU load loop is bounded by duration; CPU load safety monitor runs at 100ms only during explicit load; experiment runner sequences bounded trials.
 - Default mode: no always-on target-local loop.
-- Burst mode: explicit command.
+- Burst mode: explicit command. Pressure probes are bounded by duration <=30s,
+  memory <=128MiB, storage <=64MiB, and network <=1MiB.
 - Target class: Raspberry Pi 4 initial target, generic embedded Linux future.
 
 ## Per-Iteration Cost
@@ -22,11 +24,16 @@
 | Blocking syscall | procfs/sysfs reads | 0 in sub-100ms loop unless justified | code review | acceptable at 1s default | no sub-100ms default |
 | Lock/queue operation | none | bounded wait and bounded queue | code review | low | none |
 | O(n) data-structure operation | factor expansion in cold path | 0 per high-frequency iteration unless bounded | tests | low | expanded trials capped at 64 |
+| Pressure loops / I/O | memory page touch, tempfile write/read, netdev counter scan, monotonic jitter loop, observer sample loop | no default steady-state loop; explicit pressure burst only | code review and CLI/schema tests | acceptable for experimental-only | target evidence required before production claims |
 
 ## Cadence Decision
 
 - Default cadence: no always-on cadence; observation default 1s when explicitly run.
 - Burst cadence: 1s default for observation, user-bounded duration; CPU load duration is capped at 300s by default policy, worker count cannot exceed available parallelism, safety monitor cadence is 100ms only during explicit CPU load, and experiment matrices are capped by warmup/cooldown/repetition/trial policy.
+- Platform Operating Contract pressure cadence: command-triggered only; jitter
+  loop uses 1ms interval inside duration <=30s; observer pressure samples at
+  bounded 10ms sleeps inside duration <=30s. There is no always-on pressure
+  loop.
 - Why this cadence is needed: enough for coarse CPU/frequency/thermal smoke.
 - Event-driven or coalesced alternative: future adapters can cache surfaces if needed.
 - Measurement required: yes, before overhead claims.
@@ -52,6 +59,11 @@
 - [EHP-007] PR11 target capability profile reads controller-side run artifacts
   only; it adds no target-local hot path and does not execute workload or
   observe commands.
+- [EHP-008] Platform Operating Contract pressure probes add target-local loops
+  and bounded I/O only under explicit `pressure run`; they are not enabled by
+  default and are experimental-only until target evidence is collected.
+- [EHP-009] `report operating-contract` is controller-side artifact
+  interpretation and adds no target-local hot path.
 
 ## Handoff
 

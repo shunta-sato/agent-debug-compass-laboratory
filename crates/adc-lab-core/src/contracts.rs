@@ -223,6 +223,223 @@ pub struct ControlSurfaceInventory {
     pub surfaces: Vec<ControlSurfaceSummary>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ContractEvidenceStatus {
+    Measured,
+    MeasuredPartial,
+    NotControllable,
+    UnsafeToRunWithReason,
+    NotApplicableWithReason,
+    Insufficient,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PlatformMechanism {
+    pub domain: String,
+    pub mechanism_id: String,
+    pub description: String,
+    pub visibility_status: ContractEvidenceStatus,
+    pub control_status: ContractEvidenceStatus,
+    pub evidence_refs: Vec<String>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PlatformMechanismInventory {
+    pub schema_version: String,
+    pub target_id: String,
+    pub target_class: String,
+    pub mechanisms: Vec<PlatformMechanism>,
+    pub evidence_refs: Vec<String>,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BoundaryProbe {
+    pub probe_id: String,
+    pub boundary: String,
+    pub controlled_factors: Vec<String>,
+    pub observed_covariates: Vec<String>,
+    pub uncontrolled_confounders: Vec<String>,
+    pub safety_abort_condition: Vec<String>,
+    pub restore_cleanup: Vec<String>,
+    pub claim_supported: String,
+    pub claim_blocked: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct BoundaryProbePlan {
+    pub schema_version: String,
+    pub plan_id: String,
+    pub target_id: String,
+    pub target_class: String,
+    pub probes: Vec<BoundaryProbe>,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ResourcePressureKind {
+    MemoryPressure,
+    StorageIo,
+    NetworkIo,
+    LatencyJitter,
+    CpuPressure,
+    ThermalPressure,
+    ObserverPressure,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ResourceMetric {
+    pub metric_id: String,
+    pub value: Option<f64>,
+    pub unit: String,
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ContractFactor {
+    pub factor_id: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ResourceSideEffect {
+    pub resource: String,
+    pub status: ContractEvidenceStatus,
+    pub summary: String,
+    pub metrics: Vec<ResourceMetric>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PressureSafety {
+    pub duration_seconds_max: u64,
+    pub memory_bytes_max: u64,
+    pub storage_bytes_max: u64,
+    pub network_bytes_max: u64,
+    pub abort_conditions: Vec<String>,
+    pub cleanup: Vec<String>,
+    pub cleanup_verified: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ResourcePressureResult {
+    pub schema_version: String,
+    pub result_id: String,
+    pub target_id: String,
+    pub pressure_kind: ResourcePressureKind,
+    pub status: ContractEvidenceStatus,
+    pub duration_ms: u64,
+    pub controlled_factors: Vec<ContractFactor>,
+    pub observed_covariates: Vec<ContractFactor>,
+    pub uncontrolled_confounders: Vec<String>,
+    pub metrics: Vec<ResourceMetric>,
+    pub side_effects: Vec<ResourceSideEffect>,
+    pub safety: PressureSafety,
+    pub evidence_refs: Vec<String>,
+    pub claim_supported: Vec<String>,
+    pub claim_blocked: Vec<String>,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ResourceCouplingChain {
+    pub chain_id: String,
+    pub pressure: String,
+    pub platform_response: String,
+    pub secondary_pressure: String,
+    pub performance_degradation: String,
+    pub recovery_behavior: String,
+    pub status: ContractEvidenceStatus,
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ResourceCouplingReport {
+    pub schema_version: String,
+    pub report_id: String,
+    pub target_id: String,
+    pub report_status: ContractEvidenceStatus,
+    pub chains: Vec<ResourceCouplingChain>,
+    pub evidence_refs: Vec<String>,
+    pub unknowns: Vec<String>,
+    pub next_evidence_needed: Vec<String>,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TargetOperatingContractStatus {
+    MeasuredPartial,
+    MeasuredReference,
+    Insufficient,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OperatingRuleCategory {
+    AllowedDefault,
+    BurstOnly,
+    DegradedModeTrigger,
+    ForbiddenPattern,
+    BlockedClaim,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ContractConfidence {
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct OperatingContractRule {
+    pub rule_id: String,
+    pub category: OperatingRuleCategory,
+    pub statement: String,
+    pub evidence_refs: Vec<String>,
+    pub confidence: ContractConfidence,
+    pub allowed_design: Vec<String>,
+    pub blocked_design: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct OperatingBoundary {
+    pub boundary_id: String,
+    pub statement: String,
+    pub status: ContractEvidenceStatus,
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TargetOperatingContract {
+    pub schema_version: String,
+    pub target_id: String,
+    pub target_class: String,
+    pub contract_status: TargetOperatingContractStatus,
+    pub rules: Vec<OperatingContractRule>,
+    pub boundaries: Vec<OperatingBoundary>,
+    pub unknowns: Vec<String>,
+    pub next_evidence_needed: Vec<String>,
+    pub time_unix_ms: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct OperationBounds {

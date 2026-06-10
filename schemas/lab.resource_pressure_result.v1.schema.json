@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lab.resource_pressure_result.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "result_id", "target_id", "pressure_kind", "status", "duration_ms", "controlled_factors", "observed_covariates", "uncontrolled_confounders", "metrics", "side_effects", "safety", "evidence_refs", "claim_supported", "claim_blocked", "time_unix_ms"],
+  "properties": {
+    "schema_version": { "const": "lab.resource_pressure_result.v1" },
+    "result_id": { "type": "string", "minLength": 1 },
+    "target_id": { "type": "string", "minLength": 1 },
+    "pressure_kind": { "enum": ["memory_pressure", "storage_io", "network_io", "latency_jitter", "cpu_pressure", "thermal_pressure", "observer_pressure"] },
+    "status": { "$ref": "#/$defs/status" },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "controlled_factors": { "type": "array", "items": { "$ref": "#/$defs/factor" } },
+    "observed_covariates": { "type": "array", "items": { "$ref": "#/$defs/factor" } },
+    "uncontrolled_confounders": { "type": "array", "items": { "type": "string" } },
+    "metrics": { "type": "array", "items": { "$ref": "#/$defs/metric" } },
+    "side_effects": { "type": "array", "items": { "$ref": "#/$defs/side_effect" } },
+    "safety": { "$ref": "#/$defs/safety" },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "claim_supported": { "type": "array", "items": { "type": "string" } },
+    "claim_blocked": { "type": "array", "items": { "type": "string" } },
+    "time_unix_ms": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "status": {
+      "enum": ["measured", "measured_partial", "not_controllable", "unsafe_to_run_with_reason", "not_applicable_with_reason", "insufficient"]
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metric_id", "value", "unit", "note"],
+      "properties": {
+        "metric_id": { "type": "string", "minLength": 1 },
+        "value": { "type": ["number", "null"] },
+        "unit": { "type": "string" },
+        "note": { "type": ["string", "null"] }
+      }
+    },
+    "factor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["factor_id", "value"],
+      "properties": {
+        "factor_id": { "type": "string", "minLength": 1 },
+        "value": { "type": "string" }
+      }
+    },
+    "side_effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resource", "status", "summary", "metrics"],
+      "properties": {
+        "resource": { "type": "string", "minLength": 1 },
+        "status": { "$ref": "#/$defs/status" },
+        "summary": { "type": "string", "minLength": 1 },
+        "metrics": { "type": "array", "items": { "$ref": "#/$defs/metric" } }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["duration_seconds_max", "memory_bytes_max", "storage_bytes_max", "network_bytes_max", "abort_conditions", "cleanup", "cleanup_verified"],
+      "properties": {
+        "duration_seconds_max": { "type": "integer", "minimum": 0 },
+        "memory_bytes_max": { "type": "integer", "minimum": 0 },
+        "storage_bytes_max": { "type": "integer", "minimum": 0 },
+        "network_bytes_max": { "type": "integer", "minimum": 0 },
+        "abort_conditions": { "type": "array", "items": { "type": "string" } },
+        "cleanup": { "type": "array", "items": { "type": "string" } },
+        "cleanup_verified": { "type": "boolean" }
+      }
+    }
+  }
+}
