@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lab.privilege_setup_plan.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "plan_id", "target_id", "plan_kind", "helper_path", "operator_steps", "commands", "verification_commands", "warnings", "time_unix_ms"],
+  "properties": {
+    "schema_version": { "const": "lab.privilege_setup_plan.v1" },
+    "plan_id": { "type": "string", "minLength": 1 },
+    "target_id": { "type": "string", "minLength": 1 },
+    "plan_kind": { "enum": ["install", "uninstall"] },
+    "helper_path": { "type": "string", "minLength": 1 },
+    "operator_steps": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "commands": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "verification_commands": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "time_unix_ms": { "type": "integer", "minimum": 0 }
+  }
+}

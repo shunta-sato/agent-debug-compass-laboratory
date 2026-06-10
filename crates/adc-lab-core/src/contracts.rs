@@ -530,6 +530,137 @@ pub struct TargetOperatingContract {
     pub time_unix_ms: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum OperatingContractPackStatus {
+    ObservationalReadOnly,
+    ReadOnlyPlusPressureProbes,
+    ExploratoryPressureSmoke,
+    ControlledGovernorSubset,
+    ControlledOperatingPointSubset,
+    CompositeCouplingProbe,
+    PlatformOperatingContractCandidate,
+    PlatformOperatingContractReference,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RunSetRole {
+    Primary,
+    IncludedEvidence,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RunSetEntry {
+    pub run_id: String,
+    pub run_dir: String,
+    pub role: RunSetRole,
+    pub evidence_refs: Vec<String>,
+    pub operations_summary: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct RunSetManifest {
+    pub schema_version: String,
+    pub run_set_id: String,
+    pub target_id: String,
+    pub target_class: String,
+    pub pack_status: OperatingContractPackStatus,
+    pub runs: Vec<RunSetEntry>,
+    pub operations_summary: BTreeMap<String, String>,
+    pub included_surfaces: Vec<String>,
+    pub evidence_refs: Vec<String>,
+    pub blocked_evidence: Vec<ContractEvidenceGap>,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MultiRunOperatingContract {
+    pub schema_version: String,
+    pub contract_id: String,
+    pub target_id: String,
+    pub target_class: String,
+    pub pack_status: OperatingContractPackStatus,
+    pub contract_status: TargetOperatingContractStatus,
+    pub run_set_ref: Option<String>,
+    pub source_runs: Vec<RunSetEntry>,
+    pub rules: Vec<OperatingContractRule>,
+    pub boundaries: Vec<OperatingBoundary>,
+    pub unknowns: Vec<String>,
+    pub next_evidence_needed: Vec<String>,
+    pub evidence_refs: Vec<String>,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PrivilegeDoctorStatus {
+    Ready,
+    Degraded,
+    OperatorSetupRequired,
+    UnsupportedTarget,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PrivilegeDoctorCheckStatus {
+    Pass,
+    Fail,
+    Warning,
+    NotApplicable,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PrivilegeDoctorCheck {
+    pub check_id: String,
+    pub status: PrivilegeDoctorCheckStatus,
+    pub summary: String,
+    pub evidence: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PrivilegeDoctorReport {
+    pub schema_version: String,
+    pub target_id: String,
+    pub helper_path: String,
+    pub helper_installed: bool,
+    pub root_owned: Option<bool>,
+    pub world_writable: Option<bool>,
+    pub sudo_non_interactive_available: bool,
+    pub helper_version: Option<String>,
+    pub status: PrivilegeDoctorStatus,
+    pub checks: Vec<PrivilegeDoctorCheck>,
+    pub next_action: String,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PrivilegeSetupPlanKind {
+    Install,
+    Uninstall,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PrivilegeSetupPlan {
+    pub schema_version: String,
+    pub plan_id: String,
+    pub target_id: String,
+    pub plan_kind: PrivilegeSetupPlanKind,
+    pub helper_path: String,
+    pub operator_steps: Vec<String>,
+    pub commands: Vec<String>,
+    pub verification_commands: Vec<String>,
+    pub warnings: Vec<String>,
+    pub time_unix_ms: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct OperationBounds {

@@ -319,6 +319,38 @@ fn contract_validation_operating_contract_rejects_unsupported_boundary_status() 
 }
 
 #[test]
+fn contract_validation_run_set_rejects_unsupported_pack_status() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.run_set_manifest.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.run_set_manifest.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["pack_status"] = serde_json::json!("unsupported_by_adc_lab");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "run-set pack status must use explicit operating-contract states"
+    );
+}
+
+#[test]
+fn contract_validation_privilege_doctor_rejects_unknown_status() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.privilege_doctor.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.privilege_doctor.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["status"] = serde_json::json!("password_prompt_waiting");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "privilege doctor must classify non-interactive readiness explicitly"
+    );
+}
+
+#[test]
 fn contract_validation_release_manifest_rejects_missing_binary_sha() {
     let root = workspace_root();
     let schema_path = root.join("schemas/lab.release_manifest.v1.schema.json");

@@ -1,0 +1,46 @@
+{
+  "schema_version": "lab.run_set_manifest.v1",
+  "run_set_id": "RUN-SET-pi4-reference-v1",
+  "target_id": "target55",
+  "target_class": "raspberry_pi_4",
+  "pack_status": "platform_operating_contract_candidate",
+  "runs": [
+    {
+      "run_id": "LAB-RUN-primary",
+      "run_dir": "lab/runs/LAB-RUN-primary",
+      "role": "primary",
+      "evidence_refs": ["artifact://lab/runs/LAB-RUN-primary/pressure/cpu_pressure.result.json"],
+      "operations_summary": {
+        "cpu_pressure": "measured_partial"
+      }
+    },
+    {
+      "run_id": "LAB-RUN-governor",
+      "run_dir": "lab/runs/LAB-RUN-governor",
+      "role": "included_evidence",
+      "evidence_refs": ["artifact://lab/runs/LAB-RUN-governor/plans/PLAN-001.result.json"],
+      "operations_summary": {
+        "privileged_control": "completed"
+      }
+    }
+  ],
+  "operations_summary": {
+    "cpu_pressure": "measured_partial",
+    "privileged_control": "completed"
+  },
+  "included_surfaces": ["cpu_pressure", "privileged_control"],
+  "evidence_refs": [
+    "artifact://lab/runs/LAB-RUN-primary/pressure/cpu_pressure.result.json",
+    "artifact://lab/runs/LAB-RUN-governor/plans/PLAN-001.result.json"
+  ],
+  "blocked_evidence": [
+    {
+      "reason": "composite coupling not measured",
+      "needed_probe": "memory-storage-jitter composite boundary probe",
+      "blocking_missing_evidence": ["paired pressure phase", "recovery phase"],
+      "next_action": "run composite boundary probe before reference contract status",
+      "owner_surface": "adc-lab"
+    }
+  ],
+  "time_unix_ms": 1780000000000
+}

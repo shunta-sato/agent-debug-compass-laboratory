@@ -1,13 +1,15 @@
 use crate::contracts::{
     ApprovalRecord, BoundaryProbe, BoundaryProbePlan, ContractConfidence, ContractEvidenceGap,
     ContractEvidenceStatus, ContractFactor, ControlPlan, ControlResult, ControlResultStatus,
-    NetworkPressureEvidence, NetworkPressureMode, OperatingBoundary, OperatingContractRule,
-    OperatingRuleCategory, OperatingRuleSource, PlatformMechanism, PlatformMechanismInventory,
-    PressureCondition, PressureEffect, PressureIntensity, PressureSafety, ResourceCouplingChain,
+    MultiRunOperatingContract, NetworkPressureEvidence, NetworkPressureMode, OperatingBoundary,
+    OperatingContractPackStatus, OperatingContractRule, OperatingRuleCategory, OperatingRuleSource,
+    PlatformMechanism, PlatformMechanismInventory, PressureCondition, PressureEffect,
+    PressureIntensity, PressureSafety, PrivilegeDoctorReport, ResourceCouplingChain,
     ResourceCouplingEvidenceClass, ResourceCouplingReport, ResourceMetric,
     ResourcePressureEvidenceClass, ResourcePressureKind, ResourcePressureResult,
-    ResourceSideEffect, RestoreAttemptStatus, RestoreLease, RestoreStatus, TargetInventory,
-    TargetOperatingContract, TargetOperatingContractStatus,
+    ResourceSideEffect, RestoreAttemptStatus, RestoreLease, RestoreStatus, RunSetEntry,
+    RunSetManifest, RunSetRole, TargetInventory, TargetOperatingContract,
+    TargetOperatingContractStatus,
 };
 use crate::control::{approval_matches, CPUFREQ_SET_GOVERNOR};
 use crate::ids::{new_id, now_unix_ms};
@@ -577,6 +579,137 @@ pub fn resource_coupling_report_for_run(
     })
 }
 
+pub fn run_set_manifest_for_runs(
+    primary_run_dir: impl AsRef<Path>,
+    include_run_dirs: &[PathBuf],
+    target_id: String,
+    target_class: String,
+) -> LabResult<RunSetManifest> {
+    let run_dirs = run_set_paths(primary_run_dir.as_ref(), include_run_dirs);
+    let mut runs = Vec::new();
+    let mut evidence_refs = Vec::new();
+    let mut operations_summary = BTreeMap::new();
+    let mut included_surfaces = BTreeSet::new();
+
+    for (index, run_dir) in run_dirs.iter().enumerate() {
+        let run_id = run_id_from_run_dir(run_dir);
+        let refs = run_evidence_refs(run_dir, &run_id)?;
+        let summary = run_operations_summary(run_dir, &run_id)?;
+        for reference in &refs {
+            evidence_refs.push(reference.clone());
+        }
+        for key in summary.keys() {
+            included_surfaces.insert(key.clone());
+        }
+        let role = if index == 0 {
+            RunSetRole::Primary
+        } else {
+            RunSetRole::IncludedEvidence
+        };
+        runs.push(RunSetEntry {
+            run_id,
+            run_dir: run_dir.display().to_string(),
+            role,
+            evidence_refs: refs,
+            operations_summary: summary,
+        });
+    }
+
+    let pack_status = pack_status_for_runs(&runs)?;
+    operations_summary.insert("run_count".to_string(), runs.len().to_string());
+    operations_summary.insert("pack_status".to_string(), pack_status_string(&pack_status));
+    evidence_refs.sort();
+    evidence_refs.dedup();
+
+    Ok(RunSetManifest {
+        schema_version: "lab.run_set_manifest.v1".to_string(),
+        run_set_id: new_id("RUN-SET"),
+        target_id,
+        target_class,
+        pack_status,
+        runs,
+        operations_summary,
+        included_surfaces: included_surfaces.into_iter().collect(),
+        evidence_refs,
+        blocked_evidence: vec![evidence_gap(
+            "multi-run aggregation does not by itself prove same-condition resource coupling",
+            "phase-based composite boundary probe in one run",
+            &[
+                "baseline",
+                "paired pressure phase",
+                "latency side effect",
+                "recovery",
+            ],
+            "run composite probes before promoting ingredients-only coupling to measured coupling",
+            "adc-lab",
+        )],
+        time_unix_ms: now_unix_ms(),
+    })
+}
+
+pub fn multi_run_operating_contract_for_runs(
+    primary_run_dir: impl AsRef<Path>,
+    include_run_dirs: &[PathBuf],
+    target_id: String,
+    target_class: String,
+    run_set_ref: Option<String>,
+) -> LabResult<MultiRunOperatingContract> {
+    let primary_run_dir = primary_run_dir.as_ref();
+    let manifest = run_set_manifest_for_runs(
+        primary_run_dir,
+        include_run_dirs,
+        target_id.clone(),
+        target_class.clone(),
+    )?;
+    let run_dirs = run_set_paths(primary_run_dir, include_run_dirs);
+    let refs = aggregate_pressure_result_refs(&run_dirs)?;
+    let pressure_results = aggregate_pressure_results_by_kind(&run_dirs)?;
+    let composite_coupling_measured = run_dirs.iter().any(|run_dir| {
+        read_json_if_exists::<ResourceCouplingReport>(
+            &run_dir.join("reports/resource_coupling_report.json"),
+        )
+        .ok()
+        .flatten()
+        .is_some_and(|report| {
+            report.chains.iter().any(|chain| {
+                matches!(
+                    chain.coupling_evidence_class,
+                    ResourceCouplingEvidenceClass::CompositeMeasured
+                )
+            })
+        })
+    });
+
+    let mut base = target_operating_contract_for_run(
+        primary_run_dir,
+        target_id.clone(),
+        target_class.clone(),
+    )?;
+    apply_aggregate_contract_evidence(
+        &mut base,
+        &refs,
+        &pressure_results,
+        composite_coupling_measured,
+    );
+
+    Ok(MultiRunOperatingContract {
+        schema_version: "lab.multi_run_operating_contract.v1".to_string(),
+        contract_id: new_id("MULTI-CONTRACT"),
+        target_id,
+        target_class,
+        pack_status: manifest.pack_status,
+        contract_status: base.contract_status,
+        run_set_ref,
+        source_runs: manifest.runs,
+        rules: base.rules,
+        boundaries: base.boundaries,
+        unknowns: base.unknowns,
+        next_evidence_needed: base.next_evidence_needed,
+        evidence_refs: manifest.evidence_refs,
+        time_unix_ms: now_unix_ms(),
+    })
+}
+
 pub fn target_operating_contract_for_run(
     run_dir: impl AsRef<Path>,
     target_id: String,
@@ -853,6 +986,290 @@ fn pressure_results_by_kind(
             .push(result);
     }
     Ok(results)
+}
+
+fn run_set_paths(primary_run_dir: &Path, include_run_dirs: &[PathBuf]) -> Vec<PathBuf> {
+    let mut run_dirs = Vec::with_capacity(include_run_dirs.len() + 1);
+    run_dirs.push(primary_run_dir.to_path_buf());
+    run_dirs.extend(include_run_dirs.iter().cloned());
+    run_dirs
+}
+
+fn run_evidence_refs(run_dir: &Path, run_id: &str) -> LabResult<Vec<String>> {
+    let mut refs = Vec::new();
+    refs.extend(pressure_result_refs(run_dir, run_id)?.into_values());
+    refs.extend(cpufreq_control_evidence_refs(run_dir, run_id)?);
+    for relative_path in [
+        "inventory/target_inventory.json",
+        "reports/platform_mechanism_inventory.json",
+        "reports/boundary_probe_plan.json",
+        "reports/resource_coupling_report.json",
+        "reports/target_operating_contract.json",
+        "privilege/privilege_doctor.json",
+    ] {
+        if let Some(reference) = artifact_ref_if_exists(run_dir, run_id, relative_path)? {
+            refs.push(reference);
+        }
+    }
+    refs.sort();
+    refs.dedup();
+    Ok(refs)
+}
+
+fn run_operations_summary(run_dir: &Path, run_id: &str) -> LabResult<BTreeMap<String, String>> {
+    let mut summary = BTreeMap::new();
+    if artifact_ref_if_exists(run_dir, run_id, "inventory/target_inventory.json")?.is_some() {
+        summary.insert("inventory".to_string(), "present".to_string());
+    }
+    for key in pressure_result_refs(run_dir, run_id)?.keys() {
+        let base = key.split('#').next().unwrap_or(key);
+        summary.insert(format!("pressure.{base}"), "present".to_string());
+    }
+    if !cpufreq_control_evidence_refs(run_dir, run_id)?.is_empty() {
+        summary.insert(
+            "governor_control".to_string(),
+            "apply_verify_restore_evidence_present".to_string(),
+        );
+    }
+    if let Some(report) = read_json_if_exists::<ResourceCouplingReport>(
+        &run_dir.join("reports/resource_coupling_report.json"),
+    )? {
+        let has_composite = report.chains.iter().any(|chain| {
+            matches!(
+                chain.coupling_evidence_class,
+                ResourceCouplingEvidenceClass::CompositeMeasured
+            )
+        });
+        summary.insert(
+            "resource_coupling".to_string(),
+            if has_composite {
+                "composite_measured".to_string()
+            } else {
+                "ingredients_or_insufficient".to_string()
+            },
+        );
+    }
+    if let Some(contract) = read_json_if_exists::<TargetOperatingContract>(
+        &run_dir.join("reports/target_operating_contract.json"),
+    )? {
+        summary.insert(
+            "target_operating_contract".to_string(),
+            serde_json::to_string(&contract.contract_status)
+                .unwrap_or_else(|_| "\"unknown\"".to_string())
+                .trim_matches('"')
+                .to_string(),
+        );
+    }
+    if let Some(report) = read_json_if_exists::<PrivilegeDoctorReport>(
+        &run_dir.join("privilege/privilege_doctor.json"),
+    )? {
+        summary.insert(
+            "privilege_doctor".to_string(),
+            serde_json::to_string(&report.status)
+                .unwrap_or_else(|_| "\"unknown\"".to_string())
+                .trim_matches('"')
+                .to_string(),
+        );
+    }
+    Ok(summary)
+}
+
+fn pack_status_for_runs(runs: &[RunSetEntry]) -> LabResult<OperatingContractPackStatus> {
+    let has_pressure = runs.iter().any(|run| {
+        run.operations_summary
+            .keys()
+            .any(|key| key.starts_with("pressure."))
+    });
+    let has_governor_control = runs
+        .iter()
+        .any(|run| run.operations_summary.contains_key("governor_control"));
+    let has_composite = runs.iter().any(|run| {
+        run.operations_summary
+            .get("resource_coupling")
+            .is_some_and(|status| status == "composite_measured")
+    });
+    let has_all_pressure = required_pressure_kinds().iter().all(|kind| {
+        runs.iter().any(|run| {
+            run.operations_summary
+                .contains_key(&format!("pressure.{kind}"))
+        })
+    });
+
+    Ok(if has_composite && has_all_pressure {
+        OperatingContractPackStatus::PlatformOperatingContractCandidate
+    } else if has_composite {
+        OperatingContractPackStatus::CompositeCouplingProbe
+    } else if has_governor_control {
+        OperatingContractPackStatus::ControlledGovernorSubset
+    } else if has_all_pressure {
+        OperatingContractPackStatus::ExploratoryPressureSmoke
+    } else if has_pressure {
+        OperatingContractPackStatus::ReadOnlyPlusPressureProbes
+    } else {
+        OperatingContractPackStatus::ObservationalReadOnly
+    })
+}
+
+fn pack_status_string(status: &OperatingContractPackStatus) -> String {
+    serde_json::to_string(status)
+        .unwrap_or_else(|_| "\"unknown\"".to_string())
+        .trim_matches('"')
+        .to_string()
+}
+
+fn aggregate_pressure_result_refs(run_dirs: &[PathBuf]) -> LabResult<BTreeMap<String, String>> {
+    let mut refs = BTreeMap::new();
+    for run_dir in run_dirs {
+        let run_id = run_id_from_run_dir(run_dir);
+        for (key, reference) in pressure_result_refs(run_dir, &run_id)? {
+            insert_pressure_ref(&mut refs, key.split('#').next().unwrap_or(&key), reference);
+        }
+    }
+    Ok(refs)
+}
+
+fn insert_pressure_ref(refs: &mut BTreeMap<String, String>, base_key: &str, reference: String) {
+    let key = if refs.contains_key(base_key) {
+        format!(
+            "{base_key}#{}",
+            refs.keys()
+                .filter(|key| key.as_str() == base_key || key.starts_with(&format!("{base_key}#")))
+                .count()
+        )
+    } else {
+        base_key.to_string()
+    };
+    refs.insert(key, reference);
+}
+
+fn aggregate_pressure_results_by_kind(
+    run_dirs: &[PathBuf],
+) -> LabResult<BTreeMap<String, Vec<ResourcePressureResult>>> {
+    let mut aggregate: BTreeMap<String, Vec<ResourcePressureResult>> = BTreeMap::new();
+    for run_dir in run_dirs {
+        for (kind, mut results) in pressure_results_by_kind(run_dir)? {
+            aggregate.entry(kind).or_default().append(&mut results);
+        }
+    }
+    Ok(aggregate)
+}
+
+fn apply_aggregate_contract_evidence(
+    contract: &mut TargetOperatingContract,
+    refs: &BTreeMap<String, String>,
+    pressure_results: &BTreeMap<String, Vec<ResourcePressureResult>>,
+    composite_coupling_measured: bool,
+) {
+    let network_boundary_measured = pressure_results
+        .get("network_io")
+        .into_iter()
+        .flatten()
+        .any(|result| {
+            result.network_evidence.as_ref().is_some_and(|evidence| {
+                matches!(evidence.network_mode, NetworkPressureMode::BoundedTransfer)
+            })
+        });
+    let memory_pressure_effect_observed = pressure_results
+        .get("memory_pressure")
+        .into_iter()
+        .flatten()
+        .any(|result| result.pressure_effect.observed);
+    let missing = required_pressure_kinds()
+        .iter()
+        .filter(|kind| !refs.contains_key(**kind))
+        .map(|kind| format!("{kind} result"))
+        .collect::<Vec<_>>();
+
+    contract.contract_status = if missing.is_empty()
+        && composite_coupling_measured
+        && memory_pressure_effect_observed
+        && network_boundary_measured
+    {
+        TargetOperatingContractStatus::MeasuredPartial
+    } else {
+        TargetOperatingContractStatus::Insufficient
+    };
+
+    let mut unknowns = missing;
+    if !composite_coupling_measured {
+        unknowns.push(
+            "composite resource coupling not measured in a single phased run; multi-run evidence remains ingredients only".to_string(),
+        );
+    }
+    if !memory_pressure_effect_observed {
+        unknowns.push(
+            "memory pressure effect not observed across included runs; allocation may only be smoke"
+                .to_string(),
+        );
+    }
+    if !network_boundary_measured {
+        unknowns.push(
+            "network I/O boundary not measured by endpoint-backed bounded transfer".to_string(),
+        );
+    }
+    unknowns.push(
+        "multi-run aggregation may mix governor, thermal, and ambient conditions unless run-set metadata proves same-condition execution".to_string(),
+    );
+    contract.unknowns = unknowns;
+    contract.next_evidence_needed = contract
+        .unknowns
+        .iter()
+        .map(|entry| format!("collect evidence to resolve: {entry}"))
+        .collect();
+
+    for rule in &mut contract.rules {
+        rule.evidence_refs = match rule.rule_id.as_str() {
+            "cpu.sustained_all_core_requires_thermal_margin" => {
+                refs_for_required(refs, &["cpu_pressure", "thermal_pressure"])
+            }
+            "memory.pressure_limits_storage_heavy_work" => {
+                refs_for_required(refs, &["memory_pressure", "storage_io", "latency_jitter"])
+            }
+            "storage.default_writes_must_be_bounded" => refs_for_required(refs, &["storage_io"]),
+            "network.background_io_requires_backoff" => {
+                refs_for_required(refs, &["network_io", "latency_jitter"])
+            }
+            "latency.real_time_claim_requires_pressure_jitter_evidence" => {
+                refs_for_required(refs, &["latency_jitter"])
+            }
+            "observer.default_cadence_must_be_evidence_bounded" => {
+                refs_for_required(refs, &["observer_pressure"])
+            }
+            _ => rule.evidence_refs.clone(),
+        };
+    }
+
+    for boundary in &mut contract.boundaries {
+        match boundary.boundary_id.as_str() {
+            "compute_thermal" => {
+                boundary.status = status_for_required(refs, &["cpu_pressure", "thermal_pressure"]);
+                boundary.evidence_refs =
+                    refs_for_required(refs, &["cpu_pressure", "thermal_pressure"]);
+            }
+            "memory_cache_storage" => {
+                boundary.status = if composite_coupling_measured {
+                    ContractEvidenceStatus::MeasuredPartial
+                } else {
+                    ContractEvidenceStatus::Insufficient
+                };
+                boundary.evidence_refs =
+                    refs_for_required(refs, &["memory_pressure", "storage_io", "latency_jitter"]);
+            }
+            "network_latency" => {
+                boundary.status = if network_boundary_measured {
+                    ContractEvidenceStatus::MeasuredPartial
+                } else {
+                    ContractEvidenceStatus::Insufficient
+                };
+                boundary.evidence_refs = refs_for_required(refs, &["network_io", "latency_jitter"]);
+            }
+            "observer_effect" => {
+                boundary.status = status_for_required(refs, &["observer_pressure"]);
+                boundary.evidence_refs = refs_for_required(refs, &["observer_pressure"]);
+            }
+            _ => {}
+        }
+    }
 }
 
 fn validate_pressure_options(options: &PressureProbeOptions) -> LabResult<()> {

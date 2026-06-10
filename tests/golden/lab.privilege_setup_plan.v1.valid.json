@@ -1,0 +1,24 @@
+{
+  "schema_version": "lab.privilege_setup_plan.v1",
+  "plan_id": "PRIV-PLAN-install",
+  "target_id": "local-target",
+  "plan_kind": "install",
+  "helper_path": "/usr/local/libexec/adc-lab-priv-helper",
+  "operator_steps": [
+    "Verify the helper binary came from a checked release asset.",
+    "Install the helper as root-owned executable.",
+    "Optionally add a lab-target-only sudoers rule for the fixed helper path."
+  ],
+  "commands": [
+    "sudo install -o root -g root -m 0755 ./adc-lab-priv-helper /usr/local/libexec/adc-lab-priv-helper",
+    "sudo visudo -f /etc/sudoers.d/adc-lab"
+  ],
+  "verification_commands": [
+    "adc-lab privilege doctor --target local",
+    "sudo -n /usr/local/libexec/adc-lab-priv-helper --version"
+  ],
+  "warnings": [
+    "This plan is instructions only; adc-lab does not install or remove privileged files."
+  ],
+  "time_unix_ms": 1780000000000
+}
