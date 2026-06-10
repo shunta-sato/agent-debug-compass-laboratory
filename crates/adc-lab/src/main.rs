@@ -34,6 +34,10 @@ enum Commands {
         #[command(subcommand)]
         command: LoadCommand,
     },
+    Pressure {
+        #[command(subcommand)]
+        command: PressureCommand,
+    },
     Experiment {
         #[command(subcommand)]
         command: ExperimentCommand,
@@ -169,6 +173,39 @@ enum LoadCommand {
     Cpu(LoadCpuCommand),
 }
 
+#[derive(Debug, Subcommand)]
+enum PressureCommand {
+    Run(PressureRunCommand),
+}
+
+#[derive(Debug, Args)]
+struct PressureRunCommand {
+    #[arg(long, default_value = "local")]
+    target: String,
+    #[arg(long)]
+    kind: ResourcePressureKind,
+    #[arg(long, default_value = "1s")]
+    duration: String,
+    #[arg(long, default_value_t = 1)]
+    workers: usize,
+    #[arg(long)]
+    abort_temp_c: Option<f64>,
+    #[arg(long, default_value_t = 8 * 1024 * 1024)]
+    memory_bytes: u64,
+    #[arg(long, default_value_t = 1024 * 1024)]
+    storage_bytes: u64,
+    #[arg(long, default_value_t = 0)]
+    network_bytes: u64,
+    #[arg(long)]
+    network_endpoint: Option<String>,
+    #[arg(long)]
+    storage_dir: Option<PathBuf>,
+    #[arg(long)]
+    run_dir: Option<PathBuf>,
+    #[arg(long)]
+    json: bool,
+}
+
 #[derive(Debug, Args)]
 struct LoadCpuCommand {
     #[arg(long, default_value = "local")]
@@ -242,6 +279,7 @@ struct ExperimentRunCommand {
 enum ReportCommand {
     Pack(ReportPackCommand),
     OperatingPoint(ReportPackCommand),
+    OperatingContract(OperatingContractCommand),
     CapabilityProfile(TargetCapabilityProfileCommand),
 }
 
@@ -265,6 +303,18 @@ struct TargetCapabilityProfileCommand {
     target_id: String,
     #[arg(long)]
     workload: PathBuf,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
+struct OperatingContractCommand {
+    #[arg(long)]
+    run: PathBuf,
+    #[arg(long, default_value = "unknown-target")]
+    target_id: String,
+    #[arg(long, default_value = "unknown-target-class")]
+    target_class: String,
     #[arg(long)]
     json: bool,
 }
@@ -368,6 +418,9 @@ fn main() -> Result<()> {
         Commands::Load { command } => match command {
             LoadCommand::Cpu(args) => command_load_cpu(args),
         },
+        Commands::Pressure { command } => match command {
+            PressureCommand::Run(args) => command_pressure_run(args),
+        },
         Commands::Experiment { command } => match command {
             ExperimentCommand::Run(args) => command_experiment_run(args),
         },
@@ -377,6 +430,7 @@ fn main() -> Result<()> {
         Commands::Report { command } => match command {
             ReportCommand::Pack(args) => command_report_pack(args),
             ReportCommand::OperatingPoint(args) => command_report_operating_point(args),
+            ReportCommand::OperatingContract(args) => command_report_operating_contract(args),
             ReportCommand::CapabilityProfile(args) => command_report_capability_profile(args),
         },
         Commands::HealthCheck(args) => command_health_check(args),
@@ -645,6 +699,52 @@ fn command_load_cpu(args: LoadCpuCommand) -> Result<()> {
             approval_ref: None,
             restore_lease_ref: None,
             result: result.status.clone(),
+        },
+    )?;
+    print_artifact(&run, &path, result)
+}
+
+fn command_pressure_run(args: PressureRunCommand) -> Result<()> {
+    let target = TargetSpec::parse(&args.target)?;
+    let run = create_or_open_run(args.run_dir)?;
+    persist_target_runner_version_if_absent(&run, &target)?;
+    let options = PressureProbeOptions {
+        duration: parse_duration(&args.duration)?,
+        workers: args.workers,
+        abort_temp_c: args.abort_temp_c,
+        memory_bytes: args.memory_bytes,
+        storage_bytes: args.storage_bytes,
+        network_bytes: args.network_bytes,
+        network_endpoint: args.network_endpoint,
+        storage_dir: args.storage_dir,
+    };
+    let result = match target.transport {
+        TargetTransport::Local => {
+            run_resource_pressure(target.target_id.clone(), args.kind.clone(), &options)?
+        }
+        TargetTransport::Ssh => pressure_ssh(&target, args.kind.clone(), &options)?,
+    };
+    let file_name = format!(
+        "{}.{}.result.json",
+        result.pressure_kind.as_str(),
+        safe_artifact_id(&result.result_id, "PRESSURE")
+    );
+    let path = run.run_dir.join("pressure").join(file_name);
+    write_json_artifact(&run, &path, &result)?;
+    append_audit_event(
+        &run,
+        AuditInput {
+            target_id: result.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "pressure.run".to_string(),
+            operation_id: Some(result.pressure_kind.as_str().to_string()),
+            risk_tier: RiskTier::Tier1LowRiskReversibleNonRoot,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: serde_json::to_string(&result.status)
+                .unwrap_or_else(|_| "unknown".to_string())
+                .trim_matches('"')
+                .to_string(),
         },
     )?;
     print_artifact(&run, &path, result)
@@ -1067,6 +1167,80 @@ fn command_report_operating_point(args: ReportPackCommand) -> Result<()> {
         "capability_cost_model_ref": cost_ref,
         "coverage": coverage,
         "cost_model": cost
+    }))
+}
+
+fn command_report_operating_contract(args: OperatingContractCommand) -> Result<()> {
+    let run = existing_run_context(args.run);
+    let inventory = platform_mechanism_inventory_for_run(
+        &run.run_dir,
+        args.target_id.clone(),
+        args.target_class.clone(),
+    )?;
+    let plan = boundary_probe_plan(args.target_id.clone(), args.target_class.clone());
+    let coupling = resource_coupling_report_for_run(&run.run_dir, args.target_id.clone())?;
+
+    let inventory_path = run
+        .run_dir
+        .join("reports/platform_mechanism_inventory.json");
+    let plan_path = run.run_dir.join("reports/boundary_probe_plan.json");
+    let coupling_path = run.run_dir.join("reports/resource_coupling_report.json");
+    let inventory_ref = write_json_artifact(&run, &inventory_path, &inventory)?;
+    let plan_ref = write_json_artifact(&run, &plan_path, &plan)?;
+    let coupling_ref = write_json_artifact(&run, &coupling_path, &coupling)?;
+
+    let contract =
+        target_operating_contract_for_run(&run.run_dir, args.target_id.clone(), args.target_class)?;
+    let contract_path = run.run_dir.join("reports/target_operating_contract.json");
+    let contract_ref = write_json_artifact(&run, &contract_path, &contract)?;
+    let inventory_status = if inventory
+        .mechanisms
+        .iter()
+        .any(|mechanism| mechanism.evidence_status == ContractEvidenceStatus::Insufficient)
+    {
+        ContractEvidenceStatus::Insufficient
+    } else {
+        ContractEvidenceStatus::MeasuredPartial
+    };
+
+    for (operation, result) in [
+        (
+            "report.platform_mechanism_inventory",
+            serde_json::to_string(&inventory_status).unwrap_or_else(|_| "insufficient".to_string()),
+        ),
+        ("report.boundary_probe_plan", "planned".to_string()),
+        (
+            "report.resource_coupling",
+            serde_json::to_string(&coupling.report_status)
+                .unwrap_or_else(|_| "unknown".to_string()),
+        ),
+        (
+            "report.target_operating_contract",
+            serde_json::to_string(&contract.contract_status)
+                .unwrap_or_else(|_| "unknown".to_string()),
+        ),
+    ] {
+        append_audit_event(
+            &run,
+            AuditInput {
+                target_id: args.target_id.clone(),
+                actor: Actor::codex(),
+                operation: operation.to_string(),
+                operation_id: None,
+                risk_tier: RiskTier::Tier0ReadOnlyObservation,
+                approval_ref: None,
+                restore_lease_ref: None,
+                result: result.trim_matches('"').to_string(),
+            },
+        )?;
+    }
+
+    print_json(&serde_json::json!({
+        "platform_mechanism_inventory_ref": inventory_ref,
+        "boundary_probe_plan_ref": plan_ref,
+        "resource_coupling_report_ref": coupling_ref,
+        "target_operating_contract_ref": contract_ref,
+        "target_operating_contract": contract
     }))
 }
 
@@ -1829,6 +2003,51 @@ fn load_cpu_ssh(
         );
     }
     let mut result: LoadResult = serde_json::from_slice(&output.stdout)?;
+    result.target_id = target.target_id.clone();
+    Ok(result)
+}
+
+fn pressure_ssh(
+    target: &TargetSpec,
+    kind: ResourcePressureKind,
+    options: &PressureProbeOptions,
+) -> Result<ResourcePressureResult> {
+    let mut command = Command::new("ssh");
+    command
+        .arg(&target.endpoint)
+        .arg(ssh_runner_program()?)
+        .arg("pressure")
+        .arg("run")
+        .arg("--kind")
+        .arg(kind.as_str())
+        .arg("--duration")
+        .arg(format!("{}s", options.duration.as_secs().max(1)))
+        .arg("--workers")
+        .arg(options.workers.to_string())
+        .arg("--memory-bytes")
+        .arg(options.memory_bytes.to_string())
+        .arg("--storage-bytes")
+        .arg(options.storage_bytes.to_string())
+        .arg("--network-bytes")
+        .arg(options.network_bytes.to_string())
+        .arg("--json");
+    if let Some(limit) = options.abort_temp_c {
+        command.arg("--abort-temp-c").arg(limit.to_string());
+    }
+    if let Some(endpoint) = options.network_endpoint.as_ref() {
+        command.arg("--network-endpoint").arg(endpoint);
+    }
+    if let Some(path) = options.storage_dir.as_ref() {
+        command.arg("--storage-dir").arg(path);
+    }
+    let output = command.output()?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "ssh pressure run failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let mut result: ResourcePressureResult = serde_json::from_slice(&output.stdout)?;
     result.target_id = target.target_id.clone();
     Ok(result)
 }

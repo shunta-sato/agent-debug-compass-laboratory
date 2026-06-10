@@ -1,0 +1,20 @@
+{
+  "schema_version": "lab.boundary_probe_plan.v1",
+  "plan_id": "BOUNDARY-PLAN-001",
+  "target_id": "raspberry_pi_4_target55",
+  "target_class": "raspberry_pi_4",
+  "probes": [
+    {
+      "probe_id": "memory.pressure_boundary",
+      "boundary": "memory pressure boundary",
+      "controlled_factors": ["anonymous_memory_bytes", "duration"],
+      "observed_covariates": ["meminfo", "vmstat", "PSI", "storage_latency"],
+      "uncontrolled_confounders": ["background memory use"],
+      "safety_abort_condition": ["memory byte ceiling"],
+      "restore_cleanup": ["release allocation by process exit"],
+      "claim_supported": "bounded anonymous memory pressure side effects",
+      "claim_blocked": "resident memory budget without laddered trials"
+    }
+  ],
+  "time_unix_ms": 1780000000000
+}
