@@ -280,3 +280,7 @@ Read first:
 - [x] Verification: `cargo test -p adc-lab
   experiment_ssh_operator_abort_file_is_remote_shell_quoted -- --nocapture`
   and `make verify` both passed on 2026-06-10.
+- [x] 2026-06-10 follow-up: Added direct `adc-lab load cpu --target
+  ssh://... --operator-abort-file ...` coverage using the same fake-SSH
+  remote-shell emulation, because the security finding specifically named the
+  direct `load_cpu_ssh` call path as well as experiment trials.
