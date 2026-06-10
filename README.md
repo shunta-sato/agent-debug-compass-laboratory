@@ -301,7 +301,9 @@ It does not expose arbitrary remote shell.
 
 ## Pressure probes
 
-`adc-lab pressure run` creates bounded `lab.resource_pressure_result.v1` artifacts.
+`adc-lab pressure run` creates bounded `lab.resource_pressure_result.v1`
+artifacts. `adc-lab pressure composite` creates bounded
+`lab.composite_boundary_result.v1` artifacts.
 
 Supported pressure kinds:
 
@@ -323,7 +325,8 @@ For example:
 
 ```text
 memory allocation smoke != memory pressure boundary
-network counter visibility != network operating contract
+network counter visibility != bounded network transfer boundary
+separate memory/storage/jitter probes != composite coupling evidence
 storage tempfile smoke != flash safety
 idle jitter loop != real-time behavior under pressure
 ```
@@ -352,7 +355,17 @@ lab.resource_coupling_report.v1
 lab.target_operating_contract.v1
 ```
 
-The contract describes measured mechanisms, boundary evidence, resource-coupling evidence class, allowed patterns, burst-only patterns, degraded-mode triggers, forbidden patterns, blocked claims, and next evidence needed.
+With `--include-run`, it also writes:
+
+```text
+lab.run_set_manifest.v1
+lab.multi_run_operating_contract.v1
+```
+
+The contract describes measured mechanisms, boundary evidence,
+resource-coupling evidence class, allowed patterns, burst-only patterns,
+degraded-mode triggers, forbidden patterns, blocked claims, and next evidence
+needed.
 
 A target operating contract is **not** a benchmark score.
 
@@ -520,6 +533,9 @@ passive observation
 bounded CPU load
 pressure probe artifacts
 governor control through typed helper
+multi-run operating-contract aggregation
+endpoint-backed bounded network transfer
+phase-based memory/storage/jitter composite probe
 run manifests
 audit logs
 claim boundaries
@@ -529,14 +545,11 @@ operating-contract report skeleton
 Still being strengthened:
 
 ```text
-multi-run aggregation
-composite resource-coupling probes
 memory pressure boundary discovery
-storage I/O under memory pressure
-network bounded transfer
+larger memory pressure ladders
+concurrent storage I/O under memory pressure
 latency/jitter under pressure
 fixed-frequency sweep
-privileged helper UX
 Pi4/Pi5 comparison
 suitability decisions
 ```

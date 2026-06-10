@@ -8,12 +8,18 @@
 - OS: Debian GNU/Linux 13
 - Transport: `ssh://target55`
 - Runner used for Platform Operating Contract discovery:
-  `/home/satoshun/.local/share/adc-lab/runners/20260610-platform-contract-review/adc-lab-target`
+  `/home/satoshun/.local/share/adc-lab/runners/20260611-composite/adc-lab-target`
 - Existing installed runner preserved:
-  `/home/satoshun/.local/bin/adc-lab-target` version `0.1.11`
-- Review artifact zip:
+  `/home/satoshun/.local/bin/adc-lab-target` version `0.1.16`
+- Privileged helper readiness:
+  `privilege doctor --target local --json` reported `status=ready`,
+  helper version `0.1.16`, and `sudo_non_interactive_available=true`.
+- Prior review artifact zip:
   `/mnt/share/target55-platform-contract-review-20260610.zip`
   (`sha256=557f9706c17a2ce87631a6aa4804334ff4ff108ad1a705a73290a0f06dab7f2b`)
+- Current candidate pack zip:
+  `/mnt/share/target55-pi4-reference-pack-v1-candidate-20260611-r2.zip`
+  (`sha256=e39efaedc405dc637ce2231518f43d6de84172c1f2e4900442f173ee1274f204`)
 
 ## Decision Need
 
@@ -26,19 +32,21 @@ or safety claims.
 
 | Artifact | Status | Path / Evidence | Freshness / Revisit |
 | --- | --- | --- | --- |
-| Target characterization | completed | `lab/runs/LAB-RUN-target55-platform-contract-review-20260610/inventory/target_inventory.json` | Revisit on OS/kernel/firmware/cooling/storage/network change |
-| Passive observation | completed | `lab/runs/LAB-RUN-target55-platform-contract-review-20260610/observations/observe.json` | Revisit when workload or sampling cadence changes |
-| Platform mechanism inventory | completed | `lab/runs/LAB-RUN-target55-platform-contract-review-20260610/reports/platform_mechanism_inventory.json` | Revisit when target surfaces or runner change |
-| Boundary probe plan | completed | `lab/runs/LAB-RUN-target55-platform-contract-review-20260610/reports/boundary_probe_plan.json` | Revisit when new pressure domains or controls are added |
-| CPU pressure | completed | `lab/runs/LAB-RUN-target55-platform-contract-review-20260610/pressure/cpu_pressure.*.result.json` | Short-smoke only; repeat for governor/frequency states |
-| Thermal pressure | completed | `lab/runs/LAB-RUN-target55-platform-contract-review-20260610/pressure/thermal_pressure.*.result.json` | Short-smoke only; longer soak needs explicit approval/policy |
-| Memory pressure | completed | `lab/runs/LAB-RUN-target55-platform-contract-review-20260610/pressure/memory_pressure.*.result.json` | 8MiB allocation smoke; pressure effect was not observed |
-| Storage I/O pressure | completed | `lab/runs/LAB-RUN-target55-platform-contract-review-20260610/pressure/storage_io.*.result.json` | Bounded tempfile smoke with cleanup; no sustained cadence or flash-wear claim |
-| Network I/O pressure | completed | `lab/runs/LAB-RUN-target55-platform-contract-review-20260610/pressure/network_io.*.result.json` | Counter-only without endpoint; not a network boundary measurement |
-| Latency/jitter pressure | completed | `lab/runs/LAB-RUN-target55-platform-contract-review-20260610/pressure/latency_jitter.*.result.json` | Current-condition jitter only; not pressure-specific |
-| Observer pressure | completed | `lab/runs/LAB-RUN-target55-platform-contract-review-20260610/pressure/observer_pressure.*.result.json` | Bounded observer-off/on smoke; no workload-specific low-overhead claim |
-| Resource coupling report | completed | `lab/runs/LAB-RUN-target55-platform-contract-review-20260610/reports/resource_coupling_report.json` | `ingredients_only`; revisit after composite pressure probes |
-| Target operating contract artifact | completed | `lab/runs/LAB-RUN-target55-platform-contract-review-20260610/reports/target_operating_contract.json` | `contract_status=insufficient` until pressure effects, bounded network transfer, and composite coupling phases are measured |
+| Target characterization | completed | `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/inventory/target_inventory.json` | Revisit on OS/kernel/firmware/cooling/storage/network change |
+| Passive observation | completed | `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/observations/observe.json` | Revisit when workload or sampling cadence changes |
+| Platform mechanism inventory | completed | `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/reports/platform_mechanism_inventory.json` | Revisit when target surfaces or runner change |
+| Boundary probe plan | completed | `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/reports/boundary_probe_plan.json` | Revisit when new pressure domains or controls are added |
+| CPU pressure | completed | `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/pressure/cpu_pressure.*.result.json` and `lab/runs/LAB-RUN-target55-governor-control-20260611T0030Z/pressure/cpu_pressure.*.result.json` | Short bounded evidence under default and `performance` governor; not long-soak |
+| Governor control | completed | `lab/runs/LAB-RUN-target55-governor-control-20260611T0030Z/{plans,approvals,results,leases,health}` | Approved apply/restore evidence exists for governor subset; fixed-frequency behavior remains unmeasured |
+| Thermal pressure | completed | `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/pressure/thermal_pressure.*.result.json` | Short-smoke only; longer soak needs explicit approval/policy |
+| Memory pressure | completed | `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/pressure/memory_pressure.*.result.json` | 128MiB allocation smoke; pressure effect was not observed |
+| Storage I/O pressure | completed | `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/pressure/storage_io.*.result.json` | Bounded tempfile smoke with cleanup; no sustained cadence or flash-wear claim |
+| Memory/storage/jitter composite | completed | `lab/runs/LAB-RUN-target55-composite-memory-storage-jitter-20260611T0140Z/composite/memory_storage_jitter.*.result.json` | `coupling_evidence_class=composite_measured`, but result status is `insufficient` because memory phase lacked reclaim/PSI/fault effect and storage/jitter were sequential |
+| Network I/O pressure | completed | `lab/runs/LAB-RUN-target55-network-bounded-transfer-20260611T0030Z/pressure/network_io.*.result.json` | Endpoint-backed 1MiB bounded transfer measured; LAN-confounded and no retry/backoff/loss claim |
+| Latency/jitter pressure | completed | `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/pressure/latency_jitter.*.result.json` and governor-control jitter result | Current-condition jitter only; not full pressure matrix |
+| Observer pressure | completed | `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/pressure/observer_pressure.*.result.json` | Bounded observer-off/on smoke; no workload-specific low-overhead claim |
+| Resource coupling report | completed | `lab/runs/LAB-RUN-target55-composite-memory-storage-jitter-20260611T0140Z/reports/resource_coupling_report.json` | `memory.reclaim_to_storage_latency` has `coupling_evidence_class=composite_measured` but `status=insufficient`; other chains remain insufficient |
+| Multi-run operating contract artifact | completed | `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/reports/multi_run_operating_contract.json` | `pack_status=platform_operating_contract_candidate`, `contract_status=insufficient` |
 | Pi5 reference evidence | required_pending | none in this checkout | Required before Pi4/Pi5 contract comparison |
 | Battery/power evidence | deferred_with_reason | no power surface used | Deferred because target55 is not a battery-power target in this run |
 | Wakeup evidence | deferred_with_reason | no wakeup tool qualified | Deferred until qualified wakeup measurement is added |
@@ -54,6 +62,12 @@ Allowed:
   pressure artifacts are smoke-only or coupling evidence is ingredients-only.
 - pressure and operating-contract artifacts do not use
   `unsupported_by_adc_lab` as a final state.
+- target55 has approved apply/restore evidence for the CPU governor subset.
+- target55 has one phase-based `memory_storage_jitter` composite result that
+  records composite evidence class, but the chain status remains insufficient
+  because memory pressure effect was not observed.
+- target55 has endpoint-backed bounded network transfer evidence for a 1MiB LAN
+  transfer to the controller endpoint.
 
 Blocked:
 
@@ -62,11 +76,12 @@ Blocked:
   real-time-ish claims.
 - sustained 5/15/30 minute thermal claims beyond the current policy/evidence.
 - fixed-frequency coverage without approved controllable frequency evidence.
-- cpufreq platform control measured claims; the sysfs surface is visible, but
-  this run has no approved apply/verify/restore control result.
-- resource coupling measured claims from separate memory/storage/network/jitter
-  smoke artifacts.
-- network boundary claims without endpoint-backed bounded transfer evidence.
+- resident memory budget and memory pressure degradation thresholds; 128MiB did
+  not trigger reclaim/PSI/fault evidence on this 8GiB target.
+- concurrent storage+jitter tail-latency claims; current composite storage and
+  jitter phases are sequential under held memory.
+- network production cadence, retry/backoff, packet loss, and target-selection
+  claims; the bounded transfer is LAN-confounded.
 
 ## Handoff Status
 
@@ -76,7 +91,7 @@ Blocked:
 | Hot-path review | completed | See `reports/resource/hot-path-review.md` |
 | Observer-effect review | completed | See `reports/resource/observer-effect-review.md` |
 | Harness design | completed | See `docs/testing/resource-harness.md` |
-| Pi4 operating contract artifact | completed | Review target contract artifact; contract discovery remains pending composite probes |
+| Pi4 operating contract candidate | completed | Review multi-run contract artifact; contract reference status remains blocked by memory ladder and same-condition coupling evidence |
 | Pi5 operating contract | required_pending | Run same suite on a Pi5 target |
 
 ## Verification

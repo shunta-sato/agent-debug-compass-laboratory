@@ -4,9 +4,12 @@ use adc_lab_core::{
 use assert_cmd::Command;
 use predicates::str::contains;
 use std::fs;
+use std::io::Read;
+use std::net::TcpListener;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
+use std::thread;
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -538,6 +541,72 @@ fn pressure_run_local_writes_typed_artifact_and_audit() {
 }
 
 #[test]
+fn pressure_network_bounded_transfer_records_generated_bytes() {
+    let temp = tempfile::tempdir().unwrap();
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let endpoint = listener.local_addr().unwrap().to_string();
+    let receiver = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut buffer = [0u8; 4096];
+        let mut received = 0usize;
+        loop {
+            let read = stream.read(&mut buffer).unwrap();
+            if read == 0 {
+                break;
+            }
+            received += read;
+        }
+        received
+    });
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "pressure",
+            "run",
+            "--target",
+            "local",
+            "--kind",
+            "network_io",
+            "--duration",
+            "1ms",
+            "--network-endpoint",
+            &endpoint,
+            "--network-bytes",
+            "4096",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"network_mode\": \"bounded_transfer\""))
+        .stdout(contains("\"traffic_generated_bytes\": 4096"));
+
+    assert_eq!(receiver.join().unwrap(), 4096);
+
+    let pressure_path = fs::read_dir(temp.path().join("pressure"))
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.contains("network_io"))
+        })
+        .unwrap();
+    let result: serde_json::Value =
+        serde_json::from_slice(&fs::read(pressure_path).unwrap()).unwrap();
+    assert_eq!(result["status"], "measured_partial");
+    assert_eq!(result["evidence_class"], "boundary_probe");
+    assert_eq!(
+        result["network_evidence"]["network_mode"],
+        "bounded_transfer"
+    );
+    assert_eq!(result["network_evidence"]["traffic_generated_bytes"], 4096);
+}
+
+#[test]
 fn report_operating_contract_writes_contract_artifacts() {
     let temp = tempfile::tempdir().unwrap();
 
@@ -682,6 +751,76 @@ fn report_operating_contract_accepts_include_run_and_writes_run_set() {
     let audit = fs::read_to_string(primary.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"report.run_set_manifest\""));
     assert!(audit.contains("\"operation\":\"report.multi_run_operating_contract\""));
+}
+
+#[test]
+fn pressure_composite_promotes_coupling_evidence_class() {
+    let temp = tempfile::tempdir().unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "pressure",
+            "composite",
+            "--target",
+            "local",
+            "--scenario",
+            "memory_storage_jitter",
+            "--duration",
+            "1ms",
+            "--memory-bytes",
+            "1048576",
+            "--storage-bytes",
+            "4096",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("lab.composite_boundary_result.v1"))
+        .stdout(contains("memory_storage_jitter"));
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "operating-contract",
+            "--run",
+            temp.path().to_str().unwrap(),
+            "--target-id",
+            "local-target",
+            "--target-class",
+            "raspberry_pi_4",
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    let composite_dir = temp.path().join("composite");
+    assert!(fs::read_dir(&composite_dir)
+        .unwrap()
+        .flatten()
+        .any(|entry| entry
+            .path()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .contains("memory_storage_jitter")));
+
+    let coupling: serde_json::Value = serde_json::from_slice(
+        &fs::read(temp.path().join("reports/resource_coupling_report.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(coupling["report_status"], "insufficient");
+    assert!(coupling["chains"].as_array().unwrap().iter().any(|chain| {
+        chain["chain_id"] == "memory.reclaim_to_storage_latency"
+            && chain["status"] == "insufficient"
+            && chain["coupling_evidence_class"] == "composite_measured"
+    }));
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"pressure.composite\""));
 }
 
 fn matching_approval(plan: &ControlPlan) -> ApprovalRecord {

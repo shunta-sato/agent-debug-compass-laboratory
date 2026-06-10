@@ -38,6 +38,10 @@ Gate decision: experimental-only
   controller-side contract reports. Hardware-free tests verify schema/status
   taxonomy and CLI/report wiring; target claims require live pressure artifacts,
   and resource-coupling claims require composite or phased pressure evidence.
+- Pi4 candidate-pack work adds endpoint-backed bounded network transfer and a
+  phase-based memory/storage/jitter composite runner. Target55 live evidence is
+  still experimental-only: the 1MiB network transfer is LAN-confounded, and the
+  128MiB composite memory phase did not show reclaim/PSI/fault pressure effect.
 - `unsupported_by_adc_lab` is not an allowed final pressure/contract status;
   required surfaces must classify as measured, measured_partial,
   not_controllable, unsafe_to_run_with_reason, not_applicable_with_reason, or
@@ -60,7 +64,7 @@ Gate decision: experimental-only
 | Thermal | optional abort for load; result records whether thermal surface was available | target55 short load max 54.53C under 75C abort; PR5 contract records monitor evidence | partial | `examples/demos/target55/reports/operating-envelope/observer_on.json`; `tests/golden/lab.load_result.v1.valid.json` |
 | Latency / jitter | no claim | not measured | unknown | `docs/testing/resource-harness.md` |
 | Observer overhead | no production overhead claim | target55 short smoke iteration delta about -0.05% | partial | `examples/demos/target55/reports/operating-envelope/observer_on.json` |
-| Platform Operating Contract pressure | explicit experimental burst only; duration <=30s, memory <=128MiB, storage <=64MiB, network <=1MiB | hardware-free CLI/schema tests; target55 live smoke required; composite coupling still required for contract claims | smoke/insufficient for coupling | `schemas/lab.resource_pressure_result.v1.schema.json`; `crates/adc-lab/tests/cli.rs` |
+| Platform Operating Contract pressure | explicit experimental burst only; duration <=30s, memory <=128MiB, storage <=64MiB, network <=1MiB | hardware-free CLI/schema tests; target55 bounded pressure suite; target55 1MiB network transfer; target55 phase-based memory/storage/jitter composite with memory pressure effect not observed | candidate/insufficient for reference | `schemas/lab.resource_pressure_result.v1.schema.json`; `schemas/lab.composite_boundary_result.v1.schema.json`; `crates/adc-lab/tests/cli.rs`; `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/reports/multi_run_operating_contract.json` |
 
 ## Runtime Mode Classification
 
@@ -75,7 +79,9 @@ Gate decision: experimental-only
 | privilege provider status report | controller-side report | none on target | command lifetime | no | PR10 provider status tests passed |
 | target capability profile report | controller-side report | none on target | command lifetime | no | PR11 profile generation tests passed |
 | release binary package workflow | build/package integrity | none on target | workflow duration | no | PR11 workflow/package tests |
-| pressure probe suite | experimental-only burst | bounded probe loop or bounded I/O | duration <=30s | no | schema/CLI tests; target55 smoke required; composite runner required for coupling claims |
+| pressure probe suite | experimental-only burst | bounded probe loop or bounded I/O | duration <=30s | no | schema/CLI tests; target55 pressure suite candidate |
+| composite memory/storage/jitter probe | experimental-only burst | phase sequence | component duration <=30s, memory <=128MiB, storage <=64MiB | no | target55 composite scenario ran; chain remains insufficient because memory effect was not observed |
+| endpoint-backed network transfer | experimental-only burst | bounded TCP write | network <=1MiB | no | target55 1MiB LAN transfer measured; retry/backoff/loss claims blocked |
 | operating contract report | controller-side report | none on target | command lifetime | no | schema/CLI tests |
 | target runner | command-triggered | none while idle | process lifetime | no | target55 smoke passed |
 
@@ -99,8 +105,12 @@ Gate decision: experimental-only
   `schemas/lab.platform_mechanism_inventory.v1.schema.json`,
   `schemas/lab.boundary_probe_plan.v1.schema.json`,
   `schemas/lab.resource_pressure_result.v1.schema.json`,
+  `schemas/lab.composite_boundary_result.v1.schema.json`,
   `schemas/lab.resource_coupling_report.v1.schema.json`, and
   `schemas/lab.target_operating_contract.v1.schema.json`.
+- Target55 candidate pack:
+  `/mnt/share/target55-pi4-reference-pack-v1-candidate-20260611-r2.zip`
+  (`sha256=e39efaedc405dc637ce2231518f43d6de84172c1f2e4900442f173ee1274f204`).
 
 ## Claims Review
 
@@ -117,6 +127,8 @@ Gate decision: experimental-only
 | PR11 target capability profile links workload requirements to existing run evidence | `crates/adc-lab-core/src/capability_profile.rs` | hardware-free core/CLI tests and `lab.workload_profile.v1` / `lab.target_capability_profile.v1` schemas | allowed contract/report claim |
 | PR11 release binaries expose build identity and checksummed tarballs | `.github/workflows/release.yml`; `scripts/release/package-release.sh`; `schemas/lab.release_manifest.v1.schema.json` | hardware-free package smoke, schema fixture, and version command tests | allowed build/package integrity claim |
 | Platform Operating Contract artifacts classify Pi4/Pi5 mechanism and pressure evidence without `unsupported_by_adc_lab` | `schemas/lab.*operating_contract*.schema.json`; `crates/adc-lab-core/src/platform_contract.rs`; `crates/adc-lab/tests/cli.rs` | schema fixtures, negative unsupported-status tests, pressure/report CLI tests | allowed contract/runtime claim; not a Pi4 reference contract claim |
+| Endpoint-backed bounded network transfer records generated bytes and avoids counter-only overclaim | `crates/adc-lab-core/src/platform_contract.rs`; `crates/adc-lab/tests/cli.rs`; target55 network run | CLI loopback test and target55 1MiB transfer artifact | allowed bounded-transfer claim for measured endpoint; production cadence/retry/loss claims blocked |
+| Memory/storage/jitter composite result distinguishes composite evidence class from measured degradation | `schemas/lab.composite_boundary_result.v1.schema.json`; `crates/adc-lab-core/src/platform_contract.rs`; target55 composite run | schema fixture, CLI composite test, target55 composite artifact | allowed scenario-executed claim; degradation chain remains insufficient without memory pressure effect |
 | Pi4 is sufficient or Pi5 is required for a workload | none | no same-suite comparison or suitability decision evidence | blocked if introduced |
 | low overhead | none | short smoke insufficient | blocked if introduced |
 | battery safe | none | none | blocked if introduced |
@@ -149,10 +161,11 @@ Gate decision: experimental-only
   `selection_ready=false`.
 - PR11 release assets are not target measurement artifacts. They must be
   referenced by later runs as binary identity/provenance only.
-- Platform Operating Contract pressure smoke is not long-soak, production,
-  battery, flash-wear, or suitability evidence. It is the first measured
-  pressure artifact layer; coupling remains ingredients-only until composite or
-  phased probes are implemented and run for Pi4/Pi5 reference contracts.
+- Platform Operating Contract pressure and composite probes are not long-soak,
+  production, battery, flash-wear, or suitability evidence. Target55 now has a
+  candidate pack, but reference status remains blocked by missing memory
+  pressure-effect ladder, same-condition coupling evidence, retry/backoff/loss
+  network evidence, and longer thermal/recovery coverage.
 
 ## Handoff To Quality Gate
 

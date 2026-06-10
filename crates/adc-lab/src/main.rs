@@ -182,6 +182,7 @@ enum LoadCommand {
 #[derive(Debug, Subcommand)]
 enum PressureCommand {
     Run(PressureRunCommand),
+    Composite(PressureCompositeCommand),
 }
 
 #[derive(Debug, Args)]
@@ -190,6 +191,34 @@ struct PressureRunCommand {
     target: String,
     #[arg(long)]
     kind: ResourcePressureKind,
+    #[arg(long, default_value = "1s")]
+    duration: String,
+    #[arg(long, default_value_t = 1)]
+    workers: usize,
+    #[arg(long)]
+    abort_temp_c: Option<f64>,
+    #[arg(long, default_value_t = 8 * 1024 * 1024)]
+    memory_bytes: u64,
+    #[arg(long, default_value_t = 1024 * 1024)]
+    storage_bytes: u64,
+    #[arg(long, default_value_t = 0)]
+    network_bytes: u64,
+    #[arg(long)]
+    network_endpoint: Option<String>,
+    #[arg(long)]
+    storage_dir: Option<PathBuf>,
+    #[arg(long)]
+    run_dir: Option<PathBuf>,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
+struct PressureCompositeCommand {
+    #[arg(long, default_value = "local")]
+    target: String,
+    #[arg(long)]
+    scenario: CompositeBoundaryScenario,
     #[arg(long, default_value = "1s")]
     duration: String,
     #[arg(long, default_value_t = 1)]
@@ -440,6 +469,7 @@ fn main() -> Result<()> {
         },
         Commands::Pressure { command } => match command {
             PressureCommand::Run(args) => command_pressure_run(args),
+            PressureCommand::Composite(args) => command_pressure_composite(args),
         },
         Commands::Experiment { command } => match command {
             ExperimentCommand::Run(args) => command_experiment_run(args),
@@ -761,6 +791,52 @@ fn command_pressure_run(args: PressureRunCommand) -> Result<()> {
             actor: Actor::codex(),
             operation: "pressure.run".to_string(),
             operation_id: Some(result.pressure_kind.as_str().to_string()),
+            risk_tier: RiskTier::Tier1LowRiskReversibleNonRoot,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: serde_json::to_string(&result.status)
+                .unwrap_or_else(|_| "unknown".to_string())
+                .trim_matches('"')
+                .to_string(),
+        },
+    )?;
+    print_artifact(&run, &path, result)
+}
+
+fn command_pressure_composite(args: PressureCompositeCommand) -> Result<()> {
+    let target = TargetSpec::parse(&args.target)?;
+    let run = create_or_open_run(args.run_dir)?;
+    persist_target_runner_version_if_absent(&run, &target)?;
+    let options = PressureProbeOptions {
+        duration: parse_duration(&args.duration)?,
+        workers: args.workers,
+        abort_temp_c: args.abort_temp_c,
+        memory_bytes: args.memory_bytes,
+        storage_bytes: args.storage_bytes,
+        network_bytes: args.network_bytes,
+        network_endpoint: args.network_endpoint,
+        storage_dir: args.storage_dir,
+    };
+    let result = match target.transport {
+        TargetTransport::Local => {
+            run_composite_boundary(target.target_id.clone(), args.scenario.clone(), &options)?
+        }
+        TargetTransport::Ssh => composite_ssh(&target, args.scenario.clone(), &options)?,
+    };
+    let file_name = format!(
+        "{}.{}.result.json",
+        result.scenario.as_str(),
+        safe_artifact_id(&result.result_id, "COMPOSITE")
+    );
+    let path = run.run_dir.join("composite").join(file_name);
+    write_json_artifact(&run, &path, &result)?;
+    append_audit_event(
+        &run,
+        AuditInput {
+            target_id: result.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "pressure.composite".to_string(),
+            operation_id: Some(result.scenario.as_str().to_string()),
             risk_tier: RiskTier::Tier1LowRiskReversibleNonRoot,
             approval_ref: None,
             restore_lease_ref: None,
@@ -2229,6 +2305,56 @@ fn pressure_ssh(
         );
     }
     let mut result: ResourcePressureResult = serde_json::from_slice(&output.stdout)?;
+    result.target_id = target.target_id.clone();
+    Ok(result)
+}
+
+fn composite_ssh(
+    target: &TargetSpec,
+    scenario: CompositeBoundaryScenario,
+    options: &PressureProbeOptions,
+) -> Result<CompositeBoundaryResult> {
+    let mut remote_args = vec![
+        ssh_runner_program()?,
+        "pressure".to_string(),
+        "composite".to_string(),
+        "--scenario".to_string(),
+        scenario.as_str().to_string(),
+        "--duration".to_string(),
+        format!("{}s", options.duration.as_secs().max(1)),
+        "--workers".to_string(),
+        options.workers.to_string(),
+        "--memory-bytes".to_string(),
+        options.memory_bytes.to_string(),
+        "--storage-bytes".to_string(),
+        options.storage_bytes.to_string(),
+        "--network-bytes".to_string(),
+        options.network_bytes.to_string(),
+        "--json".to_string(),
+    ];
+    let mut command = Command::new("ssh");
+    command.arg(&target.endpoint);
+    if let Some(limit) = options.abort_temp_c {
+        remote_args.push("--abort-temp-c".to_string());
+        remote_args.push(limit.to_string());
+    }
+    if let Some(endpoint) = options.network_endpoint.as_ref() {
+        remote_args.push("--network-endpoint".to_string());
+        remote_args.push(endpoint.clone());
+    }
+    append_ssh_remote_args(&mut command, remote_args)?;
+    if let Some(path) = options.storage_dir.as_ref() {
+        command.arg(remote_shell_quote(OsStr::new("--storage-dir"))?);
+        command.arg(remote_shell_quote(path.as_os_str())?);
+    }
+    let output = command.output()?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "ssh pressure composite failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let mut result: CompositeBoundaryResult = serde_json::from_slice(&output.stdout)?;
     result.target_id = target.target_id.clone();
     Ok(result)
 }

@@ -423,6 +423,44 @@ pub struct ResourcePressureResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub enum CompositeBoundaryScenario {
+    MemoryStorageJitter,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CompositeBoundaryPhase {
+    pub phase_id: String,
+    pub pressure_kind: String,
+    pub status: ContractEvidenceStatus,
+    pub summary: String,
+    pub metrics: Vec<ResourceMetric>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CompositeBoundaryResult {
+    pub schema_version: String,
+    pub result_id: String,
+    pub target_id: String,
+    pub scenario: CompositeBoundaryScenario,
+    pub status: ContractEvidenceStatus,
+    pub coupling_evidence_class: ResourceCouplingEvidenceClass,
+    pub duration_ms: u64,
+    pub controlled_factors: Vec<ContractFactor>,
+    pub observed_covariates: Vec<ContractFactor>,
+    pub uncontrolled_confounders: Vec<String>,
+    pub phases: Vec<CompositeBoundaryPhase>,
+    pub safety: PressureSafety,
+    pub evidence_refs: Vec<String>,
+    pub claim_supported: Vec<String>,
+    pub claim_blocked: Vec<String>,
+    pub next_evidence_needed: Vec<ContractEvidenceGap>,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum ResourceCouplingEvidenceClass {
     IngredientsOnly,
     CompositeMeasured,
