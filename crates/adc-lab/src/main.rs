@@ -3,6 +3,7 @@ use adc_lab_core::*;
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use serde::Serialize;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -1774,18 +1775,21 @@ fn observe_ssh(
         })
         .collect::<Vec<_>>()
         .join(",");
-    let output = Command::new("ssh")
-        .arg(&target.endpoint)
-        .arg(ssh_runner_program()?)
-        .arg("observe")
-        .arg("--duration")
-        .arg(format!("{}s", duration.as_secs().max(1)))
-        .arg("--sample-interval")
-        .arg(format!("{}s", interval.as_secs().max(1)))
-        .arg("--signals")
-        .arg(signal_arg)
-        .arg("--json")
-        .output()?;
+    let remote_args = vec![
+        ssh_runner_program()?,
+        "observe".to_string(),
+        "--duration".to_string(),
+        format!("{}s", duration.as_secs().max(1)),
+        "--sample-interval".to_string(),
+        format!("{}s", interval.as_secs().max(1)),
+        "--signals".to_string(),
+        signal_arg,
+        "--json".to_string(),
+    ];
+    let mut command = Command::new("ssh");
+    command.arg(&target.endpoint);
+    append_ssh_remote_args(&mut command, remote_args)?;
+    let output = command.output()?;
     if !output.status.success() {
         anyhow::bail!(
             "ssh observe failed: {}",
@@ -1804,22 +1808,27 @@ fn load_cpu_ssh(
     abort_temp_c: Option<f64>,
     operator_abort_file: Option<&Path>,
 ) -> Result<LoadResult> {
-    let mut command = Command::new("ssh");
-    command
-        .arg(&target.endpoint)
-        .arg(ssh_runner_program()?)
-        .arg("load")
-        .arg("cpu")
-        .arg("--workers")
-        .arg(workers.to_string())
-        .arg("--duration")
-        .arg(format!("{}s", duration.as_secs().max(1)))
-        .arg("--json");
+    let mut remote_args = vec![
+        ssh_runner_program()?,
+        "load".to_string(),
+        "cpu".to_string(),
+        "--workers".to_string(),
+        workers.to_string(),
+        "--duration".to_string(),
+        format!("{}s", duration.as_secs().max(1)),
+        "--json".to_string(),
+    ];
     if let Some(limit) = abort_temp_c {
-        command.arg("--abort-temp-c").arg(limit.to_string());
+        remote_args.push("--abort-temp-c".to_string());
+        remote_args.push(limit.to_string());
     }
+
+    let mut command = Command::new("ssh");
+    command.arg(&target.endpoint);
+    append_ssh_remote_args(&mut command, remote_args)?;
     if let Some(path) = operator_abort_file {
-        command.arg("--operator-abort-file").arg(path);
+        command.arg(remote_shell_quote(OsStr::new("--operator-abort-file"))?);
+        command.arg(remote_shell_quote(path.as_os_str())?);
     }
     let output = command.output()?;
     if !output.status.success() {
@@ -1831,6 +1840,27 @@ fn load_cpu_ssh(
     let mut result: LoadResult = serde_json::from_slice(&output.stdout)?;
     result.target_id = target.target_id.clone();
     Ok(result)
+}
+
+fn append_ssh_remote_args<I, S>(command: &mut Command, args: I) -> Result<()>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    for arg in args {
+        command.arg(remote_shell_quote(arg.as_ref())?);
+    }
+    Ok(())
+}
+
+fn remote_shell_quote(arg: &OsStr) -> Result<String> {
+    let value = arg
+        .to_str()
+        .context("ssh remote command arguments must be valid UTF-8")?;
+    if value.is_empty() {
+        return Ok("''".to_string());
+    }
+    Ok(format!("'{}'", value.replace('\'', "'\\''")))
 }
 
 fn existing_run_context(run_dir: PathBuf) -> RunContext {
