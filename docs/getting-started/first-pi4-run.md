@@ -1,6 +1,6 @@
 # First Pi4 Run From A Pi5 Controller
 
-This guide is the longer first-run path behind the README quick start. It assumes a Raspberry Pi 5 controller and a Raspberry Pi 4 target reachable over SSH as `target55`.
+This guide is the longer first-run path behind the README quick start. It assumes a Raspberry Pi 5 controller and a Raspberry Pi 4 target reachable over SSH.
 
 The goal is to produce a first evidence pack. The goal is not to prove production readiness, target suitability, or Pi4/Pi5 superiority.
 
@@ -9,7 +9,7 @@ The goal is to produce a first evidence pack. The goal is not to prove productio
 Use release binaries for Pi4 / Pi5 measurement work. Do not build from source on the target unless you are explicitly testing the build process.
 
 ```sh
-VERSION=v0.1.13
+VERSION=vX.Y.Z
 ASSET=adc-lab-${VERSION}-linux-aarch64.tar.gz
 
 curl -LO https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${VERSION}/${ASSET}
@@ -29,9 +29,13 @@ Release artifacts prove build/package identity only. They do not prove resource,
 ## 2. Copy the non-root target runner to the Pi4
 
 ```sh
-scp bin/adc-lab-target target55:/home/<user>/.local/bin/adc-lab-target
-ssh target55 'chmod +x /home/<user>/.local/bin/adc-lab-target'
-ssh target55 '/home/<user>/.local/bin/adc-lab-target --version'
+TARGET_HOST=<pi4-ssh-host>
+TARGET_USER=<target-user>
+
+ssh "${TARGET_HOST}" "mkdir -p /home/${TARGET_USER}/.local/bin"
+scp bin/adc-lab-target "${TARGET_HOST}:/home/${TARGET_USER}/.local/bin/adc-lab-target"
+ssh "${TARGET_HOST}" "chmod +x /home/${TARGET_USER}/.local/bin/adc-lab-target"
+ssh "${TARGET_HOST}" "/home/${TARGET_USER}/.local/bin/adc-lab-target --version"
 ```
 
 The target runner exposes fixed subcommands for inventory, observation, health checks, and bounded non-root experiments. It is not an arbitrary remote shell.
@@ -39,7 +43,9 @@ The target runner exposes fixed subcommands for inventory, observation, health c
 ## 3. Point the controller at the target runner
 
 ```sh
-export ADC_LAB_TARGET_RUNNER=/home/<user>/.local/bin/adc-lab-target
+export ADC_LAB_TARGET_RUNNER="/home/${TARGET_USER}/.local/bin/adc-lab-target"
+export ADC_LAB_TARGET="ssh://${TARGET_HOST}"
+export ADC_LAB_TARGET_ID=<target-id>
 ```
 
 `ADC_LAB_TARGET_RUNNER` is a development override only and must point to an `adc-lab-target` binary from an allowlisted safe path such as:
@@ -54,12 +60,12 @@ export ADC_LAB_TARGET_RUNNER=/home/<user>/.local/bin/adc-lab-target
 
 ```sh
 adc-lab inventory \
-  --target ssh://target55 \
+  --target "${ADC_LAB_TARGET}" \
   --run-dir lab/runs/pi4-smoke \
   --json
 
 adc-lab toolchain discover \
-  --target ssh://target55 \
+  --target "${ADC_LAB_TARGET}" \
   --run-dir lab/runs/pi4-smoke \
   --json
 ```
@@ -70,7 +76,7 @@ These commands establish what the target is and which toolchain facts were disco
 
 ```sh
 adc-lab observe \
-  --target ssh://target55 \
+  --target "${ADC_LAB_TARGET}" \
   --duration 60s \
   --signals cpu,freq,thermal,memory \
   --run-dir lab/runs/pi4-smoke \
@@ -83,7 +89,7 @@ Passive observation records visible covariates. Observed CPU frequency variation
 
 ```sh
 adc-lab load cpu \
-  --target ssh://target55 \
+  --target "${ADC_LAB_TARGET}" \
   --workers 2 \
   --duration 60s \
   --abort-temp-c 75 \
@@ -98,8 +104,8 @@ Keep first loads short. Use a thermal abort when the target has a thermal surfac
 ```sh
 adc-lab report pack \
   --run lab/runs/pi4-smoke \
-  --target-id target55 \
-  --target ssh://target55 \
+  --target-id "${ADC_LAB_TARGET_ID}" \
+  --target "${ADC_LAB_TARGET}" \
   --json
 ```
 
@@ -122,7 +128,7 @@ After one or more pressure or control runs, generate a target operating contract
 ```sh
 adc-lab report operating-contract \
   --run lab/runs/pi4-smoke \
-  --target-id target55 \
+  --target-id "${ADC_LAB_TARGET_ID}" \
   --target-class raspberry_pi_4
 ```
 

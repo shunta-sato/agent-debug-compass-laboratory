@@ -74,34 +74,54 @@ ADC_LAB_TARGET_RUNNER=/home/$USER/.local/bin/adc-lab-target \
 Replace `/home/$USER` with the target user's home directory when it differs
 from the controller user.
 
-## Optional Privileged Helper
+## Optional Target-Local Tools And Privileged Helper
 
 Most measurements are non-privileged by default. Install the helper only when a
 privileged-control workflow explicitly requires it and the operator has reviewed
 the release version and checksum boundary.
 
-Preferred target-local release installer:
+Preferred target-local release installer. This follows GitHub's latest-release
+asset pointer, so it is convenient but less reproducible than a pinned version:
 
 ```sh
-ADC_LAB_VERSION=v0.1.13 bash -c 'set -euo pipefail; tmp="$(mktemp -d)"; cd "$tmp"; curl -fsSLO "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${ADC_LAB_VERSION}/install-adc-lab-helper.sh"; bash install-adc-lab-helper.sh --version "${ADC_LAB_VERSION}" --install-sudoers --user "$(id -un)"'
+curl -fsSLO https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/latest/download/install-adc-lab-helper.sh
+bash install-adc-lab-helper.sh --latest --install-sudoers --user "$(id -un)"
+```
+
+Pinned release installer:
+
+```sh
+VERSION=vX.Y.Z
+curl -fsSLO "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${VERSION}/install-adc-lab-helper.sh"
+bash install-adc-lab-helper.sh --version "${VERSION}" --install-sudoers --user "$(id -un)"
 ```
 
 Checksum-pinned variant, when the installer hash is available from a trusted
 channel:
 
 ```sh
-ADC_LAB_VERSION=v0.1.13 INSTALLER_SHA256=<expected-sha256> bash -c 'set -euo pipefail; tmp="$(mktemp -d)"; cd "$tmp"; curl -fsSLo install-adc-lab-helper.sh "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${ADC_LAB_VERSION}/install-adc-lab-helper.sh"; echo "${INSTALLER_SHA256}  install-adc-lab-helper.sh" | sha256sum -c -; bash install-adc-lab-helper.sh --version "${ADC_LAB_VERSION}" --install-sudoers --user "$(id -un)"'
+VERSION=vX.Y.Z
+INSTALLER_SHA256=<expected-sha256>
+curl -fsSLo install-adc-lab-helper.sh "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${VERSION}/install-adc-lab-helper.sh"
+echo "${INSTALLER_SHA256}  install-adc-lab-helper.sh" | sha256sum -c -
+bash install-adc-lab-helper.sh --version "${VERSION}" --install-sudoers --user "$(id -un)"
 ```
 
 The installer runs as the operator user, not as root. It uses `sudo` only for
 the fixed helper install path and optional fixed sudoers file. It downloads the
-pinned release tarball, verifies it with `SHA256SUMS`, installs
+selected release tarball, verifies it with `SHA256SUMS`, installs `adc-lab`
+and `adc-lab-target` to `~/.local/bin` by default, installs
 `/usr/local/libexec/adc-lab-priv-helper`, and runs readiness checks.
 
 Manual install from an already verified/extracted tarball remains:
 
 ```sh
+mkdir -p ~/.local/bin
+install -m 0755 bin/adc-lab ~/.local/bin/adc-lab
+install -m 0755 bin/adc-lab-target ~/.local/bin/adc-lab-target
 sudo install -o root -g root -m 0755 bin/adc-lab-priv-helper /usr/local/libexec/adc-lab-priv-helper
+~/.local/bin/adc-lab --version
+~/.local/bin/adc-lab-target --version
 /usr/local/libexec/adc-lab-priv-helper --version
 ```
 

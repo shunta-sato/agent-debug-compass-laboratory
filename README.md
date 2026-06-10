@@ -97,7 +97,7 @@ Pi4 did 1.19B iterations/sec.
 A useful `adc-lab` output is closer to:
 
 ```text
-On target55, Raspberry Pi 4 completed a 4-worker synthetic CPU load for 300s.
+On a Raspberry Pi 4 target, a 4-worker synthetic CPU load completed for 300s.
 Maximum observed temperature was 72.549C under a 75C abort threshold.
 Thermal margin was thin.
 Governor control was measured for ondemand/performance/powersave.
@@ -187,31 +187,46 @@ They do **not** prove resource, NFR, Pi4/Pi5 comparison, target suitability, or 
 
 More details: [Install release binaries](docs/getting-started/install-release-binaries.md).
 
-### Optional target-local privileged helper install
+### Optional target-local tool and privileged helper install
 
-Most commands do not need the privileged helper. Install it only on a lab target
-when governor / operating-point control is explicitly required.
+Most commands do not need the privileged helper. Install it only on a lab
+target when governor / operating-point control is explicitly required.
 
-For target55-style setup, run the release installer **on the target as the
-operator user**, not through `sudo sh`:
+For target-local setup, run the release installer **on the target as the
+operator user**, not through `sudo sh`. The installer updates `adc-lab` and
+`adc-lab-target` in `~/.local/bin` by default, then installs the privileged
+helper at `/usr/local/libexec/adc-lab-priv-helper`.
 
 ```sh
-ssh target55
-ADC_LAB_VERSION=v0.1.13 bash -c 'set -euo pipefail; tmp="$(mktemp -d)"; cd "$tmp"; curl -fsSLO "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${ADC_LAB_VERSION}/install-adc-lab-helper.sh"; bash install-adc-lab-helper.sh --version "${ADC_LAB_VERSION}" --install-sudoers --user "$(id -un)"'
+ssh <target-host>
+curl -fsSLO https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/latest/download/install-adc-lab-helper.sh
+bash install-adc-lab-helper.sh --latest --install-sudoers --user "$(id -un)"
+```
+
+For reproducible setup, pin a release tag:
+
+```sh
+VERSION=vX.Y.Z
+curl -fsSLO "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${VERSION}/install-adc-lab-helper.sh"
+bash install-adc-lab-helper.sh --version "${VERSION}" --install-sudoers --user "$(id -un)"
 ```
 
 If you have the installer checksum from a trusted channel, pin the installer
 itself before executing it:
 
 ```sh
-ssh target55
-ADC_LAB_VERSION=v0.1.13 INSTALLER_SHA256=<expected-sha256> bash -c 'set -euo pipefail; tmp="$(mktemp -d)"; cd "$tmp"; curl -fsSLo install-adc-lab-helper.sh "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${ADC_LAB_VERSION}/install-adc-lab-helper.sh"; echo "${INSTALLER_SHA256}  install-adc-lab-helper.sh" | sha256sum -c -; bash install-adc-lab-helper.sh --version "${ADC_LAB_VERSION}" --install-sudoers --user "$(id -un)"'
+VERSION=vX.Y.Z
+INSTALLER_SHA256=<expected-sha256>
+curl -fsSLo install-adc-lab-helper.sh "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${VERSION}/install-adc-lab-helper.sh"
+echo "${INSTALLER_SHA256}  install-adc-lab-helper.sh" | sha256sum -c -
+bash install-adc-lab-helper.sh --version "${VERSION}" --install-sudoers --user "$(id -un)"
 ```
 
-The installer downloads the pinned release tarball, verifies it with
-`SHA256SUMS`, installs only `/usr/local/libexec/adc-lab-priv-helper`, optionally
-adds a narrow sudoers rule for that exact helper path, and runs privilege
-readiness checks.
+The installer downloads the selected release tarball, verifies it with
+`SHA256SUMS`, installs user binaries, installs only
+`/usr/local/libexec/adc-lab-priv-helper` for the privileged boundary,
+optionally adds a narrow sudoers rule for that exact helper path, and runs
+privilege readiness checks.
 
 Do **not** use:
 
@@ -261,9 +276,10 @@ For the full command reference, see [CLI reference](docs/reference/cli.md).
 Copy the target runner to the Pi4:
 
 ```sh
-scp bin/adc-lab-target target55:/home/<user>/.local/bin/adc-lab-target
-ssh target55 'chmod +x /home/<user>/.local/bin/adc-lab-target'
-ssh target55 '/home/<user>/.local/bin/adc-lab-target --version'
+TARGET_HOST=<pi4-ssh-host>
+scp bin/adc-lab-target "${TARGET_HOST}:/home/<target-user>/.local/bin/adc-lab-target"
+ssh "${TARGET_HOST}" 'chmod +x /home/<target-user>/.local/bin/adc-lab-target'
+ssh "${TARGET_HOST}" '/home/<target-user>/.local/bin/adc-lab-target --version'
 ```
 
 Then run inventory, toolchain discovery, passive observation, a short bounded load, and report packing from the Pi5 controller.
@@ -323,7 +339,7 @@ Generate a target operating contract from a run:
 ```sh
 adc-lab report operating-contract \
   --run lab/runs/LAB-RUN-... \
-  --target-id target55 \
+  --target-id <target-id> \
   --target-class raspberry_pi_4
 ```
 

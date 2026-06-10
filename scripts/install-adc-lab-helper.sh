@@ -6,21 +6,28 @@ readonly HELPER_DEST="/usr/local/libexec/adc-lab-priv-helper"
 readonly SUDOERS_DEST="/etc/sudoers.d/adc-lab"
 
 version=""
+use_latest="false"
 asset_triple="auto"
 install_sudoers="false"
 sudo_user=""
 keep_temp="false"
+install_user_bins="true"
+user_bin_dir="${HOME}/.local/bin"
 
 usage() {
   cat <<'USAGE'
-usage: install-adc-lab-helper.sh --version vX.Y.Z [options]
+usage: install-adc-lab-helper.sh (--version vX.Y.Z | --latest) [options]
 
-Install the adc-lab privileged helper from a pinned GitHub Release tarball.
+Install adc-lab user binaries and the privileged helper from a GitHub Release.
 
 Options:
-  --version vX.Y.Z        Required release tag to install.
+  --version vX.Y.Z        Pinned release tag to install.
+  --latest                Install from the GitHub latest release pointer.
   --asset-triple VALUE    Optional release asset triple. Defaults to auto.
                           Supported: linux-aarch64, linux-x86_64.
+  --user-bin-dir DIR      Install adc-lab and adc-lab-target here.
+                          Defaults to ~/.local/bin.
+  --no-user-bins          Do not install adc-lab or adc-lab-target.
   --install-sudoers      Also install a narrow NOPASSWD sudoers rule.
   --user USER             Required with --install-sudoers; must be current user.
   --keep-temp             Keep the temporary download directory for inspection.
@@ -45,6 +52,13 @@ validate_version() {
   local value="$1"
   if [[ ! "$value" =~ ^v[0-9]+[.][0-9]+[.][0-9]+([._+-][A-Za-z0-9._+-]+)?$ ]]; then
     die "invalid --version: $value"
+  fi
+}
+
+validate_user_bin_dir() {
+  local value="$1"
+  if [[ -z "$value" || "$value" != /* ]]; then
+    die "--user-bin-dir must be an absolute path"
   fi
 }
 
@@ -86,9 +100,21 @@ while [[ $# -gt 0 ]]; do
       version="${2:?missing --version value}"
       shift 2
       ;;
+    --latest)
+      use_latest="true"
+      shift
+      ;;
     --asset-triple)
       asset_triple="${2:?missing --asset-triple value}"
       shift 2
+      ;;
+    --user-bin-dir)
+      user_bin_dir="${2:?missing --user-bin-dir value}"
+      shift 2
+      ;;
+    --no-user-bins)
+      install_user_bins="false"
+      shift
       ;;
     --install-sudoers)
       install_sudoers="true"
@@ -112,8 +138,18 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$version" ]] || die "missing required --version"
-validate_version "$version"
+if [[ -n "$version" && "$use_latest" == "true" ]]; then
+  die "--version and --latest are mutually exclusive"
+fi
+if [[ -z "$version" && "$use_latest" != "true" ]]; then
+  die "missing required --version or --latest"
+fi
+if [[ -n "$version" ]]; then
+  validate_version "$version"
+fi
+if [[ "$install_user_bins" == "true" ]]; then
+  validate_user_bin_dir "$user_bin_dir"
+fi
 
 if [[ "$(id -u)" -eq 0 ]]; then
   die "do not run this installer as root; run as the target operator user"
@@ -141,6 +177,7 @@ require_command grep
 require_command id
 require_command install
 require_command mktemp
+require_command sed
 require_command sha256sum
 require_command sudo
 require_command tar
@@ -159,15 +196,30 @@ cleanup() {
 }
 trap cleanup EXIT
 
-asset="adc-lab-${version}-${asset_triple}.tar.gz"
-base_url="https://github.com/${REPOSITORY}/releases/download/${version}"
+if [[ "$use_latest" == "true" ]]; then
+  base_url="https://github.com/${REPOSITORY}/releases/latest/download"
+else
+  base_url="https://github.com/${REPOSITORY}/releases/download/${version}"
+fi
 extract_dir="${tmp_dir}/extract"
+
+echo "Downloading SHA256SUMS from ${base_url}" >&2
+(
+  cd "$tmp_dir"
+  curl -fsSLO "${base_url}/SHA256SUMS"
+)
+
+if [[ "$use_latest" == "true" ]]; then
+  asset="$(sed -nE "s/^[[:xdigit:]]{64}[[:space:]]+(adc-lab-v[^[:space:]]+-${asset_triple}[.]tar[.]gz)$/\\1/p" "${tmp_dir}/SHA256SUMS" | head -n 1)"
+  [[ -n "$asset" ]] || die "SHA256SUMS does not list a latest ${asset_triple} tarball"
+else
+  asset="adc-lab-${version}-${asset_triple}.tar.gz"
+fi
 
 echo "Downloading ${asset} from ${base_url}" >&2
 (
   cd "$tmp_dir"
   curl -fsSLO "${base_url}/${asset}"
-  curl -fsSLO "${base_url}/SHA256SUMS"
   grep -F " ${asset}" SHA256SUMS >/dev/null || die "SHA256SUMS does not list ${asset}"
   sha256sum -c SHA256SUMS --ignore-missing
 )
@@ -177,17 +229,40 @@ tar -xzf "${tmp_dir}/${asset}" -C "$extract_dir"
 
 helper="${extract_dir}/bin/adc-lab-priv-helper"
 adc_lab="${extract_dir}/bin/adc-lab"
+adc_lab_target="${extract_dir}/bin/adc-lab-target"
 manifest="${extract_dir}/release-manifest.json"
-version_no_v="${version#v}"
 
 [[ -x "$helper" ]] || die "release tarball does not contain executable bin/adc-lab-priv-helper"
+[[ -x "$adc_lab" ]] || die "release tarball does not contain executable bin/adc-lab"
+[[ -x "$adc_lab_target" ]] || die "release tarball does not contain executable bin/adc-lab-target"
 [[ -f "$manifest" ]] || die "release tarball does not contain release-manifest.json"
-grep -F "\"version\": \"${version_no_v}\"" "$manifest" >/dev/null \
-  || die "release manifest version does not match ${version}"
+if [[ -n "$version" ]]; then
+  version_no_v="${version#v}"
+  grep -F "\"version\": \"${version_no_v}\"" "$manifest" >/dev/null \
+    || die "release manifest version does not match ${version}"
+fi
 grep -F '"name": "adc-lab-priv-helper"' "$manifest" >/dev/null \
   || die "release manifest does not list adc-lab-priv-helper"
+grep -F '"name": "adc-lab"' "$manifest" >/dev/null \
+  || die "release manifest does not list adc-lab"
+grep -F '"name": "adc-lab-target"' "$manifest" >/dev/null \
+  || die "release manifest does not list adc-lab-target"
 
+resolved_version="$(grep -E '"version":' "$manifest" | head -n 1 | sed -E 's/.*"version": "([^"]+)".*/\1/')"
+[[ -n "$resolved_version" ]] || die "failed to read release manifest version"
+
+"$adc_lab" --version >/dev/null
+"$adc_lab_target" --version >/dev/null
 "$helper" --version >/dev/null
+
+if [[ "$install_user_bins" == "true" ]]; then
+  mkdir -p "$user_bin_dir"
+  echo "Installing adc-lab user binaries to ${user_bin_dir}" >&2
+  install -m 0755 "$adc_lab" "${user_bin_dir}/adc-lab"
+  install -m 0755 "$adc_lab_target" "${user_bin_dir}/adc-lab-target"
+  "${user_bin_dir}/adc-lab" --version >/dev/null
+  "${user_bin_dir}/adc-lab-target" --version >/dev/null
+fi
 
 echo "Installing helper to ${HELPER_DEST}" >&2
 sudo install -o root -g root -m 0755 "$helper" "$HELPER_DEST"
@@ -203,11 +278,16 @@ if [[ "$install_sudoers" == "true" ]]; then
   sudo -n "$HELPER_DEST" --version >/dev/null
 fi
 
-if [[ -x "$adc_lab" ]]; then
-  "$adc_lab" privilege doctor \
+if [[ "$install_user_bins" == "true" ]]; then
+  "${user_bin_dir}/adc-lab" privilege doctor \
     --target local \
     --run-dir "${tmp_dir}/privilege-doctor-run" \
     --json
 else
-  echo "installed ${HELPER_DEST}" >&2
+  "$adc_lab" privilege doctor \
+    --target local \
+    --run-dir "${tmp_dir}/privilege-doctor-run" \
+    --json
 fi
+
+echo "installed adc-lab release ${resolved_version}" >&2
