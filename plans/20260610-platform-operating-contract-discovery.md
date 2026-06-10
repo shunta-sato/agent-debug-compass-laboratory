@@ -347,6 +347,7 @@ Test list:
 - Added unit coverage for both cpufreq surface-only evidence and complete
   cpufreq control evidence paths.
 - Second review-fix final `make verify` passed.
+- Documentation refresh started on 2026-06-10 to replace the README with a public-facing target-operating-contract narrative and move long command examples into docs/reference and getting-started pages.
 
 ## Decision Log
 
