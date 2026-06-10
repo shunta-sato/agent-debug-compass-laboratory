@@ -627,19 +627,27 @@ fn ssh_runner_rejects_shell_fragment_env() {
 }
 
 #[cfg(unix)]
-#[test]
-fn experiment_ssh_operator_abort_file_is_remote_shell_quoted() {
-    let temp = tempfile::tempdir().unwrap();
-    let bin_dir = temp.path().join("bin");
-    fs::create_dir_all(&bin_dir).unwrap();
-    let log_path = temp.path().join("fake-ssh.log");
-    let marker_path = temp.path().join("operator-abort-injected");
-    let ssh_path = bin_dir.join("ssh");
-    let target_path = bin_dir.join("adc-lab-target");
+struct FakeSshHarness {
+    temp: tempfile::TempDir,
+    bin_dir: PathBuf,
+    log_path: PathBuf,
+    marker_path: PathBuf,
+}
 
-    fs::write(
-        &ssh_path,
-        r#"#!/bin/sh
+#[cfg(unix)]
+impl FakeSshHarness {
+    fn new() -> Self {
+        let temp = tempfile::tempdir().unwrap();
+        let bin_dir = temp.path().join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let log_path = temp.path().join("fake-ssh.log");
+        let marker_path = temp.path().join("operator-abort-injected");
+        let ssh_path = bin_dir.join("ssh");
+        let target_path = bin_dir.join("adc-lab-target");
+
+        fs::write(
+            &ssh_path,
+            r#"#!/bin/sh
 set -eu
 bin_dir=$(dirname "$0")
 endpoint=$1
@@ -652,11 +660,11 @@ PATH="$bin_dir:$PATH"
 export PATH
 /bin/sh -c "$*"
 "#,
-    )
-    .unwrap();
-    fs::write(
-        &target_path,
-        r#"#!/bin/sh
+        )
+        .unwrap();
+        fs::write(
+            &target_path,
+            r#"#!/bin/sh
 set -eu
 {
   printf 'target_argv:'
@@ -682,20 +690,86 @@ else
   exit 2
 fi
 "#,
-    )
-    .unwrap();
-    fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o755)).unwrap();
-    fs::set_permissions(&target_path, fs::Permissions::from_mode(0o755)).unwrap();
+        )
+        .unwrap();
+        fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o755)).unwrap();
+        fs::set_permissions(&target_path, fs::Permissions::from_mode(0o755)).unwrap();
 
-    let old_path = std::env::var_os("PATH").unwrap_or_default();
-    let path = format!("{}:{}", bin_dir.display(), old_path.to_string_lossy());
-    let matrix = workspace_root().join("examples/experiments/bounded_load_observe_smoke.yaml");
-    let abort_path = format!("x; /usr/bin/id > {}; #", marker_path.display());
+        Self {
+            temp,
+            bin_dir,
+            log_path,
+            marker_path,
+        }
+    }
+
+    fn path_env(&self) -> String {
+        let old_path = std::env::var_os("PATH").unwrap_or_default();
+        format!("{}:{}", self.bin_dir.display(), old_path.to_string_lossy())
+    }
+
+    fn run_dir(&self) -> &std::path::Path {
+        self.temp.path()
+    }
+
+    fn semicolon_abort_path(&self) -> String {
+        format!("x; /usr/bin/id > {}; #", self.marker_path.display())
+    }
+
+    fn assert_abort_path_was_argv_data(&self, abort_path: &str) {
+        assert!(
+            !self.marker_path.exists(),
+            "operator abort path was interpreted as remote shell syntax"
+        );
+        let log = fs::read_to_string(&self.log_path).unwrap();
+        assert!(log.contains("remote_command='adc-lab-target' 'load' 'cpu'"));
+        assert!(log.contains(&format!("[{}]", abort_path)));
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn load_cpu_ssh_operator_abort_file_is_remote_shell_quoted() {
+    let harness = FakeSshHarness::new();
+    let abort_path = harness.semicolon_abort_path();
 
     Command::cargo_bin("adc-lab")
         .unwrap()
-        .env("PATH", path)
-        .env("ADC_LAB_FAKE_SSH_LOG", &log_path)
+        .env("PATH", harness.path_env())
+        .env("ADC_LAB_FAKE_SSH_LOG", &harness.log_path)
+        .args([
+            "load",
+            "cpu",
+            "--target",
+            "ssh://pi4-demo",
+            "--workers",
+            "1",
+            "--duration",
+            "1s",
+            "--operator-abort-file",
+            &abort_path,
+            "--run-dir",
+            harness.run_dir().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("LOAD-RESULT-FAKE"));
+
+    harness.assert_abort_path_was_argv_data(&abort_path);
+}
+
+#[cfg(unix)]
+#[test]
+fn experiment_ssh_operator_abort_file_is_remote_shell_quoted() {
+    let harness = FakeSshHarness::new();
+    let matrix = workspace_root().join("examples/experiments/bounded_load_observe_smoke.yaml");
+    let abort_path = harness.semicolon_abort_path();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .env("PATH", harness.path_env())
+        .env("ADC_LAB_FAKE_SSH_LOG", &harness.log_path)
         .args([
             "experiment",
             "run",
@@ -710,20 +784,14 @@ fi
             "--operator-abort-file",
             &abort_path,
             "--run-dir",
-            temp.path().to_str().unwrap(),
+            harness.run_dir().to_str().unwrap(),
             "--json",
         ])
         .assert()
         .success()
         .stdout(contains("experiment_run.json"));
 
-    assert!(
-        !marker_path.exists(),
-        "operator abort path was interpreted as remote shell syntax"
-    );
-    let log = fs::read_to_string(&log_path).unwrap();
-    assert!(log.contains("remote_command='adc-lab-target' 'load' 'cpu'"));
-    assert!(log.contains(&format!("[{}]", abort_path)));
+    harness.assert_abort_path_was_argv_data(&abort_path);
 }
 
 #[test]
