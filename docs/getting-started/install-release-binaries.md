@@ -76,9 +76,29 @@ from the controller user.
 
 ## Optional Privileged Helper
 
-PR11 measurements are non-privileged by default. Install the helper only when a
-later privileged-control workflow explicitly requires it and the operator has
-reviewed the release manifest and checksum.
+Most measurements are non-privileged by default. Install the helper only when a
+privileged-control workflow explicitly requires it and the operator has reviewed
+the release version and checksum boundary.
+
+Preferred target-local release installer:
+
+```sh
+ADC_LAB_VERSION=v0.1.13 bash -c 'set -euo pipefail; tmp="$(mktemp -d)"; cd "$tmp"; curl -fsSLO "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${ADC_LAB_VERSION}/install-adc-lab-helper.sh"; bash install-adc-lab-helper.sh --version "${ADC_LAB_VERSION}" --install-sudoers --user "$(id -un)"'
+```
+
+Checksum-pinned variant, when the installer hash is available from a trusted
+channel:
+
+```sh
+ADC_LAB_VERSION=v0.1.13 INSTALLER_SHA256=<expected-sha256> bash -c 'set -euo pipefail; tmp="$(mktemp -d)"; cd "$tmp"; curl -fsSLo install-adc-lab-helper.sh "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${ADC_LAB_VERSION}/install-adc-lab-helper.sh"; echo "${INSTALLER_SHA256}  install-adc-lab-helper.sh" | sha256sum -c -; bash install-adc-lab-helper.sh --version "${ADC_LAB_VERSION}" --install-sudoers --user "$(id -un)"'
+```
+
+The installer runs as the operator user, not as root. It uses `sudo` only for
+the fixed helper install path and optional fixed sudoers file. It downloads the
+pinned release tarball, verifies it with `SHA256SUMS`, installs
+`/usr/local/libexec/adc-lab-priv-helper`, and runs readiness checks.
+
+Manual install from an already verified/extracted tarball remains:
 
 ```sh
 sudo install -o root -g root -m 0755 bin/adc-lab-priv-helper /usr/local/libexec/adc-lab-priv-helper
@@ -87,3 +107,7 @@ sudo install -o root -g root -m 0755 bin/adc-lab-priv-helper /usr/local/libexec/
 
 Do not grant an agent a root shell. The helper remains an allowlisted typed
 operation boundary.
+
+Do not use `curl | sudo sh`. Compromised-release protection is still pending;
+checksums protect against mismatched assets, not a malicious release that
+changes both the installer and `SHA256SUMS`.
