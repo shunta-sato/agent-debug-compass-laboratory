@@ -279,7 +279,7 @@ Test list:
       `derivation`.
 - [x] Rerun target55 with the review-fix runner and attach artifact zip.
 - [x] Rerun final `make verify` after review-fix changes.
-- [ ] Push updated PR branch.
+- [x] Push updated PR branch.
 
 ## Surprises & Discoveries
 
@@ -331,6 +331,8 @@ Test list:
   `e3099c7fabbfb0481840e3200247d7096fc39b91a8f8d310b37e6d112c32ef30`.
 - Review-fix final `make verify` passed after clippy caught and fixed one
   local builder `too_many_arguments` issue.
+- Review-fix commit `29728f6` was pushed to PR #15 and the PR body/comment were
+  updated with artifact zip and conservative target55 status summary.
 
 ## Decision Log
 
