@@ -222,6 +222,10 @@ Test list:
   storing full Rust target triples in `release-manifest.json`. Rationale: the
   user specified those asset names, and the manifest keeps the exact build
   target machine-readable.
+- 2026-06-10: Pass manual release tag input through `env:` before shell use.
+  Rationale: GitHub expression expansion happens before Bash validation, so
+  direct `${{ inputs.tag }}` interpolation inside `run:` scripts can execute
+  attacker-controlled shell text before the tag regex runs.
 
 ## Validation & Acceptance
 
@@ -237,6 +241,7 @@ Acceptance criteria:
 - Install docs explain release-binary setup from Pi5 controller to Pi4 target.
 - CI permissions remain read-only; release permissions are scoped to release
   and attestation needs.
+- Manual release inputs are not directly interpolated into `run:` scripts.
 - Release workflow makes no resource/NFR claims.
 - `make verify` remains the default local gate.
 - Pi4/Pi5 measurement prompt uses release binaries and checksum verification.
@@ -257,3 +262,8 @@ Acceptance criteria:
 PR11 CI/CD release binary foundation is implemented with CI/release workflows,
 version JSON output, release manifest contract, checksum packaging, install
 docs, measurement prompt updates, and no target/NFR claims.
+
+Security follow-up: release workflow tag input injection was fixed by moving
+`workflow_dispatch.inputs.tag` into `RELEASE_TAG_INPUT` env vars and reading
+quoted shell variables inside `run:` scripts. Contract validation now parses
+workflow run scripts and fails if `${{ inputs.* }}` appears in a shell script.

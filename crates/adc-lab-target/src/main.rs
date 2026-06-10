@@ -19,6 +19,10 @@ enum Commands {
         #[command(subcommand)]
         command: LoadCommand,
     },
+    Pressure {
+        #[command(subcommand)]
+        command: PressureCommand,
+    },
     HealthCheck(JsonFlag),
 }
 
@@ -43,6 +47,35 @@ struct ObserveArgs {
 #[derive(Debug, Subcommand)]
 enum LoadCommand {
     Cpu(LoadCpuArgs),
+}
+
+#[derive(Debug, Subcommand)]
+enum PressureCommand {
+    Run(PressureRunArgs),
+}
+
+#[derive(Debug, Args)]
+struct PressureRunArgs {
+    #[arg(long)]
+    kind: ResourcePressureKind,
+    #[arg(long, default_value = "1s")]
+    duration: String,
+    #[arg(long, default_value_t = 1)]
+    workers: usize,
+    #[arg(long)]
+    abort_temp_c: Option<f64>,
+    #[arg(long, default_value_t = 8 * 1024 * 1024)]
+    memory_bytes: u64,
+    #[arg(long, default_value_t = 1024 * 1024)]
+    storage_bytes: u64,
+    #[arg(long, default_value_t = 0)]
+    network_bytes: u64,
+    #[arg(long)]
+    network_endpoint: Option<String>,
+    #[arg(long)]
+    storage_dir: Option<std::path::PathBuf>,
+    #[arg(long)]
+    json: bool,
 }
 
 #[derive(Debug, Args)]
@@ -105,6 +138,25 @@ fn main() -> Result<()> {
                     &CpuLoadRuntimeOptions {
                         operator_abort_file: args.operator_abort_file,
                     },
+                )?)
+            }
+        },
+        Commands::Pressure { command } => match command {
+            PressureCommand::Run(args) => {
+                let options = PressureProbeOptions {
+                    duration: parse_duration(&args.duration)?,
+                    workers: args.workers,
+                    abort_temp_c: args.abort_temp_c,
+                    memory_bytes: args.memory_bytes,
+                    storage_bytes: args.storage_bytes,
+                    network_bytes: args.network_bytes,
+                    network_endpoint: args.network_endpoint,
+                    storage_dir: args.storage_dir,
+                };
+                print_json(&run_resource_pressure(
+                    target.target_id,
+                    args.kind,
+                    &options,
                 )?)
             }
         },
