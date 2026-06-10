@@ -149,10 +149,12 @@ jobs:
         run: |
           mkdir -p dist-assets
           find dist-download -name '*.tar.gz' -type f -exec cp {} dist-assets/ \;
+          cp scripts/install-adc-lab-helper.sh dist-assets/install-adc-lab-helper.sh
+          chmod 0755 dist-assets/install-adc-lab-helper.sh
           test "$(find dist-assets -name '*.tar.gz' -type f | wc -l)" -ge 1
           (
             cd dist-assets
-            sha256sum *.tar.gz > SHA256SUMS
+            sha256sum *.tar.gz install-adc-lab-helper.sh > SHA256SUMS
             sha256sum -c SHA256SUMS
           )
 
@@ -177,9 +179,11 @@ jobs:
           ```sh
           sha256sum -c SHA256SUMS
           ```
+
+          For target-local privileged helper setup, download and run the installer as a normal user. Do not use curl | sudo sh.
           EOF
 
-          assets=(dist-assets/*.tar.gz dist-assets/SHA256SUMS)
+          assets=(dist-assets/*.tar.gz dist-assets/install-adc-lab-helper.sh dist-assets/SHA256SUMS)
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" "${assets[@]}" --clobber
           else

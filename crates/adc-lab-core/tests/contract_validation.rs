@@ -523,6 +523,11 @@ fn contract_validation_release_workflow_publishes_checksummed_assets_with_scoped
     assert!(workflow.contains("id-token: write"));
     assert!(workflow.contains("attestations: write"));
     assert!(workflow.contains("sha256sum -c SHA256SUMS"));
+    assert!(workflow.contains("install-adc-lab-helper.sh"));
+    assert!(workflow.contains("sha256sum *.tar.gz install-adc-lab-helper.sh > SHA256SUMS"));
+    assert!(workflow.contains(
+        "assets=(dist-assets/*.tar.gz dist-assets/install-adc-lab-helper.sh dist-assets/SHA256SUMS)"
+    ));
     assert!(workflow.contains("ADC_LAB_VERSION=\"${{ steps.release.outputs.version }}\""));
     assert!(workflow.contains("RELEASE_TAG_INPUT: ${{ inputs.tag }}"));
     assert!(workflow.contains("tag=\"$RELEASE_TAG_INPUT\""));
@@ -540,6 +545,29 @@ fn contract_validation_release_workflow_publishes_checksummed_assets_with_scoped
     assert!(workflow.contains("actions/upload-artifact@v4"));
     assert!(workflow.contains("actions/download-artifact@v4"));
     assert!(workflow.contains("actions/attest-build-provenance@v2"));
+}
+
+#[test]
+fn contract_validation_release_helper_installer_keeps_fixed_safety_boundary() {
+    let root = workspace_root();
+    let script = fs::read_to_string(root.join("scripts/install-adc-lab-helper.sh")).unwrap();
+    assert!(script.starts_with("#!/usr/bin/env bash"));
+    assert!(script.contains("set -euo pipefail"));
+    assert!(script.contains("REPOSITORY=\"shunta-sato/agent-debug-compass-laboratory\""));
+    assert!(script.contains("HELPER_DEST=\"/usr/local/libexec/adc-lab-priv-helper\""));
+    assert!(script.contains("SUDOERS_DEST=\"/etc/sudoers.d/adc-lab\""));
+    assert!(script.contains("do not run this installer as root"));
+    assert!(script.contains("validate_version \"$version\""));
+    assert!(script.contains("validate_sudo_user \"$sudo_user\" \"$current_user\""));
+    assert!(script.contains("sha256sum -c SHA256SUMS --ignore-missing"));
+    assert!(script.contains("sudo install -o root -g root -m 0755"));
+    assert!(script.contains("sudo visudo -cf \"$sudoers_tmp\""));
+    assert!(script.contains("sudo -n \"$HELPER_DEST\" --version"));
+    assert!(script.contains("privilege doctor"));
+    assert!(!script.contains("eval "));
+    assert!(!script.contains("| sudo"));
+    assert!(!script.contains("sudo bash"));
+    assert!(!script.contains("sudo sh"));
 }
 
 fn assert_workflow_yaml_parses(workflow: &str) {

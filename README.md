@@ -187,6 +187,43 @@ They do **not** prove resource, NFR, Pi4/Pi5 comparison, target suitability, or 
 
 More details: [Install release binaries](docs/getting-started/install-release-binaries.md).
 
+### Optional target-local privileged helper install
+
+Most commands do not need the privileged helper. Install it only on a lab target
+when governor / operating-point control is explicitly required.
+
+For target55-style setup, run the release installer **on the target as the
+operator user**, not through `sudo sh`:
+
+```sh
+ssh target55
+ADC_LAB_VERSION=v0.1.13 bash -c 'set -euo pipefail; tmp="$(mktemp -d)"; cd "$tmp"; curl -fsSLO "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${ADC_LAB_VERSION}/install-adc-lab-helper.sh"; bash install-adc-lab-helper.sh --version "${ADC_LAB_VERSION}" --install-sudoers --user "$(id -un)"'
+```
+
+If you have the installer checksum from a trusted channel, pin the installer
+itself before executing it:
+
+```sh
+ssh target55
+ADC_LAB_VERSION=v0.1.13 INSTALLER_SHA256=<expected-sha256> bash -c 'set -euo pipefail; tmp="$(mktemp -d)"; cd "$tmp"; curl -fsSLo install-adc-lab-helper.sh "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${ADC_LAB_VERSION}/install-adc-lab-helper.sh"; echo "${INSTALLER_SHA256}  install-adc-lab-helper.sh" | sha256sum -c -; bash install-adc-lab-helper.sh --version "${ADC_LAB_VERSION}" --install-sudoers --user "$(id -un)"'
+```
+
+The installer downloads the pinned release tarball, verifies it with
+`SHA256SUMS`, installs only `/usr/local/libexec/adc-lab-priv-helper`, optionally
+adds a narrow sudoers rule for that exact helper path, and runs privilege
+readiness checks.
+
+Do **not** use:
+
+```sh
+curl ... | sudo sh
+```
+
+Compromised-release protection is still pending. The checksum flow protects
+against transfer errors and mismatched assets, but a malicious release could
+change both the installer and `SHA256SUMS`. Stronger attestation/signature
+verification is a future hardening step.
+
 ---
 
 ## Quick start: local target
@@ -327,7 +364,8 @@ health check
 
 For repeated privileged experiments, the recommended workflow is:
 
-1. Operator installs the helper.
+1. Operator installs the helper with the release installer or reviewed local
+   build.
 2. Operator configures the minimal helper-only sudo rule if appropriate.
 3. Agent runs `adc-lab` experiments non-interactively.
 4. Agent verifies restore and health.
