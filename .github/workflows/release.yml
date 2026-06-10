@@ -68,11 +68,13 @@ jobs:
 
       - name: Resolve release metadata
         id: release
+        env:
+          RELEASE_TAG_INPUT: ${{ inputs.tag }}
         run: |
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             tag="$GITHUB_REF_NAME"
           else
-            tag="${{ inputs.tag }}"
+            tag="$RELEASE_TAG_INPUT"
           fi
           if [[ ! "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+([._+-][A-Za-z0-9._+-]+)?$ ]]; then
             echo "invalid release tag: $tag" >&2
@@ -124,11 +126,13 @@ jobs:
 
       - name: Resolve release metadata
         id: release
+        env:
+          RELEASE_TAG_INPUT: ${{ inputs.tag }}
         run: |
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
             tag="$GITHUB_REF_NAME"
           else
-            tag="${{ inputs.tag }}"
+            tag="$RELEASE_TAG_INPUT"
           fi
           if [[ ! "$tag" =~ ^v[0-9]+[.][0-9]+[.][0-9]+([._+-][A-Za-z0-9._+-]+)?$ ]]; then
             echo "invalid release tag: $tag" >&2
@@ -160,8 +164,9 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
-          tag="${{ steps.release.outputs.tag }}"
+          tag="$RELEASE_TAG"
           cat > release-notes.md <<'EOF'
           Binary release for adc-lab toolchain distribution.
 
