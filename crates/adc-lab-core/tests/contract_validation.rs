@@ -507,6 +507,8 @@ fn contract_validation_ci_workflow_runs_make_verify_with_read_only_contents() {
     assert!(workflow.contains("- main"));
     assert!(workflow.contains("workflow_dispatch:"));
     assert!(workflow.contains("permissions:\n  contents: read"));
+    assert!(workflow.contains("actions/checkout@v5"));
+    assert!(!workflow.contains("actions/checkout@v4"));
     assert!(workflow.contains("run: make verify"));
 }
 
@@ -522,6 +524,7 @@ fn contract_validation_release_workflow_publishes_checksummed_assets_with_scoped
     assert!(workflow.contains("contents: write"));
     assert!(workflow.contains("id-token: write"));
     assert!(workflow.contains("attestations: write"));
+    assert!(workflow.contains("artifact-metadata: write"));
     assert!(workflow.contains("sha256sum -c SHA256SUMS"));
     assert!(workflow.contains("install-adc-lab-helper.sh"));
     assert!(workflow.contains("sha256sum *.tar.gz install-adc-lab-helper.sh > SHA256SUMS"));
@@ -542,9 +545,12 @@ fn contract_validation_release_workflow_publishes_checksummed_assets_with_scoped
     );
     assert!(workflow.contains("--notes-file release-notes.md"));
     assert!(workflow.contains("gh release create"));
-    assert!(workflow.contains("actions/upload-artifact@v4"));
-    assert!(workflow.contains("actions/download-artifact@v4"));
-    assert!(workflow.contains("actions/attest-build-provenance@v2"));
+    assert!(workflow.contains("actions/checkout@v5"));
+    assert!(!workflow.contains("actions/checkout@v4"));
+    assert!(workflow.contains("actions/upload-artifact@v6"));
+    assert!(workflow.contains("actions/download-artifact@v7"));
+    assert!(workflow.contains("actions/attest@v4"));
+    assert!(!workflow.contains("actions/attest-build-provenance@v2"));
 }
 
 #[test]
