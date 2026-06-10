@@ -71,6 +71,19 @@ modes:
     target_capability_profile_blocks_target_selection_claims: true
     ci_cd_release_binary_foundation_target_runtime: none
     ci_cd_release_binary_foundation_resource_claims_allowed: false
+    platform_operating_contract_pressure_target_runtime: command_triggered
+    platform_operating_contract_pressure_duration_seconds_max: 30
+    platform_operating_contract_pressure_memory_bytes_max: 134217728
+    platform_operating_contract_pressure_storage_bytes_max: 67108864
+    platform_operating_contract_pressure_network_bytes_max: 1048576
+    platform_operating_contract_statuses:
+      - measured
+      - measured_partial
+      - not_controllable
+      - unsafe_to_run_with_reason
+      - not_applicable_with_reason
+      - insufficient
+    unsupported_by_adc_lab_allowed_as_final_status: false
     cpu_percent_max: null
     wakeups_per_second_added_max: null
     disk_write_bytes_total_max: null
@@ -98,14 +111,15 @@ measurement:
   pr10_privilege_provider_status_verified_by: cargo test -p adc-lab --test cli privilege_provider -- --nocapture
   pr11_target_capability_profile_verified_by: cargo test -p adc-lab --test cli report_capability_profile -- --nocapture
   pr11_ci_cd_release_binary_foundation_verified_by: make verify plus local release package smoke
+  platform_operating_contract_verified_by: cargo test --workspace contract_validation -- --nocapture plus cargo test -p adc-lab --test cli -- --nocapture
   baseline_path: examples/demos/target55/baselines/resource/idle.json
   report_path: examples/demos/target55/reports/target-characterization.json
   missing_evidence:
     - wakeup measurement
     - battery/power measurement
-    - storage write and flash-wear measurement
-    - latency/jitter measurement
+    - flash-wear measurement
     - sustained thermal and recovery envelope
+    - controlled governor/fixed-frequency repetitions
 
 budget_provenance:
   default_polling_interval_ms_min:

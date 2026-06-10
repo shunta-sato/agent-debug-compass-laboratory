@@ -35,6 +35,11 @@ The project is separate from Agent Debug Compass Flight Recorder. Flight Recorde
 - Workload profiles and target capability profiles define the same measuring
   stick for Pi4/Pi5-style target evidence. They are exploratory/short-smoke
   evidence packets only; they are not target-selection decisions.
+- Platform Operating Contract discovery adds bounded pressure probes and final
+  target operating contracts for Pi4/Pi5-style targets. These contracts
+  describe measured mechanisms, boundary evidence, resource-coupling
+  hypotheses/evidence class, degraded-mode triggers, burst-only patterns, and
+  blocked claims. They are not benchmark scores.
 
 Target-specific live-run artifacts that are useful as examples live under `examples/demos/`, not under canonical product docs. For example, `examples/demos/target55/` shows a short-smoke Raspberry Pi 4 evidence pack shape.
 
@@ -55,16 +60,22 @@ adc-lab control apply --plan lab/runs/LAB-RUN-.../plans/PLAN-....json --approval
 adc-lab restore --lease lab/runs/LAB-RUN-.../leases/LEASE-....json --dry-run
 
 adc-lab load cpu --target local --workers 2 --duration 5s --abort-temp-c 75 --operator-abort-file <target-abort-file>
+adc-lab pressure run --target local --kind latency_jitter --duration 1s
+adc-lab pressure run --target local --kind memory_pressure --duration 1s --memory-bytes 8388608
+adc-lab pressure run --target local --kind storage_io --duration 1s --storage-bytes 1048576
+adc-lab pressure run --target local --kind network_io --duration 1s
+adc-lab pressure run --target local --kind observer_pressure --duration 1s
 adc-lab experiment run --target local --matrix examples/experiments/pi4_cpu_governor_smoke.yaml --dry-run
 adc-lab experiment run --target local --matrix examples/experiments/bounded_load_observe_smoke.yaml --trial-load-duration 1s --trial-observe-duration 0s
 adc-lab report pack --run lab/runs/LAB-RUN-...
 adc-lab report operating-point --run lab/runs/LAB-RUN-... --target-id local-target
+adc-lab report operating-contract --run lab/runs/LAB-RUN-... --target-id local-target --target-class raspberry_pi_4
 adc-lab report capability-profile --run lab/runs/LAB-RUN-... --target-id local-target --workload examples/workloads/bounded_cpu_load_2_workers_60s.json
 adc-lab health-check --target local
 ```
 
 For SSH targets, `adc-lab` uses fixed `adc-lab-target` subcommands over SSH. It does not expose arbitrary remote shell.
-`ADC_LAB_TARGET_RUNNER` is a development override only and must name `adc-lab-target` from an allowlisted safe path such as `/usr/local/bin/adc-lab-target` or `/home/<user>/.local/bin/adc-lab-target`.
+`ADC_LAB_TARGET_RUNNER` is a development override only and must name `adc-lab-target` from an allowlisted safe path such as `/usr/local/bin/adc-lab-target`, `/home/<user>/.local/bin/adc-lab-target`, or a versioned `/home/<user>/.local/share/adc-lab/runners/.../adc-lab-target` staging path.
 
 `adc-lab load cpu` is a Tier 1 experimental burst. It is capped by duration and
 available parallelism, supports optional thermal abort and operator abort, and
@@ -85,6 +96,25 @@ architecture evidence packet. It records observed CPU/memory/thermal/cpufreq
 and bounded-load evidence, but keeps GPU/NPU/DSP/storage/network and production
 physical-footprint claims blocked until qualified, target-specific cost
 evidence exists. Capability presence is not an architecture recommendation.
+
+`adc-lab pressure run` writes `lab.resource_pressure_result.v1` artifacts under
+`pressure/`. Supported pressure kinds are `cpu_pressure`, `thermal_pressure`,
+`memory_pressure`, `storage_io`, `network_io`, `latency_jitter`, and
+`observer_pressure`. The probes are command-triggered, bounded, cleanup-aware,
+and classified as `measured`, `measured_partial`, `not_controllable`,
+`unsafe_to_run_with_reason`, or `not_applicable_with_reason` where applicable.
+They do not use `unsupported_by_adc_lab` as a final state.
+
+`adc-lab report operating-contract` writes:
+
+- `lab.platform_mechanism_inventory.v1`
+- `lab.boundary_probe_plan.v1`
+- `lab.resource_coupling_report.v1`
+- `lab.target_operating_contract.v1`
+
+The target operating contract tells agents which patterns are allowed by
+evidence, burst-only, degraded-mode triggers, forbidden without more evidence,
+or blocked as claims.
 
 `adc-lab report capability-profile` writes
 `lab.target_capability_profile.v1` for a specific `lab.workload_profile.v1`.

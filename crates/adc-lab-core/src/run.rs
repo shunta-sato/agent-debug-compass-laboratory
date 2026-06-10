@@ -99,6 +99,7 @@ pub fn create_or_open_run(run_dir: Option<PathBuf>) -> LabResult<RunContext> {
         "approvals",
         "leases",
         "loads",
+        "pressure",
         "experiments",
         "reports",
         "tools",

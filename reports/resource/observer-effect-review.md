@@ -4,10 +4,14 @@
 
 - Component: procfs/sysfs observation, CPU load safety monitor, experiment trial
   observer, controller-side report builders, target capability profile builder,
-  and run artifact writer.
-- Cadence: 1s default during explicit observation command; 100ms safety monitor during explicit CPU load; per-trial observation during explicit matrix runs.
-- Data captured: CPU ticks, memory availability, cpufreq, thermal readings.
-- Storage path: controller run artifacts; target runner writes only stdout in MVP.
+  Platform Operating Contract pressure probes, operating contract report
+  builder, and run artifact writer.
+- Cadence: 1s default during explicit observation command; 100ms safety monitor during explicit CPU load; per-trial observation during explicit matrix runs; pressure probe loops are explicit burst-only and bounded to <=30s.
+- Data captured: CPU ticks, memory availability, cpufreq, thermal readings,
+  meminfo/vmstat/PSI, diskstats, netdev counters, monotonic jitter samples, and
+  observer artifact-write latency.
+- Storage path: controller run artifacts; storage and observer pressure probes
+  use bounded target-local temp files and verify cleanup.
 - Transmission path: local stdout or fixed SSH command stdout.
 - Default/debug/experimental mode: experimental command-triggered burst.
 
@@ -22,6 +26,7 @@
 | Thermal behavior | observer and safety monitor may perturb load runs | target55 observer-on/off thermal smoke; PR5 safety monitor contract | keep production thermal claims blocked | partial |
 | Lock contention / queue pressure | none in MVP observer | code review | no shared queue | provisional |
 | Timing / jitter | not measured | missing target evidence | no timing claim | unknown |
+| Pressure probe observer effect | pressure probes intentionally perturb the target during explicit discovery | hardware-free command tests; target run required for target claims | bounded duration/bytes, no default mode, cleanup verification | partial |
 
 ## Observer-On vs Observer-Off
 
@@ -58,6 +63,13 @@
 - [EOE-008] PR11 target capability profile is controller-side artifact
   interpretation only; it does not run target observation, target load,
   privileged control, or SSH commands.
+- [EOE-009] Platform Operating Contract pressure probes intentionally observe
+  and perturb CPU, memory, storage, network, latency, and observer paths during
+  explicit bounded discovery. This is acceptable for experimental-only contract
+  discovery and must not be cited as production low-overhead evidence without
+  repeated target measurement.
+- [EOE-010] `report operating-contract` is controller-side artifact
+  interpretation and adds no target observer effect.
 
 ## Handoff
 

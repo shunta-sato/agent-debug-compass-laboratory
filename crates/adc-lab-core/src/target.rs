@@ -90,7 +90,10 @@ pub fn validate_ssh_runner_program(value: &str) -> LabResult<()> {
         value == "/usr/local/bin/adc-lab-target" || value == "/usr/bin/adc-lab-target";
     let allowed_user_local_path =
         value.starts_with("/home/") && value.ends_with("/.local/bin/adc-lab-target");
-    if allowed_system_path || allowed_user_local_path {
+    let allowed_staged_runner = value.starts_with("/home/")
+        && value.contains("/.local/share/adc-lab/runners/")
+        && value.ends_with("/adc-lab-target");
+    if allowed_system_path || allowed_user_local_path || allowed_staged_runner {
         Ok(())
     } else {
         Err(LabError::Policy(
@@ -150,5 +153,9 @@ mod tests {
         assert!(validate_ssh_runner_program("sh -c adc-lab-target").is_err());
         assert!(validate_ssh_runner_program("/tmp/adc-lab-target").is_err());
         assert!(validate_ssh_runner_program("/home/demo/.local/bin/adc-lab-target").is_ok());
+        assert!(validate_ssh_runner_program(
+            "/home/demo/.local/share/adc-lab/runners/20260610/adc-lab-target"
+        )
+        .is_ok());
     }
 }

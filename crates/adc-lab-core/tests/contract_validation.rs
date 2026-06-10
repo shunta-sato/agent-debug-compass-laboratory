@@ -209,6 +209,116 @@ fn contract_validation_target_capability_profile_requires_selection_ready_field(
 }
 
 #[test]
+fn contract_validation_resource_pressure_rejects_unsupported_status() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.resource_pressure_result.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.resource_pressure_result.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["status"] = serde_json::json!("unsupported_by_adc_lab");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "resource pressure results must classify surfaces explicitly instead of using unsupported_by_adc_lab"
+    );
+}
+
+#[test]
+fn contract_validation_platform_inventory_rejects_legacy_control_status() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.platform_mechanism_inventory.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.platform_mechanism_inventory.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    let mechanism = fixture_json["mechanisms"][0].as_object_mut().unwrap();
+    mechanism.insert(
+        "control_status".to_string(),
+        serde_json::json!("measured_partial"),
+    );
+    mechanism.remove("platform_control_status");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "platform mechanism inventory must split platform control from pressure probe status"
+    );
+}
+
+#[test]
+fn contract_validation_resource_pressure_requires_evidence_class() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.resource_pressure_result.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.resource_pressure_result.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json
+        .as_object_mut()
+        .unwrap()
+        .remove("evidence_class");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "resource pressure results must state smoke vs pressure-induced evidence class"
+    );
+}
+
+#[test]
+fn contract_validation_coupling_requires_evidence_class() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.resource_coupling_report.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.resource_coupling_report.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["chains"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("coupling_evidence_class");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "resource coupling chains must distinguish ingredients-only evidence from composite measurement"
+    );
+}
+
+#[test]
+fn contract_validation_operating_rule_requires_rule_source() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.target_operating_contract.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.target_operating_contract.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["rules"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("rule_source");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "target operating contract rules must state generic/evidence-needed/measured source"
+    );
+}
+
+#[test]
+fn contract_validation_operating_contract_rejects_unsupported_boundary_status() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.target_operating_contract.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.target_operating_contract.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["boundaries"][0]["status"] = serde_json::json!("unsupported_by_adc_lab");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "target operating contract boundaries must not use unsupported_by_adc_lab"
+    );
+}
+
+#[test]
 fn contract_validation_release_manifest_rejects_missing_binary_sha() {
     let root = workspace_root();
     let schema_path = root.join("schemas/lab.release_manifest.v1.schema.json");
@@ -382,6 +492,17 @@ fn contract_validation_release_workflow_publishes_checksummed_assets_with_scoped
     assert!(workflow.contains("attestations: write"));
     assert!(workflow.contains("sha256sum -c SHA256SUMS"));
     assert!(workflow.contains("ADC_LAB_VERSION=\"${{ steps.release.outputs.version }}\""));
+    assert!(workflow.contains("RELEASE_TAG_INPUT: ${{ inputs.tag }}"));
+    assert!(workflow.contains("tag=\"$RELEASE_TAG_INPUT\""));
+    assert!(workflow.contains("RELEASE_TAG: ${{ steps.release.outputs.tag }}"));
+    assert!(workflow.contains("tag=\"$RELEASE_TAG\""));
+    assert!(!workflow.contains("tag=\"${{ inputs.tag }}\""));
+    assert!(
+        workflow_run_scripts(&workflow)
+            .iter()
+            .all(|script| !script.contains("${{ inputs.")),
+        "workflow_dispatch inputs must be passed through env, not interpolated directly into run scripts"
+    );
     assert!(workflow.contains("--notes-file release-notes.md"));
     assert!(workflow.contains("gh release create"));
     assert!(workflow.contains("actions/upload-artifact@v4"));
@@ -393,6 +514,33 @@ fn assert_workflow_yaml_parses(workflow: &str) {
     let parsed: serde_yaml::Value =
         serde_yaml::from_str(workflow).expect("workflow yaml must parse");
     assert!(parsed.is_mapping(), "workflow yaml must be a mapping");
+}
+
+fn workflow_run_scripts(workflow: &str) -> Vec<String> {
+    let parsed: serde_yaml::Value =
+        serde_yaml::from_str(workflow).expect("workflow yaml must parse");
+    let mut scripts = Vec::new();
+    let Some(jobs) = yaml_mapping_get(&parsed, "jobs").and_then(|value| value.as_mapping()) else {
+        return scripts;
+    };
+    for job in jobs.values() {
+        let Some(steps) = yaml_mapping_get(job, "steps").and_then(|value| value.as_sequence())
+        else {
+            continue;
+        };
+        for step in steps {
+            if let Some(script) = yaml_mapping_get(step, "run").and_then(|value| value.as_str()) {
+                scripts.push(script.to_string());
+            }
+        }
+    }
+    scripts
+}
+
+fn yaml_mapping_get<'a>(value: &'a serde_yaml::Value, key: &str) -> Option<&'a serde_yaml::Value> {
+    value
+        .as_mapping()?
+        .get(serde_yaml::Value::String(key.to_string()))
 }
 
 #[test]
