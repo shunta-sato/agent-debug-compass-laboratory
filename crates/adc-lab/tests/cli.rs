@@ -4,6 +4,8 @@ use adc_lab_core::{
 use assert_cmd::Command;
 use predicates::str::contains;
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
 fn workspace_root() -> PathBuf {
@@ -622,6 +624,106 @@ fn ssh_runner_rejects_shell_fragment_env() {
         .assert()
         .failure()
         .stderr(contains("fixed adc-lab-target path"));
+}
+
+#[cfg(unix)]
+#[test]
+fn experiment_ssh_operator_abort_file_is_remote_shell_quoted() {
+    let temp = tempfile::tempdir().unwrap();
+    let bin_dir = temp.path().join("bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    let log_path = temp.path().join("fake-ssh.log");
+    let marker_path = temp.path().join("operator-abort-injected");
+    let ssh_path = bin_dir.join("ssh");
+    let target_path = bin_dir.join("adc-lab-target");
+
+    fs::write(
+        &ssh_path,
+        r#"#!/bin/sh
+set -eu
+bin_dir=$(dirname "$0")
+endpoint=$1
+shift
+{
+  printf 'endpoint=%s\n' "$endpoint"
+  printf 'remote_command=%s\n' "$*"
+} >> "$ADC_LAB_FAKE_SSH_LOG"
+PATH="$bin_dir:$PATH"
+export PATH
+/bin/sh -c "$*"
+"#,
+    )
+    .unwrap();
+    fs::write(
+        &target_path,
+        r#"#!/bin/sh
+set -eu
+{
+  printf 'target_argv:'
+  for arg in "$@"; do
+    printf ' [%s]' "$arg"
+  done
+  printf '\n'
+} >> "$ADC_LAB_FAKE_SSH_LOG"
+if [ "$1" = "--version" ]; then
+  cat <<'JSON'
+{"name":"adc-lab-target","version":"0.1.0","git_sha":"test","target_triple":"x86_64-unknown-linux-gnu","build_profile":"test"}
+JSON
+elif [ "$1" = "load" ] && [ "$2" = "cpu" ]; then
+  cat <<'JSON'
+{"schema_version":"lab.load_result.v1","result_id":"LOAD-RESULT-FAKE","load_id":"LOAD-FAKE","target_id":"fake-target","status":"completed","workers":1,"duration_ms":1,"abort_reason":null,"max_observed_temp_c":null,"worker_iterations":[1],"safety_monitor":{"sample_interval_ms":100,"samples":1,"thermal_surface_available":false,"operator_abort_observed":false,"restore_on_abort_status":"not_required"},"time_unix_ms":1}
+JSON
+elif [ "$1" = "observe" ]; then
+  cat <<'JSON'
+{"schema_version":"lab.observation_result.v1","target_id":"fake-target","duration_ms":1,"signals":["cpu","freq","thermal","memory"],"samples":[]}
+JSON
+else
+  echo "unexpected adc-lab-target command" >&2
+  exit 2
+fi
+"#,
+    )
+    .unwrap();
+    fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o755)).unwrap();
+    fs::set_permissions(&target_path, fs::Permissions::from_mode(0o755)).unwrap();
+
+    let old_path = std::env::var_os("PATH").unwrap_or_default();
+    let path = format!("{}:{}", bin_dir.display(), old_path.to_string_lossy());
+    let matrix = workspace_root().join("examples/experiments/bounded_load_observe_smoke.yaml");
+    let abort_path = format!("x; /usr/bin/id > {}; #", marker_path.display());
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .env("PATH", path)
+        .env("ADC_LAB_FAKE_SSH_LOG", &log_path)
+        .args([
+            "experiment",
+            "run",
+            "--target",
+            "ssh://pi4-demo",
+            "--matrix",
+            matrix.to_str().unwrap(),
+            "--trial-load-duration",
+            "1s",
+            "--trial-observe-duration",
+            "0s",
+            "--operator-abort-file",
+            &abort_path,
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("experiment_run.json"));
+
+    assert!(
+        !marker_path.exists(),
+        "operator abort path was interpreted as remote shell syntax"
+    );
+    let log = fs::read_to_string(&log_path).unwrap();
+    assert!(log.contains("remote_command='adc-lab-target' 'load' 'cpu'"));
+    assert!(log.contains(&format!("[{}]", abort_path)));
 }
 
 #[test]

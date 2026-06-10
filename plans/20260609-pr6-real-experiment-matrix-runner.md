@@ -266,3 +266,17 @@ Read first:
   - `make verify`
 - Sensitive scan over the PR diff found no API keys, passwords, IP addresses,
   email addresses, personal names, or security incident details.
+
+## Security Follow-up: SSH Operator Abort Path
+
+- [x] Confirmed Aardvark finding is still present in HEAD: SSH experiment
+  trials forwarded `--operator-abort-file` into the remote OpenSSH command
+  without remote-shell quoting.
+- [x] Remediated by shell-quoting each SSH remote command word before handing
+  it to OpenSSH, preserving the fixed `adc-lab-target` command boundary.
+- [x] Added a fake-SSH regression that emulates OpenSSH remote-shell command
+  reconstruction and verifies a semicolon-bearing operator abort path is passed
+  as data rather than executed.
+- [x] Verification: `cargo test -p adc-lab
+  experiment_ssh_operator_abort_file_is_remote_shell_quoted -- --nocapture`
+  and `make verify` both passed on 2026-06-10.
