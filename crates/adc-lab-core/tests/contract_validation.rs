@@ -556,8 +556,17 @@ fn contract_validation_release_helper_installer_keeps_fixed_safety_boundary() {
     assert!(script.contains("REPOSITORY=\"shunta-sato/agent-debug-compass-laboratory\""));
     assert!(script.contains("HELPER_DEST=\"/usr/local/libexec/adc-lab-priv-helper\""));
     assert!(script.contains("SUDOERS_DEST=\"/etc/sudoers.d/adc-lab\""));
+    assert!(script.contains("usage: install-adc-lab-helper.sh (--version vX.Y.Z | --latest)"));
     assert!(script.contains("do not run this installer as root"));
     assert!(script.contains("validate_version \"$version\""));
+    assert!(script.contains("--version and --latest are mutually exclusive"));
+    assert!(script.contains("releases/latest/download"));
+    assert!(script.contains("adc-lab-v[^[:space:]]+-${asset_triple}[.]tar[.]gz"));
+    assert!(script.contains("validate_user_bin_dir \"$user_bin_dir\""));
+    assert!(script.contains("install_user_bins=\"true\""));
+    assert!(script.contains("install -m 0755 \"$adc_lab\""));
+    assert!(script.contains("install -m 0755 \"$adc_lab_target\""));
+    assert!(script.contains("\"${user_bin_dir}/adc-lab\" privilege doctor"));
     assert!(script.contains("validate_sudo_user \"$sudo_user\" \"$current_user\""));
     assert!(script.contains("sha256sum -c SHA256SUMS --ignore-missing"));
     assert!(script.contains("sudo install -o root -g root -m 0755"));
