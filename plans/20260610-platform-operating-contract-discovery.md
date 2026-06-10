@@ -348,6 +348,7 @@ Test list:
   cpufreq control evidence paths.
 - Second review-fix final `make verify` passed.
 - Documentation refresh started on 2026-06-10 to replace the README with a public-facing target-operating-contract narrative and move long command examples into docs/reference and getting-started pages.
+- Review feedback follow-up shortened README command detail, added badges, a 30-second mental model, first-run artifact expectations, latest-release placeholder guidance, and moved pressure/operating-contract detail into dedicated docs.
 
 ## Decision Log
 

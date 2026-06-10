@@ -118,6 +118,8 @@ observer_pressure
 
 A pressure probe existing does not prove a full platform boundary or composite resource-coupling effect.
 
+For more detail, see `docs/reference/pressure-probes.md`.
+
 ## Experiment matrix
 
 ```sh
