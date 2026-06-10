@@ -36,11 +36,13 @@ Gate decision: experimental-only
   only and does not execute target commands or support resource/NFR claims.
 - Platform Operating Contract discovery adds bounded pressure probes and
   controller-side contract reports. Hardware-free tests verify schema/status
-  taxonomy and CLI/report wiring; target claims require live pressure artifacts.
+  taxonomy and CLI/report wiring; target claims require live pressure artifacts,
+  and resource-coupling claims require composite or phased pressure evidence.
 - `unsupported_by_adc_lab` is not an allowed final pressure/contract status;
   required surfaces must classify as measured, measured_partial,
   not_controllable, unsafe_to_run_with_reason, not_applicable_with_reason, or
-  insufficient at the whole-report level.
+  insufficient with reason and next evidence. `insufficient` is not accepted as
+  a silent escape hatch.
 - Production physical-footprint claims remain blocked until wakeup, battery/power, flash/storage, jitter, sustained thermal, degraded, and recovery evidence exists.
 - `make command-smoke` verifies command wiring only and explicitly reports `resource_metrics_collected=false`; it is not resource evidence.
 
@@ -58,7 +60,7 @@ Gate decision: experimental-only
 | Thermal | optional abort for load; result records whether thermal surface was available | target55 short load max 54.53C under 75C abort; PR5 contract records monitor evidence | partial | `examples/demos/target55/reports/operating-envelope/observer_on.json`; `tests/golden/lab.load_result.v1.valid.json` |
 | Latency / jitter | no claim | not measured | unknown | `docs/testing/resource-harness.md` |
 | Observer overhead | no production overhead claim | target55 short smoke iteration delta about -0.05% | partial | `examples/demos/target55/reports/operating-envelope/observer_on.json` |
-| Platform Operating Contract pressure | explicit experimental burst only; duration <=30s, memory <=128MiB, storage <=64MiB, network <=1MiB | hardware-free CLI/schema tests; target55 live run required for target contract claims | partial | `schemas/lab.resource_pressure_result.v1.schema.json`; `crates/adc-lab/tests/cli.rs` |
+| Platform Operating Contract pressure | explicit experimental burst only; duration <=30s, memory <=128MiB, storage <=64MiB, network <=1MiB | hardware-free CLI/schema tests; target55 live smoke required; composite coupling still required for contract claims | smoke/insufficient for coupling | `schemas/lab.resource_pressure_result.v1.schema.json`; `crates/adc-lab/tests/cli.rs` |
 
 ## Runtime Mode Classification
 
@@ -73,7 +75,7 @@ Gate decision: experimental-only
 | privilege provider status report | controller-side report | none on target | command lifetime | no | PR10 provider status tests passed |
 | target capability profile report | controller-side report | none on target | command lifetime | no | PR11 profile generation tests passed |
 | release binary package workflow | build/package integrity | none on target | workflow duration | no | PR11 workflow/package tests |
-| pressure probe suite | experimental-only burst | bounded probe loop or bounded I/O | duration <=30s | no | schema/CLI tests; target55 run required for target claims |
+| pressure probe suite | experimental-only burst | bounded probe loop or bounded I/O | duration <=30s | no | schema/CLI tests; target55 smoke required; composite runner required for coupling claims |
 | operating contract report | controller-side report | none on target | command lifetime | no | schema/CLI tests |
 | target runner | command-triggered | none while idle | process lifetime | no | target55 smoke passed |
 
@@ -114,7 +116,7 @@ Gate decision: experimental-only
 | PR10 Option B provider is planned-disabled and not active | `crates/adc-lab-core/src/privilege.rs` | hardware-free core/CLI tests and `lab.privilege_provider_status.v1` schema | allowed contract/report claim |
 | PR11 target capability profile links workload requirements to existing run evidence | `crates/adc-lab-core/src/capability_profile.rs` | hardware-free core/CLI tests and `lab.workload_profile.v1` / `lab.target_capability_profile.v1` schemas | allowed contract/report claim |
 | PR11 release binaries expose build identity and checksummed tarballs | `.github/workflows/release.yml`; `scripts/release/package-release.sh`; `schemas/lab.release_manifest.v1.schema.json` | hardware-free package smoke, schema fixture, and version command tests | allowed build/package integrity claim |
-| Platform Operating Contract artifacts classify Pi4/Pi5 mechanism and pressure evidence without `unsupported_by_adc_lab` | `schemas/lab.*operating_contract*.schema.json`; `crates/adc-lab-core/src/platform_contract.rs`; `crates/adc-lab/tests/cli.rs` | schema fixtures, negative unsupported-status tests, pressure/report CLI tests | allowed contract/runtime claim |
+| Platform Operating Contract artifacts classify Pi4/Pi5 mechanism and pressure evidence without `unsupported_by_adc_lab` | `schemas/lab.*operating_contract*.schema.json`; `crates/adc-lab-core/src/platform_contract.rs`; `crates/adc-lab/tests/cli.rs` | schema fixtures, negative unsupported-status tests, pressure/report CLI tests | allowed contract/runtime claim; not a Pi4 reference contract claim |
 | Pi4 is sufficient or Pi5 is required for a workload | none | no same-suite comparison or suitability decision evidence | blocked if introduced |
 | low overhead | none | short smoke insufficient | blocked if introduced |
 | battery safe | none | none | blocked if introduced |
@@ -149,7 +151,8 @@ Gate decision: experimental-only
   referenced by later runs as binary identity/provenance only.
 - Platform Operating Contract pressure smoke is not long-soak, production,
   battery, flash-wear, or suitability evidence. It is the first measured
-  pressure/coupling layer and must be repeated for Pi4/Pi5 reference contracts.
+  pressure artifact layer; coupling remains ingredients-only until composite or
+  phased probes are implemented and run for Pi4/Pi5 reference contracts.
 
 ## Handoff To Quality Gate
 

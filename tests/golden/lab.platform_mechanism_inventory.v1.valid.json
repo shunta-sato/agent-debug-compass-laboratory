@@ -4,13 +4,15 @@
   "target_class": "raspberry_pi_4",
   "mechanisms": [
     {
-      "domain": "compute",
-      "mechanism_id": "cpu.cpufreq_governor",
-      "description": "CPU governor and frequency policy surface",
+      "domain": "memory",
+      "mechanism_id": "memory.meminfo_vmstat_psi",
+      "description": "Memory pressure observation and bounded allocation probe surface",
       "visibility_status": "measured_partial",
-      "control_status": "not_controllable",
-      "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/inventory/target_inventory.json"],
-      "reason": "cpufreq policy is visible; fixed-frequency control is not established by this artifact"
+      "platform_control_status": "not_controllable",
+      "pressure_probe_status": "measured_partial",
+      "evidence_status": "insufficient",
+      "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/pressure/memory_pressure.result.json"],
+      "reason": "meminfo/vmstat/PSI can be observed and bounded anonymous allocation can be injected; Linux reclaim/page-cache policy is not controlled"
     }
   ],
   "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/inventory/target_inventory.json"],

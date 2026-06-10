@@ -22,7 +22,7 @@
     "chain": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["chain_id", "pressure", "platform_response", "secondary_pressure", "performance_degradation", "recovery_behavior", "status", "evidence_refs"],
+      "required": ["chain_id", "pressure", "platform_response", "secondary_pressure", "performance_degradation", "recovery_behavior", "status", "coupling_evidence_class", "evidence_refs", "next_evidence_needed"],
       "properties": {
         "chain_id": { "type": "string", "minLength": 1 },
         "pressure": { "type": "string", "minLength": 1 },
@@ -31,7 +31,21 @@
         "performance_degradation": { "type": "string", "minLength": 1 },
         "recovery_behavior": { "type": "string", "minLength": 1 },
         "status": { "$ref": "#/$defs/status" },
-        "evidence_refs": { "type": "array", "items": { "type": "string" } }
+        "coupling_evidence_class": { "enum": ["ingredients_only", "composite_measured", "coupling_not_measured"] },
+        "evidence_refs": { "type": "array", "items": { "type": "string" } },
+        "next_evidence_needed": { "type": "array", "items": { "$ref": "#/$defs/evidence_gap" } }
+      }
+    },
+    "evidence_gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "needed_probe", "blocking_missing_evidence", "next_action", "owner_surface"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 },
+        "needed_probe": { "type": "string", "minLength": 1 },
+        "blocking_missing_evidence": { "type": "array", "items": { "type": "string" } },
+        "next_action": { "type": "string", "minLength": 1 },
+        "owner_surface": { "enum": ["adc-lab", "target", "external_tool", "operator_approval"] }
       }
     }
   }

@@ -27,11 +27,14 @@ Findings: 0
 - Target55 state checked live:
   target55 is `aarch64`, Raspberry Pi 4 Model B Rev 1.5, Debian 13. Existing
   `/home/satoshun/.local/bin/adc-lab-target` version `0.1.11` was preserved.
-- Staged runner used for live Pi4 execution:
-  `/home/satoshun/.local/share/adc-lab/runners/20260610-platform-contract/adc-lab-target`
+- Review-fix staged runner used for live Pi4 execution:
+  `/home/satoshun/.local/share/adc-lab/runners/20260610-platform-contract-review/adc-lab-target`
   version `0.1.0`, release build from this worktree.
 - Target55 evidence path:
-  `lab/runs/LAB-RUN-target55-platform-contract-20260610`.
+  `lab/runs/LAB-RUN-target55-platform-contract-review-20260610`.
+- Review artifact zip:
+  `/mnt/share/target55-platform-contract-review-20260610.zip`
+  (`sha256=e3099c7fabbfb0481840e3200247d7096fc39b91a8f8d310b37e6d112c32ef30`).
 
 ## Triggered Branch Evidence
 
@@ -70,9 +73,16 @@ Findings: 0
   target55 run artifacts.
 - Target55 Pi4 live run produced pressure results for CPU, thermal, memory,
   storage, network, latency/jitter, and observer pressure.
-- Target55 generated a measured-partial Target Operating Contract with rules
-  and boundaries for compute/thermal, memory/cache/storage, network/latency,
-  and observer effect.
+- Target55 generated a conservative Target Operating Contract with
+  `contract_status=insufficient`; pressure artifacts are explicitly classified
+  as smoke/current-condition/counter-only where appropriate.
+- Resource coupling report chains are `coupling_evidence_class=ingredients_only`
+  and `status=insufficient` until composite or phased pressure scenarios are
+  implemented and run.
+- Memory pressure effect was not observed in the 8MiB target55 allocation smoke,
+  so resident-memory and memory/storage coupling claims remain blocked.
+- Network I/O without endpoint was classified as `network_mode=counter_only`,
+  `not_applicable_with_reason`, and not a network boundary measurement.
 - The change remains experimental-only for embedded NFR purposes. Production,
   battery-safe, flash-safe, thermally-safe, low-overhead, suitability, and
   real-time-ish claims remain blocked unless further evidence is collected.
@@ -81,6 +91,7 @@ Findings: 0
 
 ## Gate Decision
 
-Submit. The change adds bounded Platform Operating Contract discovery and
-target55 Pi4 evidence without expanding privileged control, arbitrary shell,
-or production physical-footprint claims.
+Submit. The change adds bounded Platform Operating Contract discovery surfaces
+and target55 Pi4 smoke evidence while preserving claim boundaries: the generated
+contract remains insufficient until pressure effects, bounded network transfer,
+and composite coupling evidence exist.

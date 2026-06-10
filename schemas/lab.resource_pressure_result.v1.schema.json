@@ -3,13 +3,23 @@
   "$id": "lab.resource_pressure_result.v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "result_id", "target_id", "pressure_kind", "status", "duration_ms", "controlled_factors", "observed_covariates", "uncontrolled_confounders", "metrics", "side_effects", "safety", "evidence_refs", "claim_supported", "claim_blocked", "time_unix_ms"],
+  "required": ["schema_version", "result_id", "target_id", "pressure_kind", "status", "evidence_class", "intensity", "pressure_effect", "network_evidence", "condition", "duration_ms", "controlled_factors", "observed_covariates", "uncontrolled_confounders", "metrics", "side_effects", "safety", "evidence_refs", "claim_supported", "claim_blocked", "next_evidence_needed", "time_unix_ms"],
   "properties": {
     "schema_version": { "const": "lab.resource_pressure_result.v1" },
     "result_id": { "type": "string", "minLength": 1 },
     "target_id": { "type": "string", "minLength": 1 },
     "pressure_kind": { "enum": ["memory_pressure", "storage_io", "network_io", "latency_jitter", "cpu_pressure", "thermal_pressure", "observer_pressure"] },
     "status": { "$ref": "#/$defs/status" },
+    "evidence_class": { "enum": ["smoke", "pressure_induced", "paired_pressure", "boundary_probe", "not_applicable"] },
+    "intensity": { "$ref": "#/$defs/intensity" },
+    "pressure_effect": { "$ref": "#/$defs/pressure_effect" },
+    "network_evidence": {
+      "anyOf": [
+        { "$ref": "#/$defs/network_evidence" },
+        { "type": "null" }
+      ]
+    },
+    "condition": { "$ref": "#/$defs/condition" },
     "duration_ms": { "type": "integer", "minimum": 0 },
     "controlled_factors": { "type": "array", "items": { "$ref": "#/$defs/factor" } },
     "observed_covariates": { "type": "array", "items": { "$ref": "#/$defs/factor" } },
@@ -20,11 +30,53 @@
     "evidence_refs": { "type": "array", "items": { "type": "string" } },
     "claim_supported": { "type": "array", "items": { "type": "string" } },
     "claim_blocked": { "type": "array", "items": { "type": "string" } },
+    "next_evidence_needed": { "type": "array", "items": { "$ref": "#/$defs/evidence_gap" } },
     "time_unix_ms": { "type": "integer", "minimum": 0 }
   },
   "$defs": {
     "status": {
       "enum": ["measured", "measured_partial", "not_controllable", "unsafe_to_run_with_reason", "not_applicable_with_reason", "insufficient"]
+    },
+    "intensity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requested", "relative_to_target", "pressure_effect_observed"],
+      "properties": {
+        "requested": { "type": "string", "minLength": 1 },
+        "relative_to_target": { "type": "string", "minLength": 1 },
+        "pressure_effect_observed": { "type": "boolean" }
+      }
+    },
+    "pressure_effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observed", "basis"],
+      "properties": {
+        "observed": { "type": "boolean" },
+        "basis": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "network_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["network_mode", "endpoint_available", "traffic_generated_bytes", "selection_claim_allowed"],
+      "properties": {
+        "network_mode": { "enum": ["counter_only", "endpoint_attempt", "bounded_transfer"] },
+        "endpoint_available": { "type": "boolean" },
+        "traffic_generated_bytes": { "type": "integer", "minimum": 0 },
+        "selection_claim_allowed": { "type": "boolean" }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pressure_kind", "governor", "workers", "duration"],
+      "properties": {
+        "pressure_kind": { "type": "string", "minLength": 1 },
+        "governor": { "type": ["string", "null"] },
+        "workers": { "type": ["string", "null"] },
+        "duration": { "type": "string", "minLength": 1 }
+      }
     },
     "metric": {
       "type": "object",
@@ -69,6 +121,18 @@
         "abort_conditions": { "type": "array", "items": { "type": "string" } },
         "cleanup": { "type": "array", "items": { "type": "string" } },
         "cleanup_verified": { "type": "boolean" }
+      }
+    },
+    "evidence_gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "needed_probe", "blocking_missing_evidence", "next_action", "owner_surface"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 },
+        "needed_probe": { "type": "string", "minLength": 1 },
+        "blocking_missing_evidence": { "type": "array", "items": { "type": "string" } },
+        "next_action": { "type": "string", "minLength": 1 },
+        "owner_surface": { "enum": ["adc-lab", "target", "external_tool", "operator_approval"] }
       }
     }
   }

@@ -2,7 +2,7 @@
   "schema_version": "lab.resource_coupling_report.v1",
   "report_id": "COUPLING-001",
   "target_id": "raspberry_pi_4_target55",
-  "report_status": "measured_partial",
+  "report_status": "insufficient",
   "chains": [
     {
       "chain_id": "memory.reclaim_to_storage_latency",
@@ -11,12 +11,22 @@
       "secondary_pressure": "storage latency and CPU wait side effects",
       "performance_degradation": "workload tail latency can increase",
       "recovery_behavior": "process exit releases anonymous pressure",
-      "status": "measured_partial",
-      "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/pressure/memory_pressure.result.json"]
+      "status": "insufficient",
+      "coupling_evidence_class": "ingredients_only",
+      "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/pressure/memory_pressure.result.json"],
+      "next_evidence_needed": [
+        {
+          "reason": "individual artifacts are ingredients only; no paired memory+storage scenario was run",
+          "needed_probe": "phase-based memory+storage+jitter coupling probe",
+          "blocking_missing_evidence": ["baseline storage latency", "storage I/O under memory pressure"],
+          "next_action": "run a composite boundary probe before marking coupling measured",
+          "owner_surface": "adc-lab"
+        }
+      ]
     }
   ],
   "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/pressure/memory_pressure.result.json"],
-  "unknowns": [],
-  "next_evidence_needed": ["repeat trials under controlled governor states"],
+  "unknowns": ["composite resource-coupling phases were not run"],
+  "next_evidence_needed": ["run baseline -> pressure -> paired pressure -> recovery scenarios before marking coupling measured"],
   "time_unix_ms": 1780000000000
 }

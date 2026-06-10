@@ -22,11 +22,13 @@
     "rule": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["rule_id", "category", "statement", "evidence_refs", "confidence", "allowed_design", "blocked_design"],
+      "required": ["rule_id", "category", "statement", "rule_source", "derivation", "evidence_refs", "confidence", "allowed_design", "blocked_design"],
       "properties": {
         "rule_id": { "type": "string", "minLength": 1 },
         "category": { "enum": ["allowed_default", "burst_only", "degraded_mode_trigger", "forbidden_pattern", "blocked_claim"] },
         "statement": { "type": "string", "minLength": 1 },
+        "rule_source": { "enum": ["measured_target_evidence", "generic_lab_rule", "evidence_needed_rule"] },
+        "derivation": { "type": "string", "minLength": 1 },
         "evidence_refs": { "type": "array", "items": { "type": "string" } },
         "confidence": { "enum": ["low", "medium", "high"] },
         "allowed_design": { "type": "array", "items": { "type": "string" } },
@@ -36,12 +38,25 @@
     "boundary": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["boundary_id", "statement", "status", "evidence_refs"],
+      "required": ["boundary_id", "statement", "status", "evidence_refs", "next_evidence_needed"],
       "properties": {
         "boundary_id": { "type": "string", "minLength": 1 },
         "statement": { "type": "string", "minLength": 1 },
         "status": { "$ref": "#/$defs/status" },
-        "evidence_refs": { "type": "array", "items": { "type": "string" } }
+        "evidence_refs": { "type": "array", "items": { "type": "string" } },
+        "next_evidence_needed": { "type": "array", "items": { "$ref": "#/$defs/evidence_gap" } }
+      }
+    },
+    "evidence_gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "needed_probe", "blocking_missing_evidence", "next_action", "owner_surface"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 },
+        "needed_probe": { "type": "string", "minLength": 1 },
+        "blocking_missing_evidence": { "type": "array", "items": { "type": "string" } },
+        "next_action": { "type": "string", "minLength": 1 },
+        "owner_surface": { "enum": ["adc-lab", "target", "external_tool", "operator_approval"] }
       }
     }
   }

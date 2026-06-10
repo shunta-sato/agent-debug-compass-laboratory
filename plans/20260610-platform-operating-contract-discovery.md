@@ -47,7 +47,9 @@ Out of scope:
 - `unsupported_by_adc_lab` is not an allowed final status. Every required
   operating-contract area must end as `measured`, `measured_partial`,
   `not_controllable`, `unsafe_to_run_with_reason`, or
-  `not_applicable_with_reason`.
+  `not_applicable_with_reason`, or `insufficient` with structured reason and
+  next evidence. `insufficient` must not be a silent replacement for
+  `unsupported_by_adc_lab`.
 - All probes must be typed, bounded, audited, and restorable/cleanup-aware.
 - Target-local writes must be temporary, bounded, and cleaned up.
 - New SSH runner execution must avoid overwriting the existing target55 runner
@@ -85,8 +87,9 @@ Discovery notes:
 ## Requirements
 
 - REQ-POC-1: When adc-lab discovers a target platform, it shall write a
-  platform mechanism inventory that separates visible, controllable,
-  not-controllable, not-applicable, and unsafe mechanisms.
+  platform mechanism inventory that separates visible platform mechanisms,
+  platform mechanism control, pressure-probe availability, and current evidence
+  status.
   Acceptance: schema fixture validates; target55 generated artifact contains
   compute, thermal, memory, storage, network, scheduler/latency, and observer
   mechanisms without `unsupported_by_adc_lab`.
@@ -99,8 +102,9 @@ Discovery notes:
   observed covariates, uncontrolled confounders, safety/abort condition,
   restore/cleanup, supported claim, and blocked claim fields.
 
-- REQ-POC-3: When adc-lab runs pressure probes, it shall record cross-resource
-  side effects, not only per-resource scores.
+- REQ-POC-3: When adc-lab runs pressure probes, it shall record evidence class,
+  pressure intensity, pressure-effect basis, condition metadata, and
+  cross-resource side effects, not only per-resource scores.
   Acceptance: target55 run writes `lab.resource_pressure_result.v1` artifacts
   for CPU, thermal, memory, storage, network, latency/jitter, and observer
   pressure with side-effect fields and a non-unsupported status.
@@ -110,7 +114,8 @@ Discovery notes:
   unsafe/not-controllable/not-applicable, or measured partial.
   Acceptance: target55 run writes resource coupling and target operating
   contract reports, with allowed, burst-only, degraded-mode, forbidden, and
-  blocked-claim rule categories.
+  blocked-claim rule categories. Rules must state whether they are generic lab
+  rules, measured target-evidence rules, or evidence-needed rules.
 
 - REQ-POC-5: Probe execution shall remain bounded and cleanup-aware.
   Acceptance: tests cover memory/storage/network/latency status decisions and
@@ -187,6 +192,10 @@ The target runner implements bounded local probes:
 
 The first implementation focuses on bounded smoke evidence rather than long
 soak proof.
+Pressure result status is intentionally stricter than command success:
+memory allocation without reclaim/PSI/fault deltas is allocation smoke and may
+be `insufficient`; endpoint-less network probing is counter-only and not a
+network boundary measurement.
 
 ### Reports
 
@@ -197,7 +206,10 @@ Add `adc-lab report operating-contract` to generate:
 - `reports/resource_coupling_report.json`
 - `reports/target_operating_contract.json`
 
-The report generator reads existing run artifacts. Missing Pi5 live evidence
+The report generator reads existing run artifacts. Separate pressure artifacts
+are treated as evidence ingredients, not measured coupling. Coupling chains are
+`ingredients_only` until a composite or phased scenario records baseline,
+pressure-only, paired-pressure, and recovery phases. Missing Pi5 live evidence
 does not produce a fake Pi5 contract; it remains a schema/API-supported target
 class until executed.
 
@@ -214,6 +226,9 @@ Test list:
 
 - Schema fixtures validate for all new contracts.
 - New schemas reject `unsupported_by_adc_lab`.
+- New schemas reject legacy `control_status`, missing `evidence_class`,
+  missing `coupling_evidence_class`, and missing operating-contract
+  `rule_source`.
 - Core report generator emits all required platform contract artifacts from
   pressure artifacts.
 - Pressure result helpers classify network-without-endpoint as
@@ -254,6 +269,17 @@ Test list:
 - [x] Generate target55 operating contract artifacts.
 - [x] Run final `make verify`.
 - [x] Run quality gate and update handoff/outcomes.
+- [x] Address review request: split platform control from pressure-probe
+      availability.
+- [x] Address review request: add pressure `evidence_class`, `intensity`,
+      `pressure_effect`, network mode, and condition metadata.
+- [x] Address review request: classify coupling report chains as
+      `ingredients_only` and `insufficient` until composite evidence exists.
+- [x] Address review request: add operating rule `rule_source` and
+      `derivation`.
+- [x] Rerun target55 with the review-fix runner and attach artifact zip.
+- [x] Rerun final `make verify` after review-fix changes.
+- [ ] Push updated PR branch.
 
 ## Surprises & Discoveries
 
@@ -290,6 +316,21 @@ Test list:
 - Final `make verify` passed.
 - Quality gate report updated at `reports/quality-gate.md` with
   `Gate decision: submit` and 0 findings.
+- Review on 2026-06-10 requested stricter evidence semantics: probe existence
+  is not mechanism control; individual pressure artifacts are not coupling
+  measurement; target contract rules must distinguish generic, evidence-needed,
+  and measured target evidence.
+- Schema tests now explicitly reject legacy `control_status`, missing pressure
+  evidence class, missing coupling evidence class, and missing rule source.
+- Review-fix target55 run generated
+  `lab/runs/LAB-RUN-target55-platform-contract-review-20260610`; target
+  contract status is `insufficient`, resource coupling report status is
+  `insufficient`, and coupling chains are `ingredients_only`.
+- Review artifact zip created at
+  `/mnt/share/target55-platform-contract-review-20260610.zip` with SHA-256
+  `e3099c7fabbfb0481840e3200247d7096fc39b91a8f8d310b37e6d112c32ef30`.
+- Review-fix final `make verify` passed after clippy caught and fixed one
+  local builder `too_many_arguments` issue.
 
 ## Decision Log
 
@@ -300,17 +341,27 @@ Test list:
 - 2026-06-10: Allow fixed adc-lab-owned staged target runner paths rather than
   overwriting the existing target55 runner. Rationale: target execution needs
   the new command surface, but replacing the installed runner is avoidable.
+- 2026-06-10: Keep `lab.target_operating_contract.v1` status `insufficient`
+  for target55 smoke when pressure effects or composite coupling are not
+  measured. Rationale: this avoids making a smoke suite look like a discovered
+  Pi4 reference operating contract.
+- 2026-06-10: Treat network without endpoint as `counter_only` and
+  `not_applicable_with_reason`, not a network I/O boundary measurement.
+  Rationale: interface counter visibility and traffic/retry/latency behavior
+  are distinct evidence classes.
 
 ## Handoff
 
 Current state:
 
-- Uncommitted changes implement Platform Operating Contract discovery.
-- Target55 Pi4 evidence exists under
-  `lab/runs/LAB-RUN-target55-platform-contract-20260610` and is ignored by git.
+- Uncommitted review-fix changes tighten Platform Operating Contract evidence
+  semantics.
+- Review-fix target55 Pi4 evidence exists under
+  `lab/runs/LAB-RUN-target55-platform-contract-review-20260610` and is ignored
+  by git.
 - Staged target55 runner exists at
-  `/home/satoshun/.local/share/adc-lab/runners/20260610-platform-contract/adc-lab-target`.
-- Final verification passed with `make verify`.
+  `/home/satoshun/.local/share/adc-lab/runners/20260610-platform-contract-review/adc-lab-target`.
+- Review-fix final verification passed with `make verify`.
 
 Commands run so far:
 
@@ -320,6 +371,11 @@ Commands run so far:
 - `cargo build -p adc-lab-target --release`
 - target55 pressure suite via `ADC_LAB_TARGET_RUNNER=/home/satoshun/.local/share/adc-lab/runners/20260610-platform-contract/adc-lab-target`
 - `make verify`
+- Review-fix local checks:
+  - `cargo test -p adc-lab-core contract_validation -- --nocapture`
+  - `cargo test -p adc-lab --test cli pressure -- --nocapture`
+- Review-fix target55 suite via
+  `ADC_LAB_TARGET_RUNNER=/home/satoshun/.local/share/adc-lab/runners/20260610-platform-contract-review/adc-lab-target`
 
 Known risks:
 
@@ -328,13 +384,16 @@ Known risks:
 - Pi5 reference execution is still pending.
 - Battery/power, wakeup, flash-wear, controlled governor/fixed-frequency, and
   long soak evidence remain blocked/follow-up areas.
+- Composite coupling runner is still pending; current coupling report is
+  ingredients-only by design.
 
 ## Outcomes & Retrospective
 
 - adc-lab now has first-class Platform Operating Contract contracts, bounded
   pressure probes, SSH target-runner wiring, report generation, tests, and docs.
-- target55 produced a measured-partial Pi4 operating contract covering compute,
-  thermal, memory/cache/storage, network, latency/jitter, and observer pressure.
+- target55 can produce Pi4 operating-contract artifacts, but the contract
+  remains insufficient until pressure effects, network transfer evidence, and
+  composite resource coupling are measured.
 - No final artifact uses `unsupported_by_adc_lab`; unsupported implementation
   gaps are represented as explicit evidence-needed follow-ups or measured
   partial boundaries.

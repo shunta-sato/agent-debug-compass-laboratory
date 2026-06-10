@@ -241,7 +241,9 @@ pub struct PlatformMechanism {
     pub mechanism_id: String,
     pub description: String,
     pub visibility_status: ContractEvidenceStatus,
-    pub control_status: ContractEvidenceStatus,
+    pub platform_control_status: ContractEvidenceStatus,
+    pub pressure_probe_status: ContractEvidenceStatus,
+    pub evidence_status: ContractEvidenceStatus,
     pub evidence_refs: Vec<String>,
     pub reason: String,
 }
@@ -331,6 +333,67 @@ pub struct PressureSafety {
     pub cleanup_verified: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ResourcePressureEvidenceClass {
+    Smoke,
+    PressureInduced,
+    PairedPressure,
+    BoundaryProbe,
+    NotApplicable,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PressureIntensity {
+    pub requested: String,
+    pub relative_to_target: String,
+    pub pressure_effect_observed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PressureEffect {
+    pub observed: bool,
+    pub basis: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum NetworkPressureMode {
+    CounterOnly,
+    EndpointAttempt,
+    BoundedTransfer,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct NetworkPressureEvidence {
+    pub network_mode: NetworkPressureMode,
+    pub endpoint_available: bool,
+    pub traffic_generated_bytes: u64,
+    pub selection_claim_allowed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PressureCondition {
+    pub pressure_kind: String,
+    pub governor: Option<String>,
+    pub workers: Option<String>,
+    pub duration: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ContractEvidenceGap {
+    pub reason: String,
+    pub needed_probe: String,
+    pub blocking_missing_evidence: Vec<String>,
+    pub next_action: String,
+    pub owner_surface: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ResourcePressureResult {
@@ -339,6 +402,11 @@ pub struct ResourcePressureResult {
     pub target_id: String,
     pub pressure_kind: ResourcePressureKind,
     pub status: ContractEvidenceStatus,
+    pub evidence_class: ResourcePressureEvidenceClass,
+    pub intensity: PressureIntensity,
+    pub pressure_effect: PressureEffect,
+    pub network_evidence: Option<NetworkPressureEvidence>,
+    pub condition: PressureCondition,
     pub duration_ms: u64,
     pub controlled_factors: Vec<ContractFactor>,
     pub observed_covariates: Vec<ContractFactor>,
@@ -349,7 +417,16 @@ pub struct ResourcePressureResult {
     pub evidence_refs: Vec<String>,
     pub claim_supported: Vec<String>,
     pub claim_blocked: Vec<String>,
+    pub next_evidence_needed: Vec<ContractEvidenceGap>,
     pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ResourceCouplingEvidenceClass {
+    IngredientsOnly,
+    CompositeMeasured,
+    CouplingNotMeasured,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -362,7 +439,9 @@ pub struct ResourceCouplingChain {
     pub performance_degradation: String,
     pub recovery_behavior: String,
     pub status: ContractEvidenceStatus,
+    pub coupling_evidence_class: ResourceCouplingEvidenceClass,
     pub evidence_refs: Vec<String>,
+    pub next_evidence_needed: Vec<ContractEvidenceGap>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -406,11 +485,21 @@ pub enum ContractConfidence {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OperatingRuleSource {
+    MeasuredTargetEvidence,
+    GenericLabRule,
+    EvidenceNeededRule,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct OperatingContractRule {
     pub rule_id: String,
     pub category: OperatingRuleCategory,
     pub statement: String,
+    pub rule_source: OperatingRuleSource,
+    pub derivation: String,
     pub evidence_refs: Vec<String>,
     pub confidence: ContractConfidence,
     pub allowed_design: Vec<String>,
@@ -424,6 +513,7 @@ pub struct OperatingBoundary {
     pub statement: String,
     pub status: ContractEvidenceStatus,
     pub evidence_refs: Vec<String>,
+    pub next_evidence_needed: Vec<ContractEvidenceGap>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

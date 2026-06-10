@@ -1193,12 +1193,20 @@ fn command_report_operating_contract(args: OperatingContractCommand) -> Result<(
         target_operating_contract_for_run(&run.run_dir, args.target_id.clone(), args.target_class)?;
     let contract_path = run.run_dir.join("reports/target_operating_contract.json");
     let contract_ref = write_json_artifact(&run, &contract_path, &contract)?;
+    let inventory_status = if inventory
+        .mechanisms
+        .iter()
+        .any(|mechanism| mechanism.evidence_status == ContractEvidenceStatus::Insufficient)
+    {
+        ContractEvidenceStatus::Insufficient
+    } else {
+        ContractEvidenceStatus::MeasuredPartial
+    };
 
     for (operation, result) in [
         (
             "report.platform_mechanism_inventory",
-            serde_json::to_string(&ContractEvidenceStatus::MeasuredPartial)
-                .unwrap_or_else(|_| "measured_partial".to_string()),
+            serde_json::to_string(&inventory_status).unwrap_or_else(|_| "insufficient".to_string()),
         ),
         ("report.boundary_probe_plan", "planned".to_string()),
         (

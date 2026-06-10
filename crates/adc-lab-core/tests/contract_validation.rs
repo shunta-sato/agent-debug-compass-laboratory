@@ -225,6 +225,84 @@ fn contract_validation_resource_pressure_rejects_unsupported_status() {
 }
 
 #[test]
+fn contract_validation_platform_inventory_rejects_legacy_control_status() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.platform_mechanism_inventory.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.platform_mechanism_inventory.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    let mechanism = fixture_json["mechanisms"][0].as_object_mut().unwrap();
+    mechanism.insert(
+        "control_status".to_string(),
+        serde_json::json!("measured_partial"),
+    );
+    mechanism.remove("platform_control_status");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "platform mechanism inventory must split platform control from pressure probe status"
+    );
+}
+
+#[test]
+fn contract_validation_resource_pressure_requires_evidence_class() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.resource_pressure_result.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.resource_pressure_result.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json
+        .as_object_mut()
+        .unwrap()
+        .remove("evidence_class");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "resource pressure results must state smoke vs pressure-induced evidence class"
+    );
+}
+
+#[test]
+fn contract_validation_coupling_requires_evidence_class() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.resource_coupling_report.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.resource_coupling_report.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["chains"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("coupling_evidence_class");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "resource coupling chains must distinguish ingredients-only evidence from composite measurement"
+    );
+}
+
+#[test]
+fn contract_validation_operating_rule_requires_rule_source() {
+    let root = workspace_root();
+    let schema_path = root.join("schemas/lab.target_operating_contract.v1.schema.json");
+    let fixture_path = root.join("tests/golden/lab.target_operating_contract.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["rules"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("rule_source");
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "target operating contract rules must state generic/evidence-needed/measured source"
+    );
+}
+
+#[test]
 fn contract_validation_operating_contract_rejects_unsupported_boundary_status() {
     let root = workspace_root();
     let schema_path = root.join("schemas/lab.target_operating_contract.v1.schema.json");

@@ -2,14 +2,16 @@
   "schema_version": "lab.target_operating_contract.v1",
   "target_id": "raspberry_pi_4_target55",
   "target_class": "raspberry_pi_4",
-  "contract_status": "measured_partial",
+  "contract_status": "insufficient",
   "rules": [
     {
       "rule_id": "cpu.sustained_all_core_requires_thermal_margin",
       "category": "degraded_mode_trigger",
       "statement": "Sustained all-core CPU work must be bounded or degraded unless thermal soak evidence passes.",
+      "rule_source": "evidence_needed_rule",
+      "derivation": "Bounded CPU and thermal artifacts show the short-run probe surface; sustained all-core behavior requires repeated soak and cooldown evidence.",
       "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/pressure/cpu_pressure.result.json"],
-      "confidence": "medium",
+      "confidence": "low",
       "allowed_design": ["bounded burst", "thermal degrade policy"],
       "blocked_design": ["unbounded default all-core loop"]
     }
@@ -19,10 +21,19 @@
       "boundary_id": "compute_thermal",
       "statement": "Compute and thermal claims are bounded to measured load durations.",
       "status": "measured_partial",
-      "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/pressure/cpu_pressure.result.json"]
+      "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/pressure/cpu_pressure.result.json"],
+      "next_evidence_needed": [
+        {
+          "reason": "sustained all-core thermal margin is not proven by short bounded probes",
+          "needed_probe": "repeated CPU thermal soak with cooldown curve",
+          "blocking_missing_evidence": ["5/15/30 minute soak", "cooldown/recovery curve"],
+          "next_action": "run approved thermal soak probes before sustained-design claims",
+          "owner_surface": "operator_approval"
+        }
+      ]
     }
   ],
-  "unknowns": [],
-  "next_evidence_needed": ["run Pi5 reference target with the same contract suite"],
+  "unknowns": ["composite resource coupling not measured; pressure artifacts are ingredients only"],
+  "next_evidence_needed": ["collect evidence to resolve: composite resource coupling not measured; pressure artifacts are ingredients only"],
   "time_unix_ms": 1780000000000
 }

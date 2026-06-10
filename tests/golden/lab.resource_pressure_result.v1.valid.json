@@ -3,7 +3,30 @@
   "result_id": "PRESSURE-001",
   "target_id": "raspberry_pi_4_target55",
   "pressure_kind": "memory_pressure",
-  "status": "measured_partial",
+  "status": "insufficient",
+  "evidence_class": "smoke",
+  "intensity": {
+    "requested": "8388608 anonymous bytes touched",
+    "relative_to_target": "0.100% of MemTotal",
+    "pressure_effect_observed": false
+  },
+  "pressure_effect": {
+    "observed": false,
+    "basis": [
+      "mem_available_delta_kb=-1024.000",
+      "pgscan_delta=0.000",
+      "pgsteal_delta=0.000",
+      "major_faults_delta=0.000",
+      "memory_psi_some_avg10_delta=0.000"
+    ]
+  },
+  "network_evidence": null,
+  "condition": {
+    "pressure_kind": "memory_pressure",
+    "governor": "ondemand",
+    "workers": "n/a",
+    "duration": "1000ms"
+  },
   "duration_ms": 1000,
   "controlled_factors": [
     {
@@ -29,7 +52,7 @@
   "side_effects": [
     {
       "resource": "storage",
-      "status": "measured_partial",
+      "status": "insufficient",
       "summary": "storage/cache coupling requires paired storage evidence",
       "metrics": []
     }
@@ -44,7 +67,16 @@
     "cleanup_verified": true
   },
   "evidence_refs": [],
-  "claim_supported": ["bounded memory pressure was applied"],
+  "claim_supported": ["bounded anonymous allocation smoke was applied and released; memory pressure effect remains unproven"],
   "claim_blocked": ["resident memory budget requires laddered trials"],
+  "next_evidence_needed": [
+    {
+      "reason": "resident memory budget requires laddered trials",
+      "needed_probe": "target-specific pressure or boundary probe",
+      "blocking_missing_evidence": ["resident memory budget requires laddered trials"],
+      "next_action": "collect bounded target evidence before allowing this claim",
+      "owner_surface": "adc-lab"
+    }
+  ],
   "time_unix_ms": 1780000000000
 }
