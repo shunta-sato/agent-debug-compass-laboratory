@@ -72,7 +72,7 @@ Out of scope:
 - [x] Ran targeted workflow validation test.
 - [x] Ran final `make verify`.
 - [x] Ran `git diff --check`.
-- [ ] Open PR.
+- [x] Open PR.
 
 ## Surprises & Discoveries
 
@@ -89,6 +89,7 @@ Out of scope:
 ## Handoff
 
 Current branch: `codex/fix-release-attestation-node24`.
+PR: https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/26
 
 Targeted verification:
 
@@ -99,7 +100,7 @@ Final verification:
 
 - `make verify`: pass
 
-Next step: push a PR.
+Next step: wait for GitHub-hosted CI/release workflow validation on PR #26.
 
 ## Outcomes & Retrospective
 
