@@ -34,7 +34,7 @@ Findings: 0
   `lab/runs/LAB-RUN-target55-platform-contract-review-20260610`.
 - Review artifact zip:
   `/mnt/share/target55-platform-contract-review-20260610.zip`
-  (`sha256=e3099c7fabbfb0481840e3200247d7096fc39b91a8f8d310b37e6d112c32ef30`).
+  (`sha256=557f9706c17a2ce87631a6aa4804334ff4ff108ad1a705a73290a0f06dab7f2b`).
 
 ## Triggered Branch Evidence
 
@@ -83,6 +83,9 @@ Findings: 0
   so resident-memory and memory/storage coupling claims remain blocked.
 - Network I/O without endpoint was classified as `network_mode=counter_only`,
   `not_applicable_with_reason`, and not a network boundary measurement.
+- cpufreq sysfs visibility is classified as a visible control surface only; it
+  does not become `platform_control_status=measured_partial` unless approved
+  apply/restore/health artifacts exist in the same run.
 - The change remains experimental-only for embedded NFR purposes. Production,
   battery-safe, flash-safe, thermally-safe, low-overhead, suitability, and
   real-time-ish claims remain blocked unless further evidence is collected.

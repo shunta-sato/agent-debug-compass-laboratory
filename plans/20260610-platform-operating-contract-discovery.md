@@ -328,11 +328,25 @@ Test list:
   `insufficient`, and coupling chains are `ingredients_only`.
 - Review artifact zip created at
   `/mnt/share/target55-platform-contract-review-20260610.zip` with SHA-256
-  `e3099c7fabbfb0481840e3200247d7096fc39b91a8f8d310b37e6d112c32ef30`.
+  `557f9706c17a2ce87631a6aa4804334ff4ff108ad1a705a73290a0f06dab7f2b`.
 - Review-fix final `make verify` passed after clippy caught and fixed one
   local builder `too_many_arguments` issue.
 - Review-fix commit `29728f6` was pushed to PR #15 and the PR body/comment were
   updated with artifact zip and conservative target55 status summary.
+- Second review on 2026-06-10 requested one remaining semantic fix:
+  `cpu.cpufreq_governor.platform_control_status` must not become
+  `measured_partial` from cpufreq surface visibility alone.
+- Added run-local cpufreq control evidence detection. The platform control
+  status is now `insufficient` when only the cpufreq sysfs surface is visible,
+  and only becomes `measured_partial` when approved apply, restore lease,
+  successful restore result, and restore health-check artifacts are present.
+- Regenerated target55 operating-contract reports from the existing review-fix
+  pressure artifacts; `cpu.cpufreq_governor.platform_control_status` is
+  `insufficient`. Review artifact zip SHA-256 is now
+  `557f9706c17a2ce87631a6aa4804334ff4ff108ad1a705a73290a0f06dab7f2b`.
+- Added unit coverage for both cpufreq surface-only evidence and complete
+  cpufreq control evidence paths.
+- Second review-fix final `make verify` passed.
 
 ## Decision Log
 
@@ -351,19 +365,23 @@ Test list:
   `not_applicable_with_reason`, not a network I/O boundary measurement.
   Rationale: interface counter visibility and traffic/retry/latency behavior
   are distinct evidence classes.
+- 2026-06-10: Treat cpufreq sysfs visibility as a control surface observation,
+  not platform control evidence. Rationale: governor control requires approved
+  apply/verify/restore artifacts plus post-restore health evidence in the same
+  run before the platform control status can be `measured_partial`.
 
 ## Handoff
 
 Current state:
 
-- Uncommitted review-fix changes tighten Platform Operating Contract evidence
-  semantics.
+- Second review-fix changes tighten cpufreq platform-control semantics.
 - Review-fix target55 Pi4 evidence exists under
   `lab/runs/LAB-RUN-target55-platform-contract-review-20260610` and is ignored
   by git.
 - Staged target55 runner exists at
   `/home/satoshun/.local/share/adc-lab/runners/20260610-platform-contract-review/adc-lab-target`.
 - Review-fix final verification passed with `make verify`.
+- Second review-fix final verification passed with `make verify`.
 
 Commands run so far:
 
@@ -378,6 +396,11 @@ Commands run so far:
   - `cargo test -p adc-lab --test cli pressure -- --nocapture`
 - Review-fix target55 suite via
   `ADC_LAB_TARGET_RUNNER=/home/satoshun/.local/share/adc-lab/runners/20260610-platform-contract-review/adc-lab-target`
+- Second review-fix local checks:
+  - `cargo test -p adc-lab-core platform_inventory_ -- --nocapture`
+  - `cargo clippy -p adc-lab-core --all-targets -- -D warnings`
+  - `cargo run -p adc-lab -- report operating-contract --run lab/runs/LAB-RUN-target55-platform-contract-review-20260610 --target-id target55 --target-class raspberry_pi_4 --json`
+  - `make verify`
 
 Known risks:
 

@@ -37,9 +37,9 @@ The project is separate from Agent Debug Compass Flight Recorder. Flight Recorde
   evidence packets only; they are not target-selection decisions.
 - Platform Operating Contract discovery adds bounded pressure probes and final
   target operating contracts for Pi4/Pi5-style targets. These contracts
-  describe measured mechanisms, boundaries, resource coupling, degraded-mode
-  triggers, burst-only patterns, and blocked claims. They are not benchmark
-  scores.
+  describe measured mechanisms, boundary evidence, resource-coupling
+  hypotheses/evidence class, degraded-mode triggers, burst-only patterns, and
+  blocked claims. They are not benchmark scores.
 
 Target-specific live-run artifacts that are useful as examples live under `examples/demos/`, not under canonical product docs. For example, `examples/demos/target55/` shows a short-smoke Raspberry Pi 4 evidence pack shape.
 

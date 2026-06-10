@@ -13,6 +13,7 @@
   `/home/satoshun/.local/bin/adc-lab-target` version `0.1.11`
 - Review artifact zip:
   `/mnt/share/target55-platform-contract-review-20260610.zip`
+  (`sha256=557f9706c17a2ce87631a6aa4804334ff4ff108ad1a705a73290a0f06dab7f2b`)
 
 ## Decision Need
 
@@ -61,6 +62,8 @@ Blocked:
   real-time-ish claims.
 - sustained 5/15/30 minute thermal claims beyond the current policy/evidence.
 - fixed-frequency coverage without approved controllable frequency evidence.
+- cpufreq platform control measured claims; the sysfs surface is visible, but
+  this run has no approved apply/verify/restore control result.
 - resource coupling measured claims from separate memory/storage/network/jitter
   smoke artifacts.
 - network boundary claims without endpoint-backed bounded transfer evidence.

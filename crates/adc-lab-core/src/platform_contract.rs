@@ -1,13 +1,15 @@
 use crate::contracts::{
-    BoundaryProbe, BoundaryProbePlan, ContractConfidence, ContractEvidenceGap,
-    ContractEvidenceStatus, ContractFactor, NetworkPressureEvidence, NetworkPressureMode,
-    OperatingBoundary, OperatingContractRule, OperatingRuleCategory, OperatingRuleSource,
-    PlatformMechanism, PlatformMechanismInventory, PressureCondition, PressureEffect,
-    PressureIntensity, PressureSafety, ResourceCouplingChain, ResourceCouplingEvidenceClass,
-    ResourceCouplingReport, ResourceMetric, ResourcePressureEvidenceClass, ResourcePressureKind,
-    ResourcePressureResult, ResourceSideEffect, TargetInventory, TargetOperatingContract,
-    TargetOperatingContractStatus,
+    ApprovalRecord, BoundaryProbe, BoundaryProbePlan, ContractConfidence, ContractEvidenceGap,
+    ContractEvidenceStatus, ContractFactor, ControlPlan, ControlResult, ControlResultStatus,
+    NetworkPressureEvidence, NetworkPressureMode, OperatingBoundary, OperatingContractRule,
+    OperatingRuleCategory, OperatingRuleSource, PlatformMechanism, PlatformMechanismInventory,
+    PressureCondition, PressureEffect, PressureIntensity, PressureSafety, ResourceCouplingChain,
+    ResourceCouplingEvidenceClass, ResourceCouplingReport, ResourceMetric,
+    ResourcePressureEvidenceClass, ResourcePressureKind, ResourcePressureResult,
+    ResourceSideEffect, RestoreAttemptStatus, RestoreLease, RestoreStatus, TargetInventory,
+    TargetOperatingContract, TargetOperatingContractStatus,
 };
+use crate::control::{approval_matches, CPUFREQ_SET_GOVERNOR};
 use crate::ids::{new_id, now_unix_ms};
 use crate::load::{
     new_cpu_load_plan_with_operator_abort, run_cpu_load_with_options, CpuLoadRuntimeOptions,
@@ -156,6 +158,13 @@ pub fn platform_mechanism_inventory_for_run(
     let cpufreq_surface = inventory
         .as_ref()
         .is_some_and(|value| surface_available(value, "linux.cpufreq.sysfs"));
+    let cpufreq_control_refs = cpufreq_control_evidence_refs(run_dir, &run_id)?;
+    let cpufreq_control_observed = !cpufreq_control_refs.is_empty();
+    let cpufreq_evidence_refs = inventory_ref
+        .clone()
+        .into_iter()
+        .chain(cpufreq_control_refs.clone())
+        .collect::<Vec<_>>();
 
     let mechanisms = vec![
         PlatformMechanism {
@@ -186,8 +195,10 @@ pub fn platform_mechanism_inventory_for_run(
             } else {
                 ContractEvidenceStatus::NotApplicableWithReason
             },
-            platform_control_status: if cpufreq_surface {
+            platform_control_status: if cpufreq_control_observed {
                 ContractEvidenceStatus::MeasuredPartial
+            } else if cpufreq_surface {
+                ContractEvidenceStatus::Insufficient
             } else {
                 ContractEvidenceStatus::NotControllable
             },
@@ -197,9 +208,11 @@ pub fn platform_mechanism_inventory_for_run(
             } else {
                 ContractEvidenceStatus::Insufficient
             },
-            evidence_refs: inventory_ref.clone().into_iter().collect(),
-            reason: if cpufreq_surface {
-                "cpufreq sysfs surface is visible; privileged restore-safe control remains a separate approved operation".to_string()
+            evidence_refs: cpufreq_evidence_refs,
+            reason: if cpufreq_control_observed {
+                "cpufreq approved apply/verify/restore control evidence was found in this run".to_string()
+            } else if cpufreq_surface {
+                "cpufreq sysfs surface is visible, but no approved apply/verify/restore control result was found in this run".to_string()
             } else {
                 "cpufreq sysfs control surface was not visible in target inventory".to_string()
             },
@@ -1928,6 +1941,160 @@ fn artifact_ref_if_exists(
     }
 }
 
+#[derive(Debug)]
+struct ArtifactEntry<T> {
+    artifact_ref: String,
+    value: T,
+}
+
+fn cpufreq_control_evidence_refs(run_dir: &Path, run_id: &str) -> LabResult<Vec<String>> {
+    let plans = read_json_entries::<ControlPlan>(run_dir, run_id, "plans", |name| {
+        name.ends_with(".json") && !name.ends_with(".result.json")
+    })?;
+    let approvals = read_json_entries::<ApprovalRecord>(run_dir, run_id, "approvals", |name| {
+        name.ends_with(".json")
+    })?;
+    let results = read_json_entries::<ControlResult>(run_dir, run_id, "plans", |name| {
+        name.ends_with(".result.json")
+    })?;
+    let leases = read_json_entries::<RestoreLease>(run_dir, run_id, "leases", |name| {
+        name.ends_with(".json")
+    })?;
+    let Some(health_ref) = restore_health_check_ref(run_dir, run_id)? else {
+        return Ok(Vec::new());
+    };
+
+    for plan in plans.iter().filter(|entry| {
+        entry.value.operation.operation_id == CPUFREQ_SET_GOVERNOR
+            && entry.value.approval_required
+            && entry.value.restore_required
+    }) {
+        let Some(approval) = approvals.iter().find(|entry| {
+            entry.value.approved_plan_id == plan.value.plan_id
+                && entry.value.approved_operation.operation_id == CPUFREQ_SET_GOVERNOR
+                && entry.value.restore_required
+                && entry
+                    .value
+                    .approved_actions
+                    .iter()
+                    .any(|action| action == CPUFREQ_SET_GOVERNOR)
+        }) else {
+            continue;
+        };
+        if approval_matches(&plan.value, &approval.value).is_err() {
+            continue;
+        }
+        let Some(applied) = results.iter().find(|entry| {
+            entry.value.plan_id == plan.value.plan_id
+                && entry.value.operation_id == CPUFREQ_SET_GOVERNOR
+                && matches!(entry.value.status, ControlResultStatus::Applied)
+                && entry.value.restore_lease.is_some()
+        }) else {
+            continue;
+        };
+        let Some(lease_id) = applied
+            .value
+            .restore_lease
+            .as_ref()
+            .map(|lease| lease.lease_id.as_str())
+        else {
+            continue;
+        };
+        let Some(lease) = leases.iter().find(|entry| {
+            entry.value.lease_id == lease_id
+                && entry.value.operation_id == CPUFREQ_SET_GOVERNOR
+                && matches!(entry.value.restore_status, RestoreStatus::Restored)
+        }) else {
+            continue;
+        };
+        let Some(restored) = results.iter().find(|entry| {
+            entry.value.plan_id == plan.value.plan_id
+                && entry.value.operation_id == CPUFREQ_SET_GOVERNOR
+                && matches!(entry.value.status, ControlResultStatus::Restored)
+                && entry.value.restore_attempted
+                && entry.value.restore_result.as_ref().is_some_and(|restore| {
+                    matches!(restore.status, RestoreAttemptStatus::Succeeded)
+                })
+                && entry
+                    .value
+                    .restore_lease
+                    .as_ref()
+                    .is_some_and(|restore_lease| {
+                        restore_lease.lease_id == lease_id
+                            && matches!(restore_lease.restore_status, RestoreStatus::Restored)
+                    })
+        }) else {
+            continue;
+        };
+
+        let mut refs = vec![
+            plan.artifact_ref.clone(),
+            approval.artifact_ref.clone(),
+            applied.artifact_ref.clone(),
+            lease.artifact_ref.clone(),
+            restored.artifact_ref.clone(),
+            health_ref.clone(),
+        ];
+        refs.sort();
+        refs.dedup();
+        return Ok(refs);
+    }
+
+    Ok(Vec::new())
+}
+
+fn read_json_entries<T>(
+    run_dir: &Path,
+    run_id: &str,
+    relative_dir: &str,
+    include: impl Fn(&str) -> bool,
+) -> LabResult<Vec<ArtifactEntry<T>>>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let dir = run_dir.join(relative_dir);
+    if !dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut entries = Vec::new();
+    for entry in fs::read_dir(&dir)? {
+        let path = entry?.path();
+        let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        if !include(name) {
+            continue;
+        }
+        entries.push(ArtifactEntry {
+            artifact_ref: artifact_uri_for_run(run_id, run_dir, &path)?,
+            value: serde_json::from_slice(&fs::read(&path)?)?,
+        });
+    }
+    Ok(entries)
+}
+
+fn restore_health_check_ref(run_dir: &Path, run_id: &str) -> LabResult<Option<String>> {
+    let relative_path = "health/restore_health_check.json";
+    let path = run_dir.join(relative_path);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let value: serde_json::Value = serde_json::from_slice(&fs::read(&path)?)?;
+    let healthy = value
+        .get("schema_version")
+        .and_then(|value| value.as_str())
+        .is_some_and(|value| value == "lab.health_check.v1")
+        && value
+            .get("status")
+            .and_then(|value| value.as_str())
+            .is_some_and(|value| value == "ok");
+    if healthy {
+        artifact_ref_if_exists(run_dir, run_id, relative_path)
+    } else {
+        Ok(None)
+    }
+}
+
 fn pressure_kind_set(run_dir: &Path) -> LabResult<BTreeSet<String>> {
     Ok(
         pressure_result_refs(run_dir, &run_id_from_run_dir(run_dir))?
@@ -2183,5 +2350,234 @@ mod tests {
         ] {
             assert!(ids.contains(required), "missing {required}");
         }
+    }
+
+    #[test]
+    fn platform_inventory_does_not_treat_cpufreq_surface_as_control_evidence() {
+        let temp = tempfile::tempdir().unwrap();
+        write_run_context(temp.path(), "LAB-RUN-cpufreq-surface-only");
+        write_cpufreq_surface_inventory(temp.path());
+
+        let inventory = platform_mechanism_inventory_for_run(
+            temp.path(),
+            "pi4-target55".to_string(),
+            "raspberry_pi_4".to_string(),
+        )
+        .unwrap();
+        let cpufreq = inventory
+            .mechanisms
+            .iter()
+            .find(|mechanism| mechanism.mechanism_id == "cpu.cpufreq_governor")
+            .unwrap();
+
+        assert_eq!(
+            cpufreq.visibility_status,
+            ContractEvidenceStatus::MeasuredPartial
+        );
+        assert_eq!(
+            cpufreq.platform_control_status,
+            ContractEvidenceStatus::Insufficient
+        );
+        assert!(cpufreq
+            .reason
+            .contains("no approved apply/verify/restore control result"));
+    }
+
+    #[test]
+    fn platform_inventory_accepts_complete_cpufreq_control_evidence() {
+        let temp = tempfile::tempdir().unwrap();
+        let run_id = "LAB-RUN-cpufreq-complete-control";
+        write_run_context(temp.path(), run_id);
+        write_cpufreq_surface_inventory(temp.path());
+
+        let run = crate::run::RunContext {
+            run_id: run_id.to_string(),
+            run_dir: temp.path().to_path_buf(),
+        };
+        let target = crate::TargetSpec::parse("local").unwrap();
+        let plan = crate::control::new_cpufreq_plan(
+            &run,
+            &target,
+            "performance".to_string(),
+            60,
+            Some(75.0),
+        );
+        let approval = crate::control::new_approval_record(
+            &plan,
+            "operator".to_string(),
+            "Set CPU governor for bounded contract evidence".to_string(),
+        )
+        .unwrap();
+        let lease = RestoreLease {
+            schema_version: "lab.restore_lease.v1".to_string(),
+            lease_id: "LEASE-cpufreq-complete".to_string(),
+            target_id: plan.target_id.clone(),
+            operation_id: plan.operation.operation_id.clone(),
+            captured_state: crate::contracts::CapturedState {
+                cpufreq_policies: vec![crate::contracts::CpufreqPolicyState {
+                    policy: "policy0".to_string(),
+                    governor: "ondemand".to_string(),
+                    scaling_min_freq: Some("600000".to_string()),
+                    scaling_max_freq: Some("1800000".to_string()),
+                }],
+            },
+            applied_state: crate::contracts::AppliedState {
+                governor: "performance".to_string(),
+            },
+            restore_required: true,
+            restore_status: RestoreStatus::Pending,
+            created_by_plan: plan.plan_id.clone(),
+            time_unix_ms: 1780000000000,
+        };
+        let applied_result = ControlResult {
+            schema_version: "lab.control_result.v1".to_string(),
+            result_id: "RESULT-cpufreq-applied".to_string(),
+            plan_id: plan.plan_id.clone(),
+            target_id: plan.target_id.clone(),
+            operation_id: plan.operation.operation_id.clone(),
+            risk_tier: plan.risk_tier.clone(),
+            status: ControlResultStatus::Applied,
+            refusal: None,
+            restore_lease: Some(lease.clone()),
+            restore_attempted: false,
+            restore_result: None,
+            time_unix_ms: 1780000000001,
+        };
+        let restored_lease = RestoreLease {
+            restore_status: RestoreStatus::Restored,
+            ..lease
+        };
+        let restored_result = ControlResult {
+            schema_version: "lab.control_result.v1".to_string(),
+            result_id: "RESULT-cpufreq-restored".to_string(),
+            plan_id: plan.plan_id.clone(),
+            target_id: plan.target_id.clone(),
+            operation_id: plan.operation.operation_id.clone(),
+            risk_tier: plan.risk_tier.clone(),
+            status: ControlResultStatus::Restored,
+            refusal: None,
+            restore_lease: Some(restored_lease.clone()),
+            restore_attempted: true,
+            restore_result: Some(crate::contracts::RestoreAttempt {
+                status: RestoreAttemptStatus::Succeeded,
+                message: "restore command completed and verified".to_string(),
+            }),
+            time_unix_ms: 1780000000002,
+        };
+
+        write_json(
+            temp.path().join(format!("plans/{}.json", plan.plan_id)),
+            &plan,
+        );
+        write_json(
+            temp.path()
+                .join(format!("approvals/{}.json", approval.approval_id)),
+            &approval,
+        );
+        write_json(
+            temp.path()
+                .join(format!("plans/{}.result.json", applied_result.result_id)),
+            &applied_result,
+        );
+        write_json(
+            temp.path()
+                .join(format!("leases/{}.json", restored_lease.lease_id)),
+            &restored_lease,
+        );
+        write_json(
+            temp.path()
+                .join(format!("plans/{}.result.json", restored_result.result_id)),
+            &restored_result,
+        );
+        write_json(
+            temp.path().join("health/restore_health_check.json"),
+            &serde_json::json!({
+                "schema_version": "lab.health_check.v1",
+                "target_id": "local-target",
+                "status": "ok",
+                "inventory_available": true,
+                "toolchain_available": true
+            }),
+        );
+
+        let inventory = platform_mechanism_inventory_for_run(
+            temp.path(),
+            "local-target".to_string(),
+            "raspberry_pi_4".to_string(),
+        )
+        .unwrap();
+        let cpufreq = inventory
+            .mechanisms
+            .iter()
+            .find(|mechanism| mechanism.mechanism_id == "cpu.cpufreq_governor")
+            .unwrap();
+
+        assert_eq!(
+            cpufreq.platform_control_status,
+            ContractEvidenceStatus::MeasuredPartial
+        );
+        assert!(cpufreq.reason.contains("approved apply/verify/restore"));
+        for expected in [
+            "/plans/",
+            "/approvals/",
+            "/leases/",
+            "/health/restore_health_check.json",
+        ] {
+            assert!(
+                cpufreq
+                    .evidence_refs
+                    .iter()
+                    .any(|reference| reference.contains(expected)),
+                "missing evidence ref containing {expected}"
+            );
+        }
+    }
+
+    fn write_run_context(run_dir: &Path, run_id: &str) {
+        write_json(
+            run_dir.join("run_context.json"),
+            &serde_json::json!({
+                "schema_version": "lab.run_context.v1",
+                "run_id": run_id
+            }),
+        );
+    }
+
+    fn write_cpufreq_surface_inventory(run_dir: &Path) {
+        write_json(
+            run_dir.join("inventory/target_inventory.json"),
+            &serde_json::json!({
+                "schema_version": "lab.target_inventory.v1",
+                "target_id": "pi4-target55",
+                "target": "ssh://target55",
+                "collected_by": "adc-lab",
+                "time_unix_ms": 1780000000000_u64,
+                "software_stack": {
+                    "os": "linux",
+                    "kernel": "6.x",
+                    "arch": "aarch64",
+                    "board": "raspberry_pi_4"
+                },
+                "hardware": {
+                    "cpu_count": 4,
+                    "memory_total_kb": 8388608,
+                    "thermal_zones": 1,
+                    "cpufreq_policies": 1
+                },
+                "control_surfaces": [{
+                    "surface_id": "linux.cpufreq.sysfs",
+                    "available": true,
+                    "requires_privilege": true
+                }]
+            }),
+        );
+    }
+
+    fn write_json(path: impl AsRef<Path>, value: &impl serde::Serialize) {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(path, serde_json::to_vec_pretty(value).unwrap()).unwrap();
     }
 }
