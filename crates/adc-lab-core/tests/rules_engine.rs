@@ -1,8 +1,8 @@
 use adc_lab_core::{
-    blocked_claims_for, claim, evaluate_operating_contract_v2, evaluate_rules,
-    evaluate_suitability_v2, generate_design_constraint_pack, operating_contract_from_rules_v2,
-    Artifact, CompositePayload, Decision, EvidenceStore, Kind, Pred, PressurePayload, Rule, Status,
-    SuitabilityDecision, SuitabilityDecisionValue, WorkloadDataQuality,
+    claim, evaluate_operating_contract_v2, evaluate_rules, evaluate_suitability_v2,
+    generate_constraints_artifact_v2, operating_contract_from_rules_v2,
+    render_agent_constraints_markdown, Artifact, CompositePayload, Decision, EvidenceStore, Kind,
+    Pred, PressurePayload, Rule, Status, SuitabilityDecisionValue, SuitabilityPayload,
 };
 use std::path::Path;
 
@@ -240,36 +240,42 @@ fn suitability_v2_is_conservative_without_required_v2_evidence() {
 
 #[test]
 fn constraint_pack_blocked_claims_come_from_catalog_terms() {
-    let decision = SuitabilityDecision {
-        schema_version: "lab.suitability_decision.v1".to_string(),
-        decision_id: "SUITABILITY-001".to_string(),
-        target_id: "target55".to_string(),
-        workload_id: "workload-001".to_string(),
-        policy_id: "policy-001".to_string(),
-        overall_decision: SuitabilityDecisionValue::Unknown,
-        selection_ready: false,
-        dimensions: Vec::new(),
-        blocked_claims: blocked_claims_for(&[
-            claim::PRODUCTION_READY,
-            claim::REAL_TIME_PRESSURE_SAFE,
-        ]),
-        data_quality: WorkloadDataQuality {
-            degraded: false,
-            missing: Vec::new(),
-            notes: Vec::new(),
+    let suitability = Artifact::new(
+        Kind::ReportSuitability,
+        "SUITABILITY-001",
+        "LAB-RUN-001",
+        "target55",
+        Status::Insufficient,
+        SuitabilityPayload {
+            rule_set_id: "test.suitability".to_string(),
+            selection_ready: false,
+            workload_id: Some("workload-001".to_string()),
+            policy_id: Some("policy-001".to_string()),
+            overall_decision: Some(SuitabilityDecisionValue::Unknown),
+            dimensions: Vec::new(),
+            evaluations: Vec::new(),
+            blocked_claims: vec![
+                claim::PRODUCTION_READY.to_string(),
+                claim::REAL_TIME_PRESSURE_SAFE.to_string(),
+            ],
+            next_evidence: Vec::new(),
         },
-        evidence_refs: Vec::new(),
-        time_unix_ms: 1,
-    };
+        1,
+    );
 
-    let pack = generate_design_constraint_pack(&decision);
+    let constraints = generate_constraints_artifact_v2(&suitability);
+    let markdown = render_agent_constraints_markdown(&constraints, "artifact://test");
 
-    assert!(pack
+    assert!(constraints
+        .payload
         .blocked_claims
-        .contains(&"production readiness".to_string()));
-    assert!(pack
+        .contains(&claim::PRODUCTION_READY.to_string()));
+    assert!(constraints
+        .payload
         .blocked_claims
-        .contains(&"real-time safe under all pressure".to_string()));
+        .contains(&claim::REAL_TIME_PRESSURE_SAFE.to_string()));
+    assert!(markdown.contains("production readiness"));
+    assert!(markdown.contains("real-time safe under all pressure"));
 }
 
 fn write_marker(store: &mut EvidenceStore, run_dir: &Path, kind: Kind, path: &str) {

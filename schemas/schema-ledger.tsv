@@ -6,7 +6,7 @@ lab.composite_boundary_result.v1	generated/lab.composite_boundary_result.v1.sche
 lab.control_plan.v1	lab.control_plan.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	safety-critical plan contract; keep semantics frozen
 lab.control_result.v1	lab.control_result.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	control status vocabulary is not equivalent to evidence Status
 lab.control_surface.v1	lab.control_surface.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	control discovery contract
-lab.design_constraint_pack.v1	lab.design_constraint_pack.v1.schema.json	handwritten_schema	delete	phase3-suitability-constraints	suitability	replace public JSON with v2 constraints artifact
+lab.design_constraint_pack.v1	lab.design_constraint_pack.v1.schema.json	deleted	delete	phase3-suitability-constraints	suitability	replace public JSON with v2 constraints artifact
 lab.experiment_matrix.v1	lab.experiment_matrix.v1.schema.json	handwritten_schema	generated_checked	phase5-experiment	experiment	active experiment planning contract
 lab.experiment_run.v1	lab.experiment_run.v1.schema.json	handwritten_schema	generated_checked	phase5-experiment	experiment	active experiment result contract
 lab.familiarization_pack.v1	lab.familiarization_pack.v1.schema.json	deleted	delete	phase1-report-run	reporting	replaced by v2 report.run
@@ -21,8 +21,8 @@ lab.release_manifest.v1	lab.release_manifest.v1.schema.json	handwritten_schema	g
 lab.resource_pressure_result.v1	generated/lab.resource_pressure_result.v1.schema.json	generated_snapshot	generated_checked	phase2-probe-cutover	pressure	public pressure output moved to v2 Artifact<PressurePayload>; v1 DTO remains internal/SSH wire and is generated
 lab.restore_lease.v1	lab.restore_lease.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	safety-critical restore lease contract
 lab.run_manifest.v1	lab.run_manifest.v1.schema.json	handwritten_schema	generated_checked	phase5-infra	runfs	dedicated identity artifact; keep but generate-check
-lab.suitability_decision.v1	lab.suitability_decision.v1.schema.json	handwritten_schema	delete	phase3-suitability-constraints	suitability	public suitability output is v2 artifact
-lab.suitability_policy.v1	lab.suitability_policy.v1.schema.json	handwritten_schema	generated_checked	phase3-suitability-constraints	suitability	active input policy unless replaced by v2 policy artifact
+lab.suitability_decision.v1	lab.suitability_decision.v1.schema.json	deleted	delete	phase3-suitability-constraints	suitability	public suitability output is v2 artifact
+lab.suitability_policy.v1	generated/lab.suitability_policy.v1.schema.json	generated_snapshot	generated_checked	phase3-suitability-constraints	suitability	active input policy remains v1 wire but generated from Rust DTO
 lab.target_inventory.v1	lab.target_inventory.v1.schema.json	handwritten_schema	generated_checked	phase5-inventory	inventory	active inventory contract
 lab.tool_qualification.v1	lab.tool_qualification.v1.schema.json	handwritten_schema	generated_checked	phase5-qualification	qualification	active tool qualification contract
 lab.tool_qualification_summary.v1	lab.tool_qualification_summary.v1.schema.json	handwritten_schema	generated_checked	phase5-qualification	qualification	active qualification summary contract
@@ -34,6 +34,4 @@ lab.workload_run_result.v1	lab.workload_run_result.v1.schema.json	handwritten_sc
 lab.observation_result.v1	-	no_schema_wire_contract	generated_checked	phase5-infra	observe	schema_version string exists without top-level schema file
 lab.run_context.v1	-	no_schema_wire_contract	generated_checked	phase5-infra	runfs	run context file has schema_version but no top-level schema file
 lab.build_info.v1	-	no_schema_wire_contract	generated_checked	phase5-infra	build	active build-info output without top-level schema file
-lab.constraint_check_result.v1	-	no_schema_wire_contract	generated_checked	phase3-suitability-constraints	suitability	constraints check result has schema_version but no top-level schema file
 lab.workload_fixture_result.v1	-	no_schema_wire_contract	generated_checked	phase5-workload	workload	fixture command output has schema_version but no top-level schema file
-lab.suitability_decision.v1.projected_from_v2	-	no_schema_wire_contract	exempt	phase3-suitability-constraints	suitability	internal v2-to-v1 projection object, not a persisted public schema

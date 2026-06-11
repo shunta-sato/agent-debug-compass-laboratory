@@ -3,10 +3,7 @@ use crate::evidence::{
 };
 use crate::ids::{new_id, now_unix_ms};
 use crate::rules::engine::{claim_for_evaluation, evaluate_rules, Pred, Rule, RuleEvaluation};
-use crate::{
-    SuitabilityDecision as LegacySuitabilityDecision, SuitabilityDecisionValue,
-    SuitabilityDimensionDecision, WorkloadDataQuality,
-};
+use crate::{SuitabilityDecisionValue, SuitabilityDimensionDecision};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -126,78 +123,6 @@ pub fn suitability_from_rules_v2(
         notes: vec!["v2 suitability evaluated from rule table".to_string()],
     };
     artifact
-}
-
-pub fn legacy_decision_from_suitability_artifact(
-    artifact: &Artifact<SuitabilityPayload>,
-) -> LegacySuitabilityDecision {
-    LegacySuitabilityDecision {
-        schema_version: "lab.suitability_decision.v1.projected_from_v2".to_string(),
-        decision_id: artifact.id.clone(),
-        target_id: artifact.target_id.clone(),
-        workload_id: artifact
-            .payload
-            .workload_id
-            .clone()
-            .unwrap_or_else(|| artifact.run_id.clone()),
-        policy_id: artifact
-            .payload
-            .policy_id
-            .clone()
-            .unwrap_or_else(|| "v2_suitability_policy_projection".to_string()),
-        overall_decision: artifact.payload.overall_decision.clone().unwrap_or({
-            if artifact.payload.selection_ready {
-                SuitabilityDecisionValue::Meet
-            } else {
-                SuitabilityDecisionValue::Unknown
-            }
-        }),
-        selection_ready: artifact.payload.selection_ready,
-        dimensions: artifact.payload.dimensions.clone(),
-        blocked_claims: blocked_claim_texts(&artifact.payload.blocked_claims),
-        data_quality: WorkloadDataQuality {
-            degraded: artifact.data_quality.level == DataQualityLevel::Degraded,
-            missing: Vec::new(),
-            notes: artifact.data_quality.notes.clone(),
-        },
-        evidence_refs: suitability_evidence_refs(artifact),
-        time_unix_ms: artifact.time_unix_ms,
-    }
-}
-
-pub fn generate_design_constraint_pack_from_suitability_artifact(
-    artifact: &Artifact<SuitabilityPayload>,
-) -> crate::DesignConstraintPack {
-    let decision = legacy_decision_from_suitability_artifact(artifact);
-    crate::generate_design_constraint_pack(&decision)
-}
-
-fn blocked_claim_texts(claim_ids: &[String]) -> Vec<String> {
-    let mut texts = claim_ids
-        .iter()
-        .map(|claim_id| {
-            crate::claim_definition(claim_id)
-                .map(|definition| definition.blocked_claim.to_string())
-                .unwrap_or_else(|| claim_id.clone())
-        })
-        .collect::<Vec<_>>();
-    texts.sort();
-    texts.dedup();
-    texts
-}
-
-fn suitability_evidence_refs(artifact: &Artifact<SuitabilityPayload>) -> Vec<String> {
-    let mut refs = artifact.evidence_refs.clone();
-    refs.extend(
-        artifact
-            .payload
-            .evaluations
-            .iter()
-            .flat_map(|evaluation| evaluation.evidence_refs.clone()),
-    );
-    refs.sort();
-    refs.dedup();
-    refs
 }
 
 fn blocked_claims(evaluations: &[RuleEvaluation]) -> Vec<String> {

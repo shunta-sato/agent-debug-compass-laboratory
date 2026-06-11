@@ -219,7 +219,9 @@
         "workload",
         "report.run",
         "report.operating_contract",
-        "report.suitability"
+        "report.suitability",
+        "report.constraints",
+        "report.constraints_check"
       ]
     },
     "LoadPayload": {

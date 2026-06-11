@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Artifact_for_PressurePayload",
+  "title": "Artifact_for_ConstraintsPayload",
   "type": "object",
   "required": [
     "claims",
@@ -59,7 +59,7 @@
       }
     },
     "payload": {
-      "$ref": "#/definitions/PressurePayload"
+      "$ref": "#/definitions/ConstraintsPayload"
     },
     "run_id": {
       "type": "string"
@@ -130,6 +130,93 @@
           "items": {
             "type": "string"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConstraintsPayload": {
+      "type": "object",
+      "required": [
+        "agent_instructions",
+        "allowed_patterns",
+        "blocked_claims",
+        "budget_constraints",
+        "burst_only_patterns",
+        "ci_rules",
+        "degraded_mode_triggers",
+        "forbidden_patterns",
+        "required_runtime_guards",
+        "source_suitability_id"
+      ],
+      "properties": {
+        "agent_instructions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowed_patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blocked_claims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "budget_constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "burst_only_patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ci_rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "degraded_mode_triggers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "forbidden_patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "policy_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "required_runtime_guards": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source_suitability_id": {
+          "type": "string"
+        },
+        "workload_id": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -243,56 +330,6 @@
         "value": {
           "type": "number",
           "format": "double"
-        }
-      },
-      "additionalProperties": false
-    },
-    "PressurePayload": {
-      "type": "object",
-      "required": [
-        "duration_ms",
-        "effect_observed",
-        "evidence_class",
-        "pressure_kind",
-        "source_schema_version"
-      ],
-      "properties": {
-        "duration_ms": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "effect_observed": {
-          "type": "boolean"
-        },
-        "evidence_class": {
-          "type": "string"
-        },
-        "network_endpoint_available": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "network_mode": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "network_traffic_generated_bytes": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "pressure_kind": {
-          "type": "string"
-        },
-        "source_schema_version": {
-          "type": "string"
         }
       },
       "additionalProperties": false

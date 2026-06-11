@@ -40,7 +40,10 @@ fn contract_validation_schema_fixtures_validate() {
         checked += 1;
     }
 
-    assert!(checked >= 24, "expected all MVP schemas to be checked");
+    assert!(
+        checked >= 20,
+        "expected all active top-level schemas to be checked"
+    );
 }
 
 #[test]
@@ -161,18 +164,18 @@ fn contract_validation_workload_run_plan_rejects_shell_command_field() {
 }
 
 #[test]
-fn contract_validation_suitability_policy_rejects_unknown_to_meet_escape() {
+fn contract_validation_suitability_policy_schema_is_generated_snapshot() {
     let root = workspace_root();
-    let schema_path = root.join("schemas/lab.suitability_policy.v1.schema.json");
-    let fixture_path = root.join("tests/golden/lab.suitability_policy.v1.valid.json");
-    let schema_json: serde_json::Value =
-        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
-    let mut fixture_json: serde_json::Value =
-        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
-    fixture_json["rules"]["unknown_never_becomes_meet"] = serde_json::json!(false);
     assert!(
-        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
-        "suitability policy must not convert unknown evidence into meet"
+        !root
+            .join("schemas/lab.suitability_policy.v1.schema.json")
+            .exists(),
+        "suitability policy must not keep a handwritten top-level schema"
+    );
+    assert!(
+        root.join("schemas/generated/lab.suitability_policy.v1.schema.json")
+            .exists(),
+        "suitability policy generated snapshot must exist"
     );
 }
 

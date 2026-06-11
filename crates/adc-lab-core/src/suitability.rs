@@ -1,10 +1,9 @@
 use crate::contracts::{
-    DesignConstraintPack, SuitabilityConfidence, SuitabilityDecision, SuitabilityDecisionValue,
-    SuitabilityDimensionDecision, SuitabilityDimensionKind, SuitabilityPolicy,
-    WorkloadDemandProfile,
+    SuitabilityConfidence, SuitabilityDecisionValue, SuitabilityDimensionDecision,
+    SuitabilityDimensionKind, SuitabilityPolicy, WorkloadDemandProfile,
 };
 use crate::evidence::{
-    claim, claim_definition, Artifact, DataQuality, DataQualityLevel, Decision, Kind, Status,
+    claim, claim_definition, Artifact, Claim, DataQuality, DataQualityLevel, Decision, Kind, Status,
 };
 use crate::fsutil::read_json;
 use crate::ids::{new_id, now_unix_ms};
@@ -12,7 +11,8 @@ use crate::rules::engine::{claim_for_evaluation, RuleEvaluation};
 use crate::rules::suitability::SuitabilityPayload;
 use crate::OperatingContractPayload;
 use crate::{LabError, LabResult};
-use serde::Serialize;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::fs;
@@ -26,20 +26,37 @@ pub struct TargetRunNumericEvidence {
     pub missing: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct ConstraintCheckResult {
-    pub schema_version: String,
+pub struct ConstraintCheckPayload {
     pub status: String,
     pub checked_path: String,
     pub matches: Vec<ConstraintCheckMatch>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConstraintCheckMatch {
     pub path: String,
+    pub claim_id: String,
     pub blocked_claim: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConstraintsPayload {
+    pub source_suitability_id: String,
+    pub workload_id: Option<String>,
+    pub policy_id: Option<String>,
+    pub allowed_patterns: Vec<String>,
+    pub burst_only_patterns: Vec<String>,
+    pub degraded_mode_triggers: Vec<String>,
+    pub forbidden_patterns: Vec<String>,
+    pub budget_constraints: Vec<String>,
+    pub required_runtime_guards: Vec<String>,
+    pub blocked_claims: Vec<String>,
+    pub agent_instructions: Vec<String>,
+    pub ci_rules: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -197,7 +214,67 @@ pub fn decide_suitability_artifact_v2(
     Ok(artifact)
 }
 
-pub fn generate_design_constraint_pack(decision: &SuitabilityDecision) -> DesignConstraintPack {
+pub fn generate_constraints_artifact_v2(
+    suitability: &Artifact<SuitabilityPayload>,
+) -> Artifact<ConstraintsPayload> {
+    let payload = constraints_payload_from_suitability(suitability);
+    let mut artifact = Artifact::new(
+        Kind::ReportConstraints,
+        new_id("CONSTRAINTS"),
+        suitability.run_id.clone(),
+        suitability.target_id.clone(),
+        if payload.blocked_claims.is_empty() {
+            Status::MeasuredPartial
+        } else {
+            Status::Insufficient
+        },
+        payload,
+        now_unix_ms(),
+    );
+    artifact.evidence_refs = constraints_evidence_refs(suitability);
+    artifact.claims = artifact
+        .payload
+        .blocked_claims
+        .iter()
+        .map(|claim_id| Claim {
+            claim_id: claim_id.clone(),
+            decision: Decision::Blocked,
+            evidence_refs: artifact.evidence_refs.clone(),
+            next_evidence: claim_definition(claim_id)
+                .map(|definition| {
+                    definition
+                        .default_next_evidence
+                        .iter()
+                        .map(|item| (*item).to_string())
+                        .collect()
+                })
+                .unwrap_or_default(),
+        })
+        .collect();
+    artifact.data_quality = DataQuality {
+        level: DataQualityLevel::Partial,
+        notes: vec!["v2 constraints are generated from v2 suitability claim IDs".to_string()],
+    };
+    artifact
+}
+
+fn constraints_evidence_refs(suitability: &Artifact<SuitabilityPayload>) -> Vec<String> {
+    let mut refs = suitability.evidence_refs.clone();
+    refs.extend(
+        suitability
+            .payload
+            .evaluations
+            .iter()
+            .flat_map(|evaluation| evaluation.evidence_refs.clone()),
+    );
+    refs.sort();
+    refs.dedup();
+    refs
+}
+
+fn constraints_payload_from_suitability(
+    suitability: &Artifact<SuitabilityPayload>,
+) -> ConstraintsPayload {
     let mut allowed_patterns = Vec::new();
     let mut burst_only_patterns = vec!["bounded burst workload execution only".to_string()];
     let mut degraded_mode_triggers = Vec::new();
@@ -211,10 +288,10 @@ pub fn generate_design_constraint_pack(decision: &SuitabilityDecision) -> Design
         "preserve stdout/stderr byte limits".to_string(),
         "do not use SSH workload execution in v1".to_string(),
     ];
-    for dimension in &decision.dimensions {
+    for dimension in &suitability.payload.dimensions {
         match dimension.decision {
             SuitabilityDecisionValue::Meet => allowed_patterns.push(format!(
-                "{:?} demand is within measured v1 policy envelope",
+                "{:?} demand is within measured v2 policy envelope",
                 dimension.dimension
             )),
             SuitabilityDecisionValue::Marginal => {
@@ -262,48 +339,47 @@ pub fn generate_design_constraint_pack(decision: &SuitabilityDecision) -> Design
     required_runtime_guards.sort();
     required_runtime_guards.dedup();
     let mut agent_instructions = vec![
-        "Do not claim production readiness from this v1 workload suitability slice.".to_string(),
+        "Do not claim production readiness from this v2 workload suitability slice.".to_string(),
         "Treat unknown suitability dimensions as blocked until new evidence exists.".to_string(),
     ];
-    if !decision.selection_ready {
+    if !suitability.payload.selection_ready {
         agent_instructions.push(
             "Do not select this target/workload pair as ready without resolving required unknowns or failures."
                 .to_string(),
         );
     }
-    DesignConstraintPack {
-        schema_version: "lab.design_constraint_pack.v1".to_string(),
-        constraint_pack_id: new_id("CONSTRAINTS"),
-        target_id: decision.target_id.clone(),
-        workload_id: decision.workload_id.clone(),
+    ConstraintsPayload {
+        source_suitability_id: suitability.id.clone(),
+        workload_id: suitability.payload.workload_id.clone(),
+        policy_id: suitability.payload.policy_id.clone(),
         allowed_patterns,
         burst_only_patterns,
         degraded_mode_triggers,
         forbidden_patterns,
         budget_constraints,
         required_runtime_guards,
-        blocked_claims: decision.blocked_claims.clone(),
+        blocked_claims: suitability.payload.blocked_claims.clone(),
         agent_instructions,
         ci_rules: vec![
             "blocked_claims_must_not_appear_in_agent_facing_claims".to_string(),
             "unknown_required_dimensions_block_selection_readiness".to_string(),
         ],
-        evidence_refs: decision.evidence_refs.clone(),
-        time_unix_ms: now_unix_ms(),
     }
 }
 
 pub fn render_agent_constraints_markdown(
-    pack: &DesignConstraintPack,
+    constraints: &Artifact<ConstraintsPayload>,
     decision_ref: &str,
 ) -> String {
+    let pack = &constraints.payload;
+    let workload_id = pack.workload_id.as_deref().unwrap_or("unknown_workload");
     let mut out = String::new();
     out.push_str(&format!(
         "# Target Constraints for {} / {}\n\n",
-        pack.target_id, pack.workload_id
+        constraints.target_id, workload_id
     ));
     out.push_str("Source:\n");
-    out.push_str(&format!("- suitability_decision: {decision_ref}\n\n"));
+    out.push_str(&format!("- suitability_artifact: {decision_ref}\n\n"));
     out.push_str("## Must obey\n\n");
     for instruction in &pack.agent_instructions {
         out.push_str(&format!("- {instruction}\n"));
@@ -316,7 +392,7 @@ pub fn render_agent_constraints_markdown(
     }
     out.push_str("\n## Budget constraints\n\n");
     if pack.budget_constraints.is_empty() {
-        out.push_str("- No numeric budget constraint was established by this v1 decision.\n");
+        out.push_str("- No numeric budget constraint was established by this v2 decision.\n");
     } else {
         for constraint in &pack.budget_constraints {
             out.push_str(&format!("- {constraint}\n"));
@@ -327,20 +403,22 @@ pub fn render_agent_constraints_markdown(
         out.push_str(&format!("- {pattern}\n"));
     }
     out.push_str("\n## Blocked claims\n\n");
-    for claim in &pack.blocked_claims {
-        out.push_str(&format!("- \"{claim}\"\n"));
+    for claim_id in &pack.blocked_claims {
+        let blocked_claim = claim_definition(claim_id)
+            .map(|definition| definition.blocked_claim)
+            .unwrap_or(claim_id);
+        out.push_str(&format!("- `{claim_id}`: \"{blocked_claim}\"\n"));
     }
     out
 }
 
-pub fn check_constraints(
-    pack: &DesignConstraintPack,
+pub fn check_constraints_v2(
+    constraints: &Artifact<ConstraintsPayload>,
     path: &Path,
-) -> LabResult<ConstraintCheckResult> {
+) -> LabResult<Artifact<ConstraintCheckPayload>> {
     let mut matches = Vec::new();
-    scan_path_for_blocked_claims(pack, path, &mut matches)?;
-    Ok(ConstraintCheckResult {
-        schema_version: "lab.constraint_check_result.v1".to_string(),
+    scan_path_for_blocked_claims(&constraints.payload.blocked_claims, path, &mut matches)?;
+    let payload = ConstraintCheckPayload {
         status: if matches.is_empty() {
             "pass".to_string()
         } else {
@@ -348,7 +426,24 @@ pub fn check_constraints(
         },
         checked_path: path.display().to_string(),
         matches,
-    })
+    };
+    let mut artifact = Artifact::new(
+        Kind::ReportConstraintsCheck,
+        new_id("CONSTRAINT-CHECK"),
+        constraints.run_id.clone(),
+        constraints.target_id.clone(),
+        if payload.status == "pass" {
+            Status::MeasuredPartial
+        } else {
+            Status::UnsafeBlocked {
+                reason: "blocked constraints matched checked path".to_string(),
+            }
+        },
+        payload,
+        now_unix_ms(),
+    );
+    artifact.evidence_refs = constraints.evidence_refs.clone();
+    Ok(artifact)
 }
 
 fn validate_policy(policy: &SuitabilityPolicy) -> LabResult<()> {
@@ -783,7 +878,7 @@ fn harvest_numeric_value(value: &Value, evidence: &mut TargetRunNumericEvidence)
 }
 
 fn scan_path_for_blocked_claims(
-    pack: &DesignConstraintPack,
+    blocked_claims: &[String],
     path: &Path,
     matches: &mut Vec<ConstraintCheckMatch>,
 ) -> LabResult<()> {
@@ -797,17 +892,21 @@ fn scan_path_for_blocked_claims(
             if should_skip_path(&child) {
                 continue;
             }
-            scan_path_for_blocked_claims(pack, &child, matches)?;
+            scan_path_for_blocked_claims(blocked_claims, &child, matches)?;
         }
     } else if should_scan_file(path) {
         let Ok(text) = fs::read_to_string(path) else {
             return Ok(());
         };
-        for claim in &pack.blocked_claims {
-            if !claim.trim().is_empty() && text.contains(claim) {
+        for claim_id in blocked_claims {
+            let blocked_claim = claim_definition(claim_id)
+                .map(|definition| definition.blocked_claim)
+                .unwrap_or(claim_id);
+            if !blocked_claim.trim().is_empty() && text.contains(blocked_claim) {
                 matches.push(ConstraintCheckMatch {
                     path: path.display().to_string(),
-                    blocked_claim: claim.clone(),
+                    claim_id: claim_id.clone(),
+                    blocked_claim: blocked_claim.to_string(),
                 });
             }
         }

@@ -206,11 +206,37 @@ fn workload_run_local_captures_process_scoped_demand() {
 fn constraints_generate_writes_agent_markdown() {
     let temp = tempfile::tempdir().unwrap();
     let decision_path = temp.path().join("suitability_decision.json");
-    let out_path = temp.path().join("design_constraint_pack.json");
+    let out_path = temp.path().join("constraints.json");
     let md_path = temp.path().join("agent_constraints.md");
-    fs::copy(
-        workspace_root().join("tests/golden/lab.suitability_decision.v1.valid.json"),
+    fs::write(
         &decision_path,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "schema": "lab.artifact.v2",
+            "kind": "report.suitability",
+            "id": "SUITABILITY-001",
+            "run_id": "LAB-RUN-001",
+            "target_id": "target55",
+            "status": { "state": "insufficient" },
+            "bounds": null,
+            "factors": { "controlled": [], "observed": [], "confounders": [] },
+            "metrics": [],
+            "claims": [],
+            "evidence_refs": [],
+            "data_quality": { "level": "partial", "notes": [] },
+            "payload": {
+                "rule_set_id": "test.suitability",
+                "selection_ready": false,
+                "workload_id": "workload-001",
+                "policy_id": "policy-001",
+                "overall_decision": "unknown",
+                "dimensions": [],
+                "evaluations": [],
+                "blocked_claims": ["target.selection.production_ready"],
+                "next_evidence": []
+            },
+            "time_unix_ms": 1
+        }))
+        .unwrap(),
     )
     .unwrap();
 
@@ -229,12 +255,12 @@ fn constraints_generate_writes_agent_markdown() {
         ])
         .assert()
         .success()
-        .stdout(contains(
-            "\"schema_version\": \"lab.design_constraint_pack.v1\"",
-        ));
+        .stdout(contains("\"schema\": \"lab.artifact.v2\""))
+        .stdout(contains("\"kind\": \"report.constraints\""));
     let markdown = fs::read_to_string(md_path).unwrap();
     assert!(markdown.contains("# Target Constraints"));
     assert!(markdown.contains("## Blocked claims"));
+    assert!(markdown.contains("target.selection.production_ready"));
 }
 
 #[test]
@@ -407,9 +433,8 @@ fn suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end() {
         ])
         .assert()
         .success()
-        .stdout(contains(
-            "\"schema_version\": \"lab.design_constraint_pack.v1\"",
-        ));
+        .stdout(contains("\"schema\": \"lab.artifact.v2\""))
+        .stdout(contains("\"kind\": \"report.constraints\""));
 
     let decision: serde_json::Value =
         serde_json::from_slice(&fs::read(&decision_path).unwrap()).unwrap();
@@ -422,10 +447,13 @@ fn suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end() {
         .any(|claim| claim == "target.selection.production_ready"));
     let constraints: serde_json::Value =
         serde_json::from_slice(&fs::read(&constraints_path).unwrap()).unwrap();
-    assert_eq!(
-        constraints["schema_version"],
-        "lab.design_constraint_pack.v1"
-    );
+    assert_eq!(constraints["schema"], "lab.artifact.v2");
+    assert_eq!(constraints["kind"], "report.constraints");
+    assert!(constraints["payload"]["blocked_claims"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|claim| claim == "target.selection.production_ready"));
     let markdown = fs::read_to_string(agent_md_path).unwrap();
     assert!(markdown.contains("## Blocked claims"));
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
@@ -437,11 +465,40 @@ fn suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end() {
 #[test]
 fn constraints_check_fails_on_blocked_claim_fixture() {
     let temp = tempfile::tempdir().unwrap();
-    let pack_path = temp.path().join("design_constraint_pack.json");
+    let pack_path = temp.path().join("constraints.json");
     let claim_path = temp.path().join("CLAIMS.md");
-    fs::copy(
-        workspace_root().join("tests/golden/lab.design_constraint_pack.v1.valid.json"),
+    fs::write(
         &pack_path,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "schema": "lab.artifact.v2",
+            "kind": "report.constraints",
+            "id": "CONSTRAINTS-001",
+            "run_id": "LAB-RUN-001",
+            "target_id": "target55",
+            "status": { "state": "insufficient" },
+            "bounds": null,
+            "factors": { "controlled": [], "observed": [], "confounders": [] },
+            "metrics": [],
+            "claims": [],
+            "evidence_refs": [],
+            "data_quality": { "level": "partial", "notes": [] },
+            "payload": {
+                "source_suitability_id": "SUITABILITY-001",
+                "workload_id": "workload-001",
+                "policy_id": "policy-001",
+                "allowed_patterns": [],
+                "burst_only_patterns": [],
+                "degraded_mode_triggers": [],
+                "forbidden_patterns": [],
+                "budget_constraints": [],
+                "required_runtime_guards": [],
+                "blocked_claims": ["target.selection.production_ready"],
+                "agent_instructions": [],
+                "ci_rules": []
+            },
+            "time_unix_ms": 1
+        }))
+        .unwrap(),
     )
     .unwrap();
     fs::write(&claim_path, "This target has production readiness.\n").unwrap();
@@ -459,6 +516,7 @@ fn constraints_check_fails_on_blocked_claim_fixture() {
         ])
         .assert()
         .failure()
+        .stdout(contains("\"kind\": \"report.constraints_check\""))
         .stdout(contains("\"status\": \"fail\""))
         .stdout(contains("production readiness"));
 }
