@@ -1,4 +1,7 @@
-use adc_lab_core::{Artifact, ClaimDefinition, OperatingContractPayload, SuitabilityPayload};
+use adc_lab_core::{
+    Artifact, ClaimDefinition, CompositePayload, LoadPayload, ObservationPayload,
+    OperatingContractPayload, PressurePayload, SuitabilityPayload, WorkloadPayload,
+};
 use schemars::schema_for;
 use std::fs;
 use std::path::PathBuf;
@@ -32,6 +35,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(
         out_dir.join("lab.report.suitability.v2.schema.json"),
         serde_json::to_vec_pretty(&suitability_schema)?,
+    )?;
+
+    let observation_schema = schema_for!(Artifact<ObservationPayload>);
+    fs::write(
+        out_dir.join("lab.observation.v2.schema.json"),
+        serde_json::to_vec_pretty(&observation_schema)?,
+    )?;
+
+    let load_schema = schema_for!(Artifact<LoadPayload>);
+    fs::write(
+        out_dir.join("lab.load.v2.schema.json"),
+        serde_json::to_vec_pretty(&load_schema)?,
+    )?;
+
+    let pressure_schema = schema_for!(Artifact<PressurePayload>);
+    fs::write(
+        out_dir.join("lab.pressure.v2.schema.json"),
+        serde_json::to_vec_pretty(&pressure_schema)?,
+    )?;
+
+    let composite_schema = schema_for!(Artifact<CompositePayload>);
+    fs::write(
+        out_dir.join("lab.composite.v2.schema.json"),
+        serde_json::to_vec_pretty(&composite_schema)?,
+    )?;
+
+    let workload_schema = schema_for!(Artifact<WorkloadPayload>);
+    fs::write(
+        out_dir.join("lab.workload.v2.schema.json"),
+        serde_json::to_vec_pretty(&workload_schema)?,
     )?;
 
     Ok(())
