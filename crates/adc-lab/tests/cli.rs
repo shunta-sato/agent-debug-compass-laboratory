@@ -277,11 +277,18 @@ fn decide_suitability_reads_run_evidence_and_keeps_thermal_target_conditioned() 
         ])
         .assert()
         .success()
-        .stdout(contains(
-            "\"schema_version\": \"lab.suitability_decision.v1\"",
-        ));
-    let decision: serde_json::Value = serde_json::from_slice(&fs::read(out_path).unwrap()).unwrap();
-    let thermal = decision["dimensions"]
+        .stdout(contains("\"schema\": \"lab.artifact.v2\""))
+        .stdout(contains("\"kind\": \"report.suitability\""));
+    let decision: serde_json::Value =
+        serde_json::from_slice(&fs::read(&out_path).unwrap()).unwrap();
+    assert_eq!(decision["schema"], "lab.artifact.v2");
+    assert_eq!(decision["kind"], "report.suitability");
+    assert_eq!(decision["payload"]["selection_ready"], true);
+    let legacy: serde_json::Value = serde_json::from_slice(
+        &fs::read(temp.path().join("suitability_decision.v1.json")).unwrap(),
+    )
+    .unwrap();
+    let thermal = legacy["dimensions"]
         .as_array()
         .unwrap()
         .iter()
@@ -719,7 +726,7 @@ fn pressure_network_bounded_transfer_records_generated_bytes() {
         .find(|path| {
             path.file_name()
                 .and_then(|name| name.to_str())
-                .is_some_and(|name| name.contains("network_io"))
+                .is_some_and(|name| name.contains("network_io") && name.ends_with(".result.json"))
         })
         .unwrap();
     let result: serde_json::Value =
@@ -771,20 +778,21 @@ fn report_operating_contract_writes_contract_artifacts() {
         .assert()
         .success()
         .stdout(contains("target_operating_contract_ref"))
-        .stdout(contains(
-            "\"schema_version\": \"lab.target_operating_contract.v1\"",
-        ));
+        .stdout(contains("\"schema\": \"lab.artifact.v2\""))
+        .stdout(contains("\"kind\": \"report.operating_contract\""));
 
     for path in [
         "reports/platform_mechanism_inventory.json",
         "reports/boundary_probe_plan.json",
         "reports/resource_coupling_report.json",
         "reports/target_operating_contract.json",
+        "reports/target_operating_contract.v2.json",
     ] {
         assert!(temp.path().join(path).exists(), "missing {path}");
     }
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"report.target_operating_contract\""));
+    assert!(audit.contains("\"operation\":\"report.target_operating_contract.v2\""));
 }
 
 #[test]

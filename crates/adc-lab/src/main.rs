@@ -11,6 +11,8 @@ use std::process::Command;
 use std::thread;
 use std::time::{Duration, Instant};
 
+mod commands;
+
 #[derive(Debug, Parser)]
 #[command(name = "adc-lab")]
 #[command(about = "Safety-gated embedded target familiarization laboratory")]
@@ -596,7 +598,7 @@ fn main() -> Result<()> {
             WorkloadCommand::Run(args) => command_workload_run(args),
         },
         Commands::Decide { command } => match command {
-            DecideCommand::Suitability(args) => command_decide_suitability(args),
+            DecideCommand::Suitability(args) => commands::decide::command_decide_suitability(args),
         },
         Commands::Constraints { command } => match command {
             ConstraintsCommand::Generate(args) => command_constraints_generate(args),
@@ -616,7 +618,9 @@ fn main() -> Result<()> {
         Commands::Report { command } => match command {
             ReportCommand::Pack(args) => command_report_pack(args),
             ReportCommand::OperatingPoint(args) => command_report_operating_point(args),
-            ReportCommand::OperatingContract(args) => command_report_operating_contract(args),
+            ReportCommand::OperatingContract(args) => {
+                commands::report::command_report_operating_contract(args)
+            }
             ReportCommand::CapabilityProfile(args) => command_report_capability_profile(args),
         },
         Commands::HealthCheck(args) => command_health_check(args),
@@ -707,6 +711,8 @@ fn command_observe(args: ObserveCommand) -> Result<()> {
     };
     let path = run.run_dir.join("observations/observe.json");
     write_json_artifact(&run, &path, &observation)?;
+    let mut store = evidence_store_for_run(&run)?;
+    write_observation_artifact_v2(&mut store, &run.run_dir, observation.clone())?;
     append_audit_event(
         &run,
         AuditInput {
@@ -877,6 +883,8 @@ fn command_load_cpu(args: LoadCpuCommand) -> Result<()> {
         .join("loads")
         .join(format!("{}.result.json", result.load_id));
     write_json_artifact(&run, &path, &result)?;
+    let mut store = evidence_store_for_run(&run)?;
+    write_load_artifact_v2(&mut store, &run.run_dir, result.clone())?;
     append_audit_event(
         &run,
         AuditInput {
@@ -920,6 +928,8 @@ fn command_pressure_run(args: PressureRunCommand) -> Result<()> {
     );
     let path = run.run_dir.join("pressure").join(file_name);
     write_json_artifact(&run, &path, &result)?;
+    let mut store = evidence_store_for_run(&run)?;
+    write_pressure_artifact_v2(&mut store, &run.run_dir, result.clone())?;
     append_audit_event(
         &run,
         AuditInput {
@@ -966,6 +976,8 @@ fn command_pressure_composite(args: PressureCompositeCommand) -> Result<()> {
     );
     let path = run.run_dir.join("composite").join(file_name);
     write_json_artifact(&run, &path, &result)?;
+    let mut store = evidence_store_for_run(&run)?;
+    write_composite_artifact_v2(&mut store, &run.run_dir, result.clone())?;
     append_audit_event(
         &run,
         AuditInput {
@@ -1060,6 +1072,8 @@ fn persist_workload_artifacts(
     artifacts.demand_profile.evidence_refs.sort();
     artifacts.demand_profile.evidence_refs.dedup();
     let profile_ref = write_json_artifact(run, &profile_path, &artifacts.demand_profile)?;
+    let mut store = evidence_store_for_run(run)?;
+    write_workload_artifact_v2(&mut store, &run.run_dir, artifacts.demand_profile.clone())?;
     append_audit_event(
         run,
         AuditInput {
@@ -1088,28 +1102,6 @@ fn persist_workload_artifacts(
             value: artifacts.demand_profile,
         })?
     );
-    Ok(())
-}
-
-fn command_decide_suitability(args: SuitabilityCommand) -> Result<()> {
-    let target_contract: TargetOperatingContract = read_json(&args.target_contract)?;
-    let workload: WorkloadDemandProfile = read_json(&args.workload_demand)?;
-    let policy: SuitabilityPolicy = read_yaml(&args.policy)?;
-    let decision = decide_suitability(
-        &args.target_run,
-        &target_contract,
-        &workload,
-        &policy,
-        path_ref(&args.target_contract),
-        path_ref(&args.workload_demand),
-        path_ref(&args.policy),
-    )?;
-    write_json_pretty(&args.out, &decision)?;
-    if args.json {
-        print_json(&decision)?;
-    } else {
-        println!("{}", args.out.display());
-    }
     Ok(())
 }
 
@@ -1613,134 +1605,6 @@ fn command_report_operating_point(args: ReportPackCommand) -> Result<()> {
         "capability_cost_model_ref": cost_ref,
         "coverage": coverage,
         "cost_model": cost
-    }))
-}
-
-fn command_report_operating_contract(args: OperatingContractCommand) -> Result<()> {
-    let run = existing_run_context(args.run);
-    let inventory = platform_mechanism_inventory_for_run(
-        &run.run_dir,
-        args.target_id.clone(),
-        args.target_class.clone(),
-    )?;
-    let plan = boundary_probe_plan(args.target_id.clone(), args.target_class.clone());
-    let coupling = resource_coupling_report_for_run(&run.run_dir, args.target_id.clone())?;
-
-    let inventory_path = run
-        .run_dir
-        .join("reports/platform_mechanism_inventory.json");
-    let plan_path = run.run_dir.join("reports/boundary_probe_plan.json");
-    let coupling_path = run.run_dir.join("reports/resource_coupling_report.json");
-    let inventory_ref = write_json_artifact(&run, &inventory_path, &inventory)?;
-    let plan_ref = write_json_artifact(&run, &plan_path, &plan)?;
-    let coupling_ref = write_json_artifact(&run, &coupling_path, &coupling)?;
-
-    let contract =
-        target_operating_contract_for_run(&run.run_dir, args.target_id.clone(), args.target_class)?;
-    let contract_path = run.run_dir.join("reports/target_operating_contract.json");
-    let contract_ref = write_json_artifact(&run, &contract_path, &contract)?;
-    let mut run_set_ref = None;
-    let mut multi_run_contract_ref = None;
-    let mut multi_run_contract = None;
-    if !args.include_runs.is_empty() {
-        let run_set = run_set_manifest_for_runs(
-            &run.run_dir,
-            &args.include_runs,
-            args.target_id.clone(),
-            contract.target_class.clone(),
-        )?;
-        let run_set_path = run.run_dir.join("reports/run_set_manifest.json");
-        let written_run_set_ref = write_json_artifact(&run, &run_set_path, &run_set)?;
-        let multi = multi_run_operating_contract_for_runs(
-            &run.run_dir,
-            &args.include_runs,
-            args.target_id.clone(),
-            contract.target_class.clone(),
-            Some(written_run_set_ref.clone()),
-        )?;
-        let multi_path = run
-            .run_dir
-            .join("reports/multi_run_operating_contract.json");
-        let written_multi_ref = write_json_artifact(&run, &multi_path, &multi)?;
-        run_set_ref = Some(written_run_set_ref);
-        multi_run_contract_ref = Some(written_multi_ref);
-        multi_run_contract = Some(multi);
-    }
-    let inventory_status = if inventory
-        .mechanisms
-        .iter()
-        .any(|mechanism| mechanism.evidence_status == ContractEvidenceStatus::Insufficient)
-    {
-        ContractEvidenceStatus::Insufficient
-    } else {
-        ContractEvidenceStatus::MeasuredPartial
-    };
-
-    for (operation, result) in [
-        (
-            "report.platform_mechanism_inventory",
-            serde_json::to_string(&inventory_status).unwrap_or_else(|_| "insufficient".to_string()),
-        ),
-        ("report.boundary_probe_plan", "planned".to_string()),
-        (
-            "report.resource_coupling",
-            serde_json::to_string(&coupling.report_status)
-                .unwrap_or_else(|_| "unknown".to_string()),
-        ),
-        (
-            "report.target_operating_contract",
-            serde_json::to_string(&contract.contract_status)
-                .unwrap_or_else(|_| "unknown".to_string()),
-        ),
-    ] {
-        append_audit_event(
-            &run,
-            AuditInput {
-                target_id: args.target_id.clone(),
-                actor: Actor::codex(),
-                operation: operation.to_string(),
-                operation_id: None,
-                risk_tier: RiskTier::Tier0ReadOnlyObservation,
-                approval_ref: None,
-                restore_lease_ref: None,
-                result: result.trim_matches('"').to_string(),
-            },
-        )?;
-    }
-    if let Some(multi) = multi_run_contract.as_ref() {
-        for (operation, result) in [
-            ("report.run_set_manifest", "recorded".to_string()),
-            (
-                "report.multi_run_operating_contract",
-                serde_json::to_string(&multi.contract_status)
-                    .unwrap_or_else(|_| "unknown".to_string()),
-            ),
-        ] {
-            append_audit_event(
-                &run,
-                AuditInput {
-                    target_id: args.target_id.clone(),
-                    actor: Actor::codex(),
-                    operation: operation.to_string(),
-                    operation_id: None,
-                    risk_tier: RiskTier::Tier0ReadOnlyObservation,
-                    approval_ref: None,
-                    restore_lease_ref: None,
-                    result: result.trim_matches('"').to_string(),
-                },
-            )?;
-        }
-    }
-
-    print_json(&serde_json::json!({
-        "platform_mechanism_inventory_ref": inventory_ref,
-        "boundary_probe_plan_ref": plan_ref,
-        "resource_coupling_report_ref": coupling_ref,
-        "target_operating_contract_ref": contract_ref,
-        "run_set_manifest_ref": run_set_ref,
-        "multi_run_operating_contract_ref": multi_run_contract_ref,
-        "multi_run_operating_contract": multi_run_contract,
-        "target_operating_contract": contract
     }))
 }
 
@@ -2714,6 +2578,18 @@ fn existing_run_context(run_dir: PathBuf) -> RunContext {
 fn write_json_artifact<T: Serialize>(run: &RunContext, path: &Path, value: &T) -> Result<String> {
     write_json_pretty(path, value)?;
     Ok(run.artifact_uri(path)?)
+}
+
+fn evidence_store_for_run(run: &RunContext) -> Result<EvidenceStore> {
+    Ok(EvidenceStore::open(std::slice::from_ref(&run.run_dir))?)
+}
+
+fn legacy_v1_sidecar_path(path: &Path) -> PathBuf {
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("artifact");
+    path.with_file_name(format!("{stem}.v1.json"))
 }
 
 fn write_text_artifact(run: &RunContext, path: &Path, value: &str) -> Result<String> {
