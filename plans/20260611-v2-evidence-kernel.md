@@ -375,6 +375,27 @@ Phase 1 complexity budget and audit:
   one repeated concern from the plan; do not add report/probe adapters until
   Phases 2-3 prove the call sites.
 
+Phase 2 responsibility map:
+
+- `rules/engine.rs`: predicate evaluation, table-driven rule evaluation,
+  evidence-ref collection, and claim instance projection from catalog defaults.
+- `rules/operating_contract.rs`: v2 operating-contract artifact payload and
+  rule table behind core API only.
+- `rules/suitability.rs`: v2 suitability artifact payload and conservative
+  selection-readiness rule table behind core API only.
+- `evidence/catalog.rs`: claim IDs, blocked scan terms, and default next
+  evidence lookup for both v1 constraints and v2 rules.
+- `suitability.rs`: legacy v1 public DTO generation remains in place, but its
+  initial blocked claim terms now come from the claim catalog.
+
+Phase 2 complexity budget and audit:
+
+- New public abstraction budget: `Pred`, `Rule`, `RuleEvaluation`, plus two
+  v2 report payload structs.
+- Post-implementation decision: keep this as Rust tables, not YAML, and keep
+  CLI/report cutover out of Phase 2. The v1 generators remain parallel until
+  Phase 4/5 parity cleanup.
+
 ### Rules Engine
 
 Use Rust declaration tables with a small predicate vocabulary. Do not start
@@ -536,13 +557,13 @@ make verify
 - [x] Phase 1: Implement evidence kernel and schema generation.
 - [x] Phase 1: Add `make schemas` to `Makefile` and register it in
       `COMMANDS.md`.
-- [ ] Phase 2: Implement `rules/engine.rs`.
-- [ ] Phase 2: Implement claim catalog and connect blocked-claim lookup.
-- [ ] Phase 2: Replace operating contract internals behind core APIs while
+- [x] Phase 2: Implement `rules/engine.rs`.
+- [x] Phase 2: Implement claim catalog and connect blocked-claim lookup.
+- [x] Phase 2: Replace operating contract internals behind core APIs while
       keeping CLI v1 output.
-- [ ] Phase 2: Replace suitability internals behind core APIs while keeping CLI
+- [x] Phase 2: Replace suitability internals behind core APIs while keeping CLI
       v1 output.
-- [ ] Phase 2: Connect `constraints check` to the claim catalog.
+- [x] Phase 2: Connect `constraints check` to the claim catalog.
 - [ ] Phase 3: Replace probe outputs with `Artifact<P>`.
 - [ ] Phase 4: Split CLI modules and update target/helper payloads.
 - [ ] Phase 4: Cut CLI output and `cli.rs` expectations over to v2 together.
@@ -574,6 +595,11 @@ make verify
 - The generated `schemars::schema_for!` root stores envelope
   `additionalProperties: false` at the root object, while nested properties
   are under `properties`.
+- Phase 2 keeps the public CLI on v1 shapes. The new operating-contract and
+  suitability artifacts are exposed only through core API tests and generated
+  v2 schemas.
+- Making `Kind` `Copy` simplified rule-table evidence kind slices; existing
+  store code was updated to avoid clone-on-copy clippy failures.
 
 ## Verification Log
 
@@ -622,6 +648,20 @@ make verify
   integration tests, contract validation, docs smoke, and command smoke.
 - Phase 1 PR: draft PR #31 opened at
   `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/31`.
+- Phase 2 schema generation: `make schemas` passed and regenerated catalog
+  schema plus new `lab.report.operating_contract.v2.schema.json` and
+  `lab.report.suitability.v2.schema.json` snapshots.
+- Phase 2 focused verification:
+  `cargo test -p adc-lab-core --test rules_engine -- --nocapture` passed with
+  5 tests.
+- Phase 2 kernel regression:
+  `cargo test -p adc-lab-core --test evidence_kernel -- --nocapture` passed
+  with 7 tests.
+- Phase 2 contract gate:
+  `cargo test --workspace contract_validation -- --nocapture` passed and kept
+  Phase 0 safety invariant tests green.
+- Phase 2 final gate: `make verify` passed after adding the rules engine,
+  catalog-backed blocked claim terms, v2 report schemas, and focused tests.
 
 ## Decision Log
 
@@ -659,15 +699,23 @@ make verify
   refusals such as symlinks, malformed JSON artifacts, and path escapes.
   Rationale: these are repository/run-directory contract violations, not claim
   decisions.
+- 2026-06-11: Keep Phase 2 v2 operating-contract and suitability outputs
+  core-only. Rationale: this satisfies the table-driven rule acceptance
+  criteria without creating a dual public CLI contract before Phase 4.
+- 2026-06-11: Store blocked claim scan terms in the claim catalog while
+  preserving v1 `DesignConstraintPack` string shape. Rationale: constraints
+  can move to one source of truth without changing the CLI schema yet.
 
 ## Handoff
 
-- Branch: `codex/adc-labv2-phase1-evidence-kernel`.
+- Branch: `codex/adc-labv2-phase2-rules-engine`.
 - Baseline commit: `543edf0`.
-- Current status: Phase 1 implemented, verified, pushed, and published as
-  stacked draft PR #31. Phase 0 remains draft PR #30.
-- Uncommitted changes: none expected after the Phase 1 PR URL plan update is
-  committed and pushed.
+- Current status: Phase 2 implemented and verified locally. Phase 0 is draft PR
+  #30; Phase 1 is stacked draft PR #31. Phase 2 should be committed, pushed,
+  and opened as a stacked draft PR based on
+  `codex/adc-labv2-phase1-evidence-kernel`.
+- Uncommitted changes: Phase 2 rules engine, catalog connection, generated
+  schemas, tests, and this plan update are pending commit.
 - Commands run so far:
   - `sed -n ...` on the request attachment, `PLANS.md`, execution-plan
     references, existing plans, `COMMANDS.md`, Cargo manifests, Makefile, and
@@ -683,21 +731,24 @@ make verify
   - `cargo test --workspace contract_validation -- --nocapture`.
   - `make schemas`.
   - `cargo test -p adc-lab-core --test evidence_kernel -- --nocapture`.
+  - `cargo test -p adc-lab-core --test rules_engine -- --nocapture`.
   - `make verify`.
 - Next steps:
-  1. Start Phase 2 from `codex/adc-labv2-phase1-evidence-kernel`.
-  2. Keep the Phase 2 PR based on the Phase 1 branch while PR #31 is open.
-  3. Implement rules engine/catalog integration behind core APIs while keeping
-     public CLI output v1.
+  1. Commit and push Phase 2 on `codex/adc-labv2-phase2-rules-engine`.
+  2. Open the Phase 2 draft PR against
+     `codex/adc-labv2-phase1-evidence-kernel`.
+  3. Start Phase 3 from the Phase 2 branch after the Phase 2 PR exists.
 - Read these files first when resuming:
   - `plans/20260611-v2-evidence-kernel.md`
   - `crates/adc-lab-core/src/control.rs`
   - `crates/adc-lab-core/src/platform_contract.rs`
   - `crates/adc-lab-core/src/report.rs`
   - `crates/adc-lab-core/src/evidence/`
+  - `crates/adc-lab-core/src/rules/`
   - `crates/adc-lab/tests/cli.rs`
 
 ## Outcomes & Retrospective
 
-Phase 0 and Phase 1 are complete and PR'd. Whole-cutover outcomes remain
-pending until Phases 2-5 are implemented and PR'd.
+Phase 0 and Phase 1 are complete and PR'd. Phase 2 is complete locally.
+Whole-cutover outcomes remain pending until Phases 2-5 are implemented and
+PR'd.

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 pub const ARTIFACT_SCHEMA_V2: &str = "lab.artifact.v2";
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Kind {
     Inventory,
