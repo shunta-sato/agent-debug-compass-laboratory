@@ -17,10 +17,10 @@
 | `inventory` | explain target fingerprint collection | CLI start to artifact write |
 | `toolchain.discover` | explain evidence-source availability | CLI start to artifact write |
 | `observe` | explain bounded read-only sampling | CLI start to observation artifact |
-| `familiarize.read_only` | explain read-only evidence pack generation | CLI start to manifest and pack artifacts |
-| `report.claim_trace` | explain claim-boundary artifact generation | CLI start to claim trace artifact |
+| `familiarize.read_only` | explain read-only evidence pack generation | CLI start to manifest and run-report artifacts |
+| `report.run` | explain claim-boundary artifact generation | CLI start to run-report artifact |
 | `run_manifest.write` | explain run manifest generation | CLI start to manifest artifact |
-| `report.pack` | explain familiarization pack generation | CLI start to pack artifact |
+| `report.pack` | explain run-report generation from existing artifacts | CLI start to run-report artifact |
 | `tool.version` | explain controller or target runner binary identity capture | CLI start to version artifact |
 | `tool.qualify_inventory` | explain discovered tool evidence acceptance/rejection | CLI start to qualification summary artifact |
 | `control.plan` | explain planned state change | CLI start to plan artifact |
@@ -103,9 +103,9 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
   thermal safety claims.
 - Failure mode / misleading interpretation: a completed bounded load is not a
   sustained thermal, battery, flash, latency, or production readiness claim.
-- Artifact path: `artifact://lab/runs/<run_id>/loads/<load_id>.result.json`.
+- Artifact path: `artifact://lab/runs/<run_id>/load/cpu.<result_id>.v2.json`.
 
-- Signal: experiment claim decision.
+- Signal: run report claim decision.
 - Decision supported: whether matrix artifacts can support a target behavior claim.
 - Action owner: lab operator or agent reviewing the run.
 - Expected action when degraded: inspect trial `failure`, trial artifact refs,
@@ -115,7 +115,7 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
 - Failure mode / misleading interpretation: completed `cpu_load_workers` trials
   do not prove privileged governor, fixed-frequency, thermal safety, or
   production behavior.
-- Artifact path: `artifact://lab/runs/<run_id>/reports/claim_evidence_trace.json`.
+- Artifact path: `artifact://lab/runs/<run_id>/reports/run_report.v2.json`.
 
 - Signal: experiment trial artifact refs.
 - Decision supported: which observation/load artifacts justify each completed
@@ -141,7 +141,7 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
 - Failure mode / misleading interpretation: `controlled_subset` for
   `cpu_load_workers` does not prove fixed-frequency or governor behavior.
 - Artifact path:
-  `artifact://lab/runs/<run_id>/reports/operating_point_coverage.json`.
+  `artifact://lab/runs/<run_id>/reports/run_report.v2.json`.
 
 - Signal: v2 operating contract report.
 - Decision supported: whether rule-table predicates support, defer, or block
@@ -157,7 +157,7 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
 - Artifact path:
   `artifact://lab/runs/<run_id>/reports/target_operating_contract.v2.json`.
 
-- Signal: read-only run manifest.
+- Signal: read-only run report.
 - Decision supported: whether target familiarization has inventory, toolchain,
   observation, optional bounded-load, audit, release identity, and claim trace
   artifacts consistent with one logical run.
@@ -166,8 +166,8 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
   `data_quality.missing`, and `data_quality.inconsistent`; rerun missing or
   inconsistent operations before creating suitability or operating-contract
   claims.
-- Counter-metric: familiarization pack `pack_status`, claim trace blocked
-  entries, and target capability profile `selection_ready=false`.
+- Counter-metric: run-report data quality, blocked claim decisions, and
+  suitability `selection_ready=false`.
 - Failure mode / misleading interpretation: an exploratory short-smoke pack is
   not controlled operating-point, battery, flash, sustained thermal, or
   production evidence.
@@ -189,11 +189,11 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
 - Decision supported: which operations actually ran in the evidence pack:
   inventory, toolchain discovery, passive observe, bounded load, privileged
   control, controlled operating point, and sustained thermal.
-- Action owner: lab operator or agent preparing target capability profiles.
+- Action owner: lab operator or agent preparing suitability artifacts.
 - Expected action when degraded: keep unsupported claims blocked when an
   operation is `not_run`, and rerun report pack after adding artifacts to a
   run directory.
-- Counter-metric: claim trace supported/blocked entries must be generated from
+- Counter-metric: run-report supported/blocked entries must be generated from
   the same operation summary.
 - Failure mode / misleading interpretation: artifact presence without matching
   operation status and audit evidence is not enough for formal comparison.
@@ -246,7 +246,7 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
 - Signal: release binary identity.
 - Decision supported: whether a Pi4/Pi5 measurement used a specific adc-lab
   version, git sha, target triple, and build profile.
-- Action owner: lab operator or agent preparing target capability evidence.
+- Action owner: lab operator or agent preparing suitability evidence.
 - Expected action when degraded: reject same-binary comparison claims and rerun
   with a verified GitHub Release asset.
 - Counter-metric: `SHA256SUMS`, GitHub artifact attestation, and

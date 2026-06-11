@@ -78,6 +78,47 @@ fn contract_validation_control_plan_rejects_arbitrary_shell_field() {
 }
 
 #[test]
+fn contract_validation_approval_record_rejects_forged_shell_field() {
+    let root = workspace_root();
+    let schema_path = schema_path_for(&root, "lab.approval_record.v1");
+    let fixture_path = root.join("tests/golden/lab.approval_record.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json.as_object_mut().unwrap().insert(
+        "approved_shell".to_string(),
+        serde_json::json!("sudo sh -c echo bad"),
+    );
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "approval records must not accept forged shell approval fields"
+    );
+}
+
+#[test]
+fn contract_validation_restore_lease_rejects_forged_restore_command_field() {
+    let root = workspace_root();
+    let schema_path = schema_path_for(&root, "lab.restore_lease.v1");
+    let fixture_path = root.join("tests/golden/lab.restore_lease.v1.valid.json");
+    let schema_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
+    let mut fixture_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
+    fixture_json["captured_state"]["cpufreq_policies"][0]
+        .as_object_mut()
+        .unwrap()
+        .insert(
+            "restore_command".to_string(),
+            serde_json::json!("sudo sh -c echo bad"),
+        );
+    assert!(
+        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
+        "restore leases must not accept forged restore command fields"
+    );
+}
+
+#[test]
 fn contract_validation_experiment_run_accepts_not_implemented_status() {
     let root = workspace_root();
     let schema_path = schema_path_for(&root, "lab.experiment_run.v1");

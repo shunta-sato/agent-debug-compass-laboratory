@@ -47,8 +47,9 @@ Blocked claims:
 The blocked claims are intentional. The claim catalog keeps stable IDs and
 next-evidence guidance so constraints checks can reject unsupported text.
 
-`adc-lab report operating-point` creates `lab.operating_point_coverage.v1`.
-Coverage status is explicit:
+`adc-lab report operating-point` writes or updates `reports/run_report.v2.json`
+as a `lab.artifact.v2` envelope with `kind = report.run`. Operating-point
+coverage status is explicit:
 
 ```text
 observational_only:

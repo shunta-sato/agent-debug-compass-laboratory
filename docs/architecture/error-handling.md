@@ -22,8 +22,8 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
 | CPU load worker execution | worker thread panic or unreadable operator abort marker | CLI error; load result is not trusted as evidence |
 | Experiment matrix execution | unsupported controlled factor, randomized order, failed load, failed observation, or safety-aborted load | trial `status=blocked` or `status=failed`; only successful supported trials become `completed` |
 | Operating point coverage report | missing observation/experiment artifacts, blocked trial, failed trial, unsupported factor, or unsafe factor | structured coverage with `observational_only`, `controlled_subset`, `not_controllable`, or `blocked_unsafe`; malformed JSON artifacts are CLI errors |
-| Capability cost model report | missing optional inventory/toolchain/coverage/load artifacts, malformed JSON, or absent accelerator/storage/network evidence | missing optional artifacts become `missing_evidence`/blocked claims; malformed JSON artifacts are CLI errors because evidence cannot be trusted |
-| Target capability profile report | missing optional run/load/observation artifacts, malformed workload profile, or malformed run artifact | missing optional artifacts become `no_evidence`/`exploratory_partial` with `selection_ready=false`; malformed workload or evidence JSON is a CLI validation error |
+| Operating contract report | missing pressure/composite artifacts, malformed JSON, or insufficient evidence effects | missing evidence becomes blocked/provisional claim decisions; malformed JSON artifacts are CLI errors because evidence cannot be trusted |
+| Suitability and constraints reports | missing target contract, malformed workload profile, malformed policy, or malformed v2 suitability artifact | missing required dimensions keep `selection_ready=false`; malformed inputs are CLI validation errors |
 | Evidence pack consistency | artifact/operation mismatch, audit run-id mismatch, missing target runner version, or missing release checksum | report pack records `data_quality.missing` or `data_quality.inconsistent`; downstream formal comparison remains blocked |
 | Top-level version command | missing build environment metadata in local/dev builds | JSON still emits required fields; `git_sha` may be `unknown` outside release workflow |
 | Release packaging | missing binary, missing required docs/license, invalid metadata token, or checksum command failure | script exits before tarball publication |
@@ -70,16 +70,13 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
   artifacts fail the command because evidence cannot be trusted.
 - Observed frequency variation is always kept separate from fixed-frequency
   control coverage.
-- Capability cost model generation is generated from existing run artifacts.
-  Missing optional evidence blocks or limits architecture claims; malformed
-  artifacts fail the command.
-- Capability presence is not an architecture recommendation. Offload and
-  production physical-footprint claims require qualified, target-specific cost
-  evidence.
-- Target capability profile generation reads existing run artifacts for a
-  supplied workload profile. Missing artifacts become explicit evidence gaps;
-  malformed artifacts fail the command because target-selection profiles must
-  not be built from corrupted evidence.
+- Operating contract reports read existing v2 evidence artifacts from the
+  evidence store. Missing predicate evidence blocks or limits operating claims;
+  malformed artifacts fail the command because evidence cannot be trusted.
+- Suitability reports read an existing v2 operating contract, workload demand
+  profile, and policy. Missing required dimensions become explicit evidence
+  gaps; malformed artifacts fail the command because target/workload decisions
+  must not be built from corrupted evidence.
 - Run manifests are generated from one operation summary. If a bounded load
   artifact exists, the pack cannot claim `observational_read_only` and the
   claim trace must include only short-smoke load claims, not sustained or
@@ -91,8 +88,8 @@ Relevant workflow headings: "13. Error handling" and "13.1 Basic templates".
 - Version and release identity are evidence preconditions. Missing release
   asset checksums or target runner version are recorded as missing data; binary
   version/git mismatches are recorded as inconsistent data.
-- PR11 target capability profiles keep `selection_ready=false`; Pi4/Pi5
-  comparison and suitability claims remain blocked even when short-smoke
+- Suitability artifacts keep `selection_ready=false` when required evidence is
+  unknown; Pi4/Pi5 comparison claims remain blocked even when short-smoke
   artifacts exist.
 - PR11 CI/CD release artifacts record binary identity only. `--version`,
   `release-manifest.json`, `SHA256SUMS`, and GitHub attestations are

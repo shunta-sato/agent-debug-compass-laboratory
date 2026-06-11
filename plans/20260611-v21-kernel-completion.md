@@ -71,9 +71,9 @@ Reframed quantitative targets:
   - report behavior changes through rule rows, not bespoke generators,
   - generated schema drift is checked by `make verify`.
 - v2.1 LoC expectation is forecast-driven, not fixed. The actuals table below
-  is authoritative when it differs from prose. After Phase 5, expected final
-  landing is roughly 18,017 Rust lines plus documentation-only Phase 6 changes.
-  This is a guardrail record, not an acceptance target.
+  is authoritative when it differs from prose. Final landing is 18,058 Rust
+  lines after the Phase 5 control-schema negative-test follow-up; this is a
+  guardrail record, not an acceptance target.
 - File budgets after Phase 4:
   - `crates/adc-lab/src/main.rs` <= 800 lines,
   - `crates/adc-lab-core/src/report.rs` <= 900 lines or deleted,
@@ -105,8 +105,8 @@ Phase contribution forecast:
 | Phase 3 suitability/constraints | -100 to +100 | -2 to -3 | Revised after Phase 1/2 showed v2 payload and test cost offsets deleted v1 DTOs. |
 | Phase 4 CLI module split | -100 to +100 | 0 | Better boundaries may add small module overhead. |
 | Phase 5 generated schemas | +200 to +400 | maintained-by-hand -> 0 | Derives, adapters, and compatibility tests add code. |
-| Phase 6 docs | 0 | 0 | Documentation-only. |
-| Total forecast | Actuals plus remaining phase forecast | maintained-by-hand -> 0 | Current expected landing after Phase 5: about 18,017 Rust lines; Phase 6 is docs-only. |
+| Phase 6 docs | 0, plus test-only follow-up if needed | 0 | Documentation normalization; Phase 5 review added lightweight control negative tests. |
+| Total forecast | Actuals plus remaining phase forecast | maintained-by-hand -> 0 | Final landing: 18,058 Rust lines, top-level schemas 0, generated schemas 43. |
 
 Phase contribution actuals:
 
@@ -117,6 +117,7 @@ Phase contribution actuals:
 | Phase 3 suitability/constraints | +68 total Rust LoC (`17,856` -> `17,924`) | top-level `25` -> `22`, generated `14` -> `17`, maintained-by-hand `25` -> `22` | Remaining phases now forecast final total around `18,024-18,424`; LoC is effectively neutral while schema maintenance drops. |
 | Phase 4 CLI module split | +84 total Rust LoC (`17,924` -> `18,008`) | no schema change | In forecast. `main.rs` dropped to 605 lines and all production Rust files are under budget. |
 | Phase 5 generated schemas | +9 total Rust LoC (`18,008` -> `18,017`) | top-level `22` -> `0`, generated `17` -> `43`, maintained-by-hand `22` -> `0` | Better than forecast. Most DTOs already had `JsonSchema`; generator helper offset small DTO additions. |
+| Phase 6 docs normalization | +41 total Rust LoC (`18,017` -> `18,058`) | no schema change | Test-only follow-up for approval/restore schema rejection; production Rust budget remains unchanged. |
 
 ## Context & Orientation
 
@@ -591,6 +592,38 @@ Acceptance:
 - README links point to the normalized docs.
 - No old doc claims v1 report/probe/suitability artifacts as primary outputs.
 
+Phase 6 dev workflow route:
+
+- Risk route: normal. Rationale: docs and schema-validation tests only; no
+  runtime command behavior or wire DTO shape changes.
+- Required branches: default implementation lane, `implementation-economy`,
+  ExecPlan update, and final `quality-gate`.
+- Not triggered: design-balance, embedded NFR, observability, performance,
+  concurrency, destructive-refactor, and error-handling. This phase clarifies
+  existing contracts instead of adding runtime surfaces.
+- Verification depth: focused contract validation for the Phase 5 follow-up,
+  docs-smoke, stale-reference scans, and full `make verify`.
+
+Phase 6 complexity budget:
+
+- Changed files target: 10-16 files, mostly documentation plus one focused
+  contract-validation test file.
+- New modules/classes target: 0.
+- New helper/wrapper target: 0.
+- Production Rust LoC budget: 0; test-only Rust additions are allowed for the
+  control schema negative-test follow-up.
+- Documentation budget: consolidate wording and add one docs index instead of
+  adding a second narrative layer.
+
+Phase 6 post-implementation economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `docs/README.md` documentation index | Makes the normative/reference split explicit without moving historical architecture notes or duplicating contracts. | keep | `docs-smoke` checks the index and the normative docs. |
+
+No new runtime modules, helper wrappers, or production Rust abstractions were
+added in Phase 6.
+
 ## Validation & Acceptance
 
 Every phase exits with:
@@ -666,11 +699,11 @@ Quality gate rule:
 - [x] Phase 4: Wire `make file-budgets` into `make verify`.
 - [x] Phase 5: Convert non-control active schemas to generated snapshots.
 - [x] Phase 5: Convert control schemas last after compatibility tests.
-- [ ] Phase 6: Normalize docs and update `docs-smoke`.
-- [ ] Phase 6: Document or rename public output file names whose v2 artifact
+- [x] Phase 6: Normalize docs and update `docs-smoke`.
+- [x] Phase 6: Document or rename public output file names whose v2 artifact
       kind no longer matches legacy v1 file names.
-- [ ] Run final `make verify` and record final measurements.
-- [ ] Record final Outcomes against file budgets, schema classification,
+- [x] Run final `make verify` and record final measurements.
+- [x] Record final Outcomes against file budgets, schema classification,
       contribution forecast, and any missed target disposition in the Decision
       Log.
 
@@ -818,6 +851,18 @@ Quality gate rule:
   generator write blocks with one helper offset the small DTO/test additions.
   The final expected Rust LoC after Phase 5 is about 18,017 plus docs-only
   Phase 6 changes.
+- 2026-06-11: Add approval-record and restore-lease schema negative tests in
+  Phase 6 instead of reopening Phase 5. Rationale: the Phase 5 review accepted
+  the generated-schema cutover and identified these as lightweight follow-up
+  evidence that generated control schemas did not relax forged-field rejection.
+- 2026-06-11: Keep retained architecture documents as reference-only through
+  `docs/README.md` instead of moving or deleting them. Rationale: the four
+  normative documents are explicit, docs-smoke can verify the map, and avoiding
+  path churn keeps historical design context available.
+- 2026-06-11: Document public output file names against v2 artifact `kind`
+  rather than changing CLI defaults. Rationale: suitability and constraints
+  paths are caller-provided, while the stable contract is the envelope kind;
+  examples can use `.v2.json` names without a behavior change.
 
 ## Verification Log
 
@@ -1048,13 +1093,45 @@ Quality gate rule:
   submit. Acceptance criteria are met: maintained-by-hand schema count is 0,
   every active schema is generated or generated-checked, and `make verify`
   fails on generated schema drift plus final ledger violations.
+- Phase 6 branch setup:
+  `git fetch origin --prune` updated `origin/main` to `5a2eb16`; `git switch
+  -c codex/adc-labv21-docs-normalization origin/main` created the Phase 6
+  branch.
+- Phase 6 focused verification:
+  `cargo test -p adc-lab-core --test contract_validation -- --nocapture`
+  passed; 16 tests. The added approval-record and restore-lease forged-field
+  cases both reject invalid fixtures.
+- Phase 6 focused verification:
+  `make docs-smoke` passed with `docs/README.md`, the normative docs, CLI
+  reference, and pressure reference in the checked set.
+- Phase 6 stale-reference scan:
+  `rg -n "claim_evidence_trace|familiarization_pack|suitability_decision|design_constraint_pack|operating_point_coverage|lab\\.load_result\\.v1|lab\\.resource_pressure_result\\.v1|lab\\.composite_boundary_result\\.v1|reports/(claim_evidence_trace|familiarization_pack|suitability_decision|design_constraint_pack|target_operating_contract\\.json)" README.md docs`
+  returned no matches.
+- Phase 6 file-budget check:
+  `make file-budgets` passed with
+  `file budgets: enforced checked=50 violations=0`.
+- Phase 6 final measurements:
+  total Rust lines `18,058`; top-level schemas `0`; generated schemas `43`;
+  maintained-by-hand schemas remain `0`. The Rust increase is test-only from
+  the Phase 5 follow-up; production file budgets remain green.
+- Phase 6 final gate:
+  `make verify` passed. The gate covered workspace build, format check,
+  clippy, generated schema drift plus final ledger enforcement
+  (`top_level=0 no_schema_wire=31 maintained_by_hand=0`), enforced file
+  budgets, unit tests, integration tests, safety invariants, contract
+  validation, docs smoke, and command smoke.
+- Phase 6 quality gate:
+  submit. Acceptance criteria are met: docs-smoke checks the normalized
+  normative set, README links to the docs index and v2 examples, and old v1
+  report/probe/suitability artifacts are not claimed as primary outputs in
+  README/docs.
 
 ## Handoff
 
-- Branch: `codex/adc-labv21-generated-schemas`.
-- Base commit: `de23632` (`origin/main` after PR #45 / Phase 4 merge).
-- Current status: Phase 5 implementation is complete locally with `make verify`
-  passing. Commit and PR publication are next.
+- Branch: `codex/adc-labv21-docs-normalization`.
+- Base commit: `5a2eb16` (`origin/main` after Phase 5 merge).
+- Current status: Phase 6 implementation is complete locally with
+  `make verify` passing. Commit and PR publication are next.
 - Untracked local files exist and were not staged:
   `.DS_Store`, `._.DS_Store`,
   `plans/._20260611-v21-kernel-completion.md`,
@@ -1063,14 +1140,15 @@ Quality gate rule:
   `reports/20260611-planning-skills-improvement-proposal.md`, and
   `reports/20260611-v2-evidence-kernel-outcome-review.md`.
 - Next steps:
-  1. Commit and publish the Phase 5 PR.
-  2. Start Phase 6 docs normalization after Phase 5 lands.
+  1. Commit and publish the Phase 6 PR.
+  2. After merge, the v2.1 completion plan is satisfied; future work should be
+     opened from a new plan or follow-up issue.
 - Read first when resuming:
   - this plan,
+  - `docs/README.md`,
+  - `docs/reference/cli.md`,
   - `reports/20260611-v2-evidence-kernel-outcome-review.md`,
   - `plans/20260611-v2-evidence-kernel.md`,
-  - `crates/adc-lab/src/main.rs`,
-  - `crates/adc-lab-core/examples/generate_schemas.rs`,
   - `crates/adc-lab-core/tests/contract_validation.rs`,
   - `schemas/schema-ledger.tsv`.
 
@@ -1154,3 +1232,31 @@ Phase 5 outcome:
 - Phase 5 landed at +9 Rust lines while reducing maintained-by-hand schemas
   from 22 to 0. `platform_contract.rs` stayed at 1,496 lines, so no file-budget
   exemption was needed.
+
+Phase 6 outcome:
+
+- `docs/README.md` now defines the normative documentation set and marks
+  architecture notes as reference-only unless they are listed as normative.
+- README and CLI/reference docs use v2 example paths for suitability and
+  constraints outputs, document public output paths against artifact `kind`,
+  and no longer claim retired v1 report/probe/suitability artifacts as primary
+  outputs.
+- `docs-smoke` checks the docs index, CLI reference, pressure reference, and
+  existing normative docs.
+- Approval-record and restore-lease schema negative tests now prove generated
+  control schemas reject forged shell/restore-command fields.
+
+Final v2.1 outcome:
+
+- The v2.1 completion plan is satisfied through Phase 6.
+- Maintained-by-hand schema JSON went from 32 top-level files at Phase 0 to 0;
+  generated snapshots now cover 43 contracts.
+- Production Rust file budgets are enforced by `make verify` and have 0
+  violations. `main.rs` remains 605 lines and `platform_contract.rs` remains
+  1,496 lines.
+- Total Rust LoC is 18,058 versus the Phase 0 baseline of 17,939. The net
+  increase is accepted because LoC is a guardrail, production file budgets are
+  enforced, and the primary schema-source objective is complete.
+- Final verification: `make verify` passed with schema drift/final ledger
+  enforcement, file budgets, unit/integration/safety/contract tests, docs
+  smoke, and command smoke.

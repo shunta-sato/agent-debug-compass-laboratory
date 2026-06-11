@@ -55,10 +55,9 @@ TARGET=ssh://pi4 scripts/targets/pi5-to-pi4-readonly-familiarization.sh
 ```
 
 The smoke writes one run directory containing `run_manifest.json`,
-`reports/familiarization_pack.json`, `reports/claim_evidence_trace.json`,
-`inventory/target_inventory.json`, `toolchain/toolchain_inventory.json`,
-`tools/tool_qualification_summary.json`, `observations/observe.json`, and
-`audit.jsonl`.
+`reports/run_report.v2.json`, `inventory/target_inventory.json`,
+`toolchain/toolchain_inventory.json`, `tools/tool_qualification_summary.json`,
+`observations/observe.json`, and `audit.jsonl`.
 
 Optional Tier 1 bounded CPU load is separate from read-only familiarization.
 Keep it short, set a thermal abort when the target has a thermal surface, and

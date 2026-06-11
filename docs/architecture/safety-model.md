@@ -14,9 +14,9 @@ MVP behavior:
 - Tier 1 CPU load is bounded by worker count, duration, optional thermal abort,
   and optional operator abort.
 - Tier 1 CPU load default policy caps duration at 300s and worker count at available parallelism.
-- Tier 1 CPU load records a safety monitor summary in `lab.load_result.v1`,
-  including monitor samples, thermal surface availability, operator abort
-  observation, and restore-on-abort status.
+- Tier 1 CPU load records a safety monitor summary in a v2 `kind = load`
+  artifact, including monitor samples, thermal surface availability, operator
+  abort observation, and restore-on-abort status.
 - Tier 1 CPU load does not mutate target state in this MVP, so
   restore-on-abort status is `not_required`.
 - Tier 1 experiment matrix execution is limited to listed-order trials over
@@ -30,10 +30,10 @@ MVP behavior:
   fixed Option A helper as active and the future Option B systemd/Unix-socket
   provider as planned-disabled; it does not enable a daemon, socket, or new
   privileged transport.
-- PR11 target capability profile reporting is Tier 0 read-only reporting. It
-  reads existing run artifacts for a supplied workload profile and writes a
-  controller-side report; it does not execute observe, load, helper apply, SSH,
-  or destructive experiments.
+- Workload suitability reporting is Tier 0 read-only reporting. It reads an
+  existing v2 operating contract, workload demand profile, and policy, then
+  writes controller-side v2 suitability and constraint artifacts; it does not
+  execute observe, load, helper apply, SSH, or destructive experiments.
 - PR11 CI/CD release binary foundation is build/package infrastructure. It
   creates binary identity, checksum, and provenance artifacts only; it is not a
   target operation and cannot support resource/NFR or target-selection claims.
@@ -46,10 +46,11 @@ MVP behavior:
   in experiment matrices until privileged plan/apply/restore is wired into
   trial execution.
 - Operating point coverage reporting is Tier 0. It reads existing artifacts and
-  classifies claim boundaries; it does not execute new target operations.
-- Target capability profile reporting keeps `selection_ready=false` in PR11.
-  Target-selection claims remain blocked until comparison and suitability
-  decision contracts are added with matching evidence.
+  records claim boundaries in `kind = report.run`; it does not execute new
+  target operations.
+- Suitability reporting keeps `selection_ready=false` whenever required
+  evidence is unknown. Target-selection claims remain blocked unless a
+  policy-bound suitability artifact has matching evidence.
 - Coverage statuses are safety-gated: unsupported controlled points become
   `not_controllable`, and degradation-inducing points become `blocked_unsafe`.
 - Tier 3 is documentation-only in this MVP.
