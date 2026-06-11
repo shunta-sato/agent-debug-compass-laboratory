@@ -620,6 +620,8 @@ make verify
   schema generation, and command registry entry. The gate ran workspace build,
   `cargo fmt --all --check`, clippy with `-D warnings`, library tests,
   integration tests, contract validation, docs smoke, and command smoke.
+- Phase 1 PR: draft PR #31 opened at
+  `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/31`.
 
 ## Decision Log
 
@@ -662,11 +664,10 @@ make verify
 
 - Branch: `codex/adc-labv2-phase1-evidence-kernel`.
 - Baseline commit: `543edf0`.
-- Current status: Phase 1 implemented and verified locally. Phase 0 is draft PR
-  #30; Phase 1 should be committed, pushed, and opened as a stacked draft PR
-  based on `codex/adc-labv2-phase0-safety-invariants`.
-- Uncommitted changes: Phase 1 evidence kernel, generated schemas, command
-  registry updates, and this plan update are pending commit.
+- Current status: Phase 1 implemented, verified, pushed, and published as
+  stacked draft PR #31. Phase 0 remains draft PR #30.
+- Uncommitted changes: none expected after the Phase 1 PR URL plan update is
+  committed and pushed.
 - Commands run so far:
   - `sed -n ...` on the request attachment, `PLANS.md`, execution-plan
     references, existing plans, `COMMANDS.md`, Cargo manifests, Makefile, and
@@ -684,10 +685,10 @@ make verify
   - `cargo test -p adc-lab-core --test evidence_kernel -- --nocapture`.
   - `make verify`.
 - Next steps:
-  1. Commit and push Phase 1 on `codex/adc-labv2-phase1-evidence-kernel`.
-  2. Open the Phase 1 draft PR against
-     `codex/adc-labv2-phase0-safety-invariants`.
-  3. Start Phase 2 from the Phase 1 branch after the Phase 1 PR exists.
+  1. Start Phase 2 from `codex/adc-labv2-phase1-evidence-kernel`.
+  2. Keep the Phase 2 PR based on the Phase 1 branch while PR #31 is open.
+  3. Implement rules engine/catalog integration behind core APIs while keeping
+     public CLI output v1.
 - Read these files first when resuming:
   - `plans/20260611-v2-evidence-kernel.md`
   - `crates/adc-lab-core/src/control.rs`
@@ -698,5 +699,5 @@ make verify
 
 ## Outcomes & Retrospective
 
-Phase 0 and Phase 1 are complete locally. Whole-cutover outcomes remain
+Phase 0 and Phase 1 are complete and PR'd. Whole-cutover outcomes remain
 pending until Phases 2-5 are implemented and PR'd.
