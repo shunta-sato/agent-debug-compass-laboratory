@@ -972,6 +972,299 @@ pub struct WorkloadProfile {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+pub enum WorkloadExecutionMode {
+    Local,
+    TargetLocal,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkloadRunStatus {
+    Completed,
+    Failed,
+    Aborted,
+    Refused,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkloadDemandScope {
+    ProcessScoped,
+    SystemWideOnly,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadEnvironmentVariable {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadEnvironmentPolicy {
+    pub inherit: bool,
+    pub allowed: Vec<WorkloadEnvironmentVariable>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadExecution {
+    pub executable_path: String,
+    pub args: Vec<String>,
+    pub working_directory: String,
+    pub expected_executable_sha256: Option<String>,
+    pub require_executable_sha256: bool,
+    pub reject_setuid: bool,
+    pub reject_world_writable: bool,
+    pub environment_policy: WorkloadEnvironmentPolicy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadBounds {
+    pub duration_seconds_max: u64,
+    pub stdout_bytes_max: u64,
+    pub stderr_bytes_max: u64,
+    pub memory_bytes_max: u64,
+    pub storage_bytes_max: u64,
+    pub thermal_abort_c: Option<f64>,
+    pub operator_abort_file: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadObservationConfig {
+    pub sample_interval_ms: u64,
+    pub process_scoped: bool,
+    pub system_context: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadRunPlan {
+    pub schema_version: String,
+    pub workload_id: String,
+    pub workload_name: String,
+    pub target: String,
+    pub execution: WorkloadExecution,
+    pub bounds: WorkloadBounds,
+    pub observation: WorkloadObservationConfig,
+    pub claim_boundary: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadDataQuality {
+    pub degraded: bool,
+    pub missing: Vec<String>,
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadRunResult {
+    pub schema_version: String,
+    pub run_id: String,
+    pub workload_id: String,
+    pub target_id: String,
+    pub execution_mode: WorkloadExecutionMode,
+    pub status: WorkloadRunStatus,
+    pub reason: Option<String>,
+    pub exit_code: Option<i32>,
+    pub signal: Option<i32>,
+    pub started_at_unix_ms: u64,
+    pub ended_at_unix_ms: u64,
+    pub duration_ms: u64,
+    pub stdout_ref: Option<String>,
+    pub stderr_ref: Option<String>,
+    pub stdout_truncated: bool,
+    pub stderr_truncated: bool,
+    pub process_ids: Vec<u32>,
+    pub audit_refs: Vec<String>,
+    pub data_quality: WorkloadDataQuality,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadDemand {
+    pub process_cpu_utime_ticks: Option<u64>,
+    pub process_cpu_stime_ticks: Option<u64>,
+    pub process_cpu_time_ms: Option<f64>,
+    pub process_cpu_percent_avg: Option<f64>,
+    pub process_cpu_percent_peak: Option<f64>,
+    pub rss_peak_kb: Option<u64>,
+    pub vmhwm_peak_kb: Option<u64>,
+    pub read_bytes: Option<u64>,
+    pub write_bytes: Option<u64>,
+    pub cancelled_write_bytes: Option<u64>,
+    pub voluntary_ctxt_switches: Option<u64>,
+    pub nonvoluntary_ctxt_switches: Option<u64>,
+    pub duty_cycle: String,
+    pub child_process_accounting_status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadTargetConditionedResponse {
+    pub portable_between_targets: bool,
+    pub thermal_max_c: Option<f64>,
+    pub thermal_margin_c: Option<f64>,
+    pub freq_range_khz: Option<Vec<u64>>,
+    pub abort_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadSystemContext {
+    pub system_cpu_percent_avg: Option<f64>,
+    pub system_memory_available_min_kb: Option<u64>,
+    pub background_activity_confounder: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadDemandProfile {
+    pub schema_version: String,
+    pub profile_id: String,
+    pub run_id: String,
+    pub workload_id: String,
+    pub target_id: String,
+    pub execution_mode: WorkloadExecutionMode,
+    pub demand_scope: WorkloadDemandScope,
+    pub workload_demand: WorkloadDemand,
+    pub target_conditioned_response: WorkloadTargetConditionedResponse,
+    pub system_context: WorkloadSystemContext,
+    pub data_quality: WorkloadDataQuality,
+    pub evidence_refs: Vec<String>,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+pub enum SuitabilityDimensionKind {
+    Cpu,
+    Thermal,
+    Memory,
+    StorageIo,
+    NetworkIo,
+    LatencyJitter,
+    Observer,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SuitabilityDecisionValue {
+    Meet,
+    Marginal,
+    Fail,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SuitabilityConfidence {
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SuitabilityPolicyRules {
+    pub unknown_required_dimension_blocks_selection: bool,
+    pub unknown_never_becomes_meet: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ThermalSuitabilityPolicy {
+    pub max_temp_c: f64,
+    pub marginal_margin_c_below: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct CpuSuitabilityPolicy {
+    pub max_process_cpu_percent_avg: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct MemorySuitabilityPolicy {
+    pub min_memory_margin_mb: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SuitabilityPolicy {
+    pub schema_version: String,
+    pub policy_id: String,
+    pub required_dimensions: Vec<SuitabilityDimensionKind>,
+    pub optional_dimensions: Vec<SuitabilityDimensionKind>,
+    pub rules: SuitabilityPolicyRules,
+    pub thermal: Option<ThermalSuitabilityPolicy>,
+    pub cpu: Option<CpuSuitabilityPolicy>,
+    pub memory: Option<MemorySuitabilityPolicy>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SuitabilityDimensionDecision {
+    pub dimension: SuitabilityDimensionKind,
+    pub decision: SuitabilityDecisionValue,
+    pub requirement: String,
+    pub observed_demand: Option<String>,
+    pub target_envelope: Option<String>,
+    pub margin: Option<String>,
+    pub confidence: SuitabilityConfidence,
+    pub target_conditioned: bool,
+    pub portable_between_targets: bool,
+    pub evidence_refs: Vec<String>,
+    pub unknown_reason: Option<String>,
+    pub next_evidence_needed: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SuitabilityDecision {
+    pub schema_version: String,
+    pub decision_id: String,
+    pub target_id: String,
+    pub workload_id: String,
+    pub policy_id: String,
+    pub overall_decision: SuitabilityDecisionValue,
+    pub selection_ready: bool,
+    pub dimensions: Vec<SuitabilityDimensionDecision>,
+    pub blocked_claims: Vec<String>,
+    pub data_quality: WorkloadDataQuality,
+    pub evidence_refs: Vec<String>,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct DesignConstraintPack {
+    pub schema_version: String,
+    pub constraint_pack_id: String,
+    pub target_id: String,
+    pub workload_id: String,
+    pub allowed_patterns: Vec<String>,
+    pub burst_only_patterns: Vec<String>,
+    pub degraded_mode_triggers: Vec<String>,
+    pub forbidden_patterns: Vec<String>,
+    pub budget_constraints: Vec<String>,
+    pub required_runtime_guards: Vec<String>,
+    pub blocked_claims: Vec<String>,
+    pub agent_instructions: Vec<String>,
+    pub ci_rules: Vec<String>,
+    pub evidence_refs: Vec<String>,
+    pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum TargetCapabilityStatus {
     NoEvidence,
     ExploratoryPartial,

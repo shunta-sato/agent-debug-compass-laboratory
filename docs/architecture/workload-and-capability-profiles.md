@@ -94,11 +94,29 @@ is intentionally evidence-pending and contains no invented measurements.
 
 ## Follow-Up Layers
 
-Later PRs should add:
+The local suitability v1 layer adds:
+
+- `lab.workload_run_plan.v1` for a bounded local workload plan.
+- `lab.workload_run_result.v1` for completed / failed / aborted / refused run
+  outcomes.
+- `lab.workload_demand_profile.v1` for process-scoped demand, separated from
+  target-conditioned response and system context.
+- `lab.suitability_policy.v1` for required dimensions, thresholds, and margin
+  rules.
+- `lab.suitability_decision.v1` for workload-specific meet / marginal / fail /
+  unknown decisions.
+- `lab.design_constraint_pack.v1` and agent-facing Markdown constraints.
+
+This v1 layer is local-target only. `adc-lab workload run --target ssh://...`
+returns a structured refusal because forwarding `executable_path + args` over
+SSH would become arbitrary remote command execution. A future remote workload
+layer needs staged allowlisted paths, sha256 verification, no shell, and
+target-side manifest validation.
+
+Still future:
 
 - `lab.target_comparison.v1` for apples-to-apples Pi4/Pi5 comparison.
-- `lab.suitability_decision.v1` for workload-specific meet/marginal/fail/unknown
-  decisions.
+- Final target selection across devices.
 
-Until those layers exist and evidence is collected, target-selection claims
+Until same-suite comparison evidence exists, Pi4/Pi5 target-selection claims
 remain blocked.

@@ -20,6 +20,9 @@
 - Current candidate pack zip:
   `/mnt/share/target55-pi4-reference-pack-v1-candidate-20260611-r2.zip`
   (`sha256=e39efaedc405dc637ce2231518f43d6de84172c1f2e4900442f173ee1274f204`)
+- Local workload suitability validation zip:
+  `/mnt/share/target55-local-workload-suitability-20260611.zip`
+  (`sha256=bb039e3eeeb36184973b676edaac2aede32fab45b7435d90914b6a075c9f0572`)
 
 ## Decision Need
 
@@ -47,6 +50,11 @@ or safety claims.
 | Observer pressure | completed | `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/pressure/observer_pressure.*.result.json` | Bounded observer-off/on smoke; no workload-specific low-overhead claim |
 | Resource coupling report | completed | `lab/runs/LAB-RUN-target55-composite-memory-storage-jitter-20260611T0140Z/reports/resource_coupling_report.json` | `memory.reclaim_to_storage_latency` has `coupling_evidence_class=composite_measured` but `status=insufficient`; other chains remain insufficient |
 | Multi-run operating contract artifact | completed | `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/reports/multi_run_operating_contract.json` | `pack_status=platform_operating_contract_candidate`, `contract_status=insufficient` |
+| Local workload run | completed | `lab/runs/LAB-RUN-target55-local-workload-suitability-20260611T015207Z/workloads/pi4_representative_smoke/workload_run_result.json` | Target-local run only; `execution_mode=target_local`; representative workload, not real app performance |
+| Workload demand profile | completed | `lab/runs/LAB-RUN-target55-local-workload-suitability-20260611T015207Z/reports/workload_demand_profile.json` | Process-scoped direct-child demand; child process aggregation unsupported in v1 |
+| Suitability decision | completed | `lab/runs/LAB-RUN-target55-local-workload-suitability-20260611T015207Z/reports/suitability_decision.json` | `overall_decision=fail`, `selection_ready=false` under `pi4_default_policy`; not Pi4/Pi5 selection evidence |
+| Agent constraints | completed | `lab/runs/LAB-RUN-target55-local-workload-suitability-20260611T015207Z/reports/agent_constraints.md` | Implementation-agent constraints for this workload/evidence/policy body |
+| SSH workload transport | deferred_with_reason | `lab/runs/LAB-RUN-workload-ssh-refusal-20260611T015207Z/workloads/pi4_representative_smoke/workload_run_result.json` | v1 refuses `workload run --target ssh://...` to avoid arbitrary remote command execution |
 | Pi5 reference evidence | required_pending | none in this checkout | Required before Pi4/Pi5 contract comparison |
 | Battery/power evidence | deferred_with_reason | no power surface used | Deferred because target55 is not a battery-power target in this run |
 | Wakeup evidence | deferred_with_reason | no wakeup tool qualified | Deferred until qualified wakeup measurement is added |
@@ -68,6 +76,10 @@ Allowed:
   because memory pressure effect was not observed.
 - target55 has endpoint-backed bounded network transfer evidence for a 1MiB LAN
   transfer to the controller endpoint.
+- target55 has a completed target-local representative workload run with
+  process-scoped demand evidence and `execution_mode=target_local`.
+- adc-lab v1 refuses SSH workload transport with
+  `remote_workload_execution_not_supported_in_v1`.
 
 Blocked:
 
@@ -82,6 +94,9 @@ Blocked:
   jitter phases are sequential under held memory.
 - network production cadence, retry/backoff, packet loss, and target-selection
   claims; the bounded transfer is LAN-confounded.
+- representative workload results are not real application performance,
+  production readiness, sustained thermal safety, flash-wear evidence, or
+  Pi4/Pi5 selection evidence.
 
 ## Handoff Status
 
@@ -92,6 +107,7 @@ Blocked:
 | Observer-effect review | completed | See `reports/resource/observer-effect-review.md` |
 | Harness design | completed | See `docs/testing/resource-harness.md` |
 | Pi4 operating contract candidate | completed | Review multi-run contract artifact; contract reference status remains blocked by memory ladder and same-condition coupling evidence |
+| Local workload suitability loop | completed | Review workload demand, suitability decision, design constraint pack, and agent constraints; keep `selection_ready=false` unless policy/evidence changes |
 | Pi5 operating contract | required_pending | Run same suite on a Pi5 target |
 
 ## Verification

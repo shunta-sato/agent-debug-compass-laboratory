@@ -1,0 +1,44 @@
+schema_version: lab.workload_run_plan.v1
+workload_id: pi4_representative_smoke
+workload_name: Pi4 representative bounded smoke
+target: local
+execution:
+  executable_path: /usr/local/bin/adc-lab
+  args:
+    - workload-fixture
+    - bounded-smoke
+    - --duration-ms
+    - "1000"
+    - --memory-bytes
+    - "8388608"
+    - --storage-bytes
+    - "1048576"
+  working_directory: /tmp
+  expected_executable_sha256: null
+  require_executable_sha256: false
+  reject_setuid: true
+  reject_world_writable: true
+  environment_policy:
+    inherit: false
+    allowed:
+      - name: PATH
+        value: /usr/bin:/bin:/usr/local/bin
+bounds:
+  duration_seconds_max: 5
+  stdout_bytes_max: 65536
+  stderr_bytes_max: 65536
+  memory_bytes_max: 8388608
+  storage_bytes_max: 1048576
+  thermal_abort_c: 75.0
+  operator_abort_file: null
+observation:
+  sample_interval_ms: 100
+  process_scoped: true
+  system_context: true
+claim_boundary:
+  - exploratory target-local capability evidence only
+  - not real application performance
+  - not production readiness
+  - not Pi4/Pi5 selection evidence
+  - not sustained thermal safety
+  - not flash-wear evidence

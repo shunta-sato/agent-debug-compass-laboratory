@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lab.suitability_decision.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "decision_id", "target_id", "workload_id", "policy_id", "overall_decision", "selection_ready", "dimensions", "blocked_claims", "data_quality", "evidence_refs", "time_unix_ms"],
+  "properties": {
+    "schema_version": { "const": "lab.suitability_decision.v1" },
+    "decision_id": { "type": "string", "minLength": 1 },
+    "target_id": { "type": "string", "minLength": 1 },
+    "workload_id": { "type": "string", "minLength": 1 },
+    "policy_id": { "type": "string", "minLength": 1 },
+    "overall_decision": { "$ref": "#/$defs/decision" },
+    "selection_ready": { "type": "boolean" },
+    "dimensions": { "type": "array", "items": { "$ref": "#/$defs/dimension_decision" } },
+    "blocked_claims": { "type": "array", "items": { "type": "string" } },
+    "data_quality": { "$ref": "#/$defs/data_quality" },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "time_unix_ms": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "dimension": {
+      "enum": ["cpu", "thermal", "memory", "storage_io", "network_io", "latency_jitter", "observer"]
+    },
+    "decision": {
+      "enum": ["meet", "marginal", "fail", "unknown"]
+    },
+    "confidence": {
+      "enum": ["low", "medium", "high"]
+    },
+    "dimension_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimension", "decision", "requirement", "observed_demand", "target_envelope", "margin", "confidence", "target_conditioned", "portable_between_targets", "evidence_refs", "unknown_reason", "next_evidence_needed"],
+      "properties": {
+        "dimension": { "$ref": "#/$defs/dimension" },
+        "decision": { "$ref": "#/$defs/decision" },
+        "requirement": { "type": "string", "minLength": 1 },
+        "observed_demand": { "type": ["string", "null"] },
+        "target_envelope": { "type": ["string", "null"] },
+        "margin": { "type": ["string", "null"] },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "target_conditioned": { "type": "boolean" },
+        "portable_between_targets": { "type": "boolean" },
+        "evidence_refs": { "type": "array", "items": { "type": "string" } },
+        "unknown_reason": { "type": ["string", "null"] },
+        "next_evidence_needed": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "data_quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["degraded", "missing", "notes"],
+      "properties": {
+        "degraded": { "type": "boolean" },
+        "missing": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

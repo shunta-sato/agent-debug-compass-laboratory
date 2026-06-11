@@ -139,6 +139,91 @@ A pressure probe existing does not prove a full platform boundary or composite r
 
 For more detail, see `docs/reference/pressure-probes.md`.
 
+## Local workload suitability loop
+
+`adc-lab workload run` v1 is local-target only. It does not forward
+`executable_path + args` through SSH.
+
+```sh
+adc-lab workload run \
+  --target local \
+  --target-id target-id \
+  --execution-mode target-local \
+  --plan examples/workloads/pi4_representative_smoke.yaml \
+  --run-dir lab/runs/LAB-RUN-workload-... \
+  --json
+```
+
+The command writes:
+
+```text
+workloads/<workload-id>/workload_run_plan.json
+workloads/<workload-id>/workload_run_result.json
+workloads/<workload-id>/stdout.txt
+workloads/<workload-id>/stderr.txt
+reports/workload_demand_profile.json
+```
+
+`lab.workload_demand_profile.v1` separates:
+
+```text
+workload_demand              process-scoped CPU/RSS/I/O/context switches
+target_conditioned_response  thermal/frequency/abort response on this target
+system_context               whole-system background context
+```
+
+Thermal response is target-conditioned and non-portable. It is not workload
+demand.
+
+SSH workload execution is refused in v1:
+
+```sh
+adc-lab workload run \
+  --target ssh://target-host \
+  --plan examples/workloads/pi4_representative_smoke.yaml \
+  --json
+```
+
+The structured result uses
+`reason=remote_workload_execution_not_supported_in_v1`.
+
+Create a policy-bound decision from a target evidence run, a target operating
+contract, and a workload demand profile:
+
+```sh
+adc-lab decide suitability \
+  --target-run lab/runs/LAB-RUN-target-contract-... \
+  --target-contract lab/runs/LAB-RUN-target-contract-.../reports/target_operating_contract.json \
+  --workload-demand lab/runs/LAB-RUN-workload-.../reports/workload_demand_profile.json \
+  --policy examples/suitability/pi4-default-policy.yaml \
+  --out lab/runs/LAB-RUN-workload-.../reports/suitability_decision.json \
+  --json
+```
+
+Unknown required dimensions force `selection_ready=false`. Policy cannot
+convert unknown evidence to meet.
+
+Generate constraints for implementation agents:
+
+```sh
+adc-lab constraints generate \
+  --decision lab/runs/LAB-RUN-workload-.../reports/suitability_decision.json \
+  --out lab/runs/LAB-RUN-workload-.../reports/design_constraint_pack.json \
+  --agent-instructions-out lab/runs/LAB-RUN-workload-.../reports/agent_constraints.md \
+  --json
+```
+
+Run the minimal blocked-claim lint:
+
+```sh
+adc-lab constraints check \
+  --constraints lab/runs/LAB-RUN-workload-.../reports/design_constraint_pack.json \
+  --path .
+```
+
+This check is intentionally small. It fails when blocked claim text appears in
+candidate agent-facing content; it is not a full static analyzer.
+
 ## Experiment matrix
 
 ```sh
