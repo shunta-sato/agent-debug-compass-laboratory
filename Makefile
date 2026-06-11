@@ -1,4 +1,4 @@
-.PHONY: help build-debug build-release format format-fix lint analysis test-unit test-integration contract docs-smoke command-smoke resource-smoke verify clean
+.PHONY: help build-debug build-release format format-fix lint analysis test-unit test-integration contract schemas docs-smoke command-smoke verify clean
 
 help:
 	@printf '%s\n' \
@@ -12,8 +12,8 @@ help:
 	  '  make test-unit         cargo test --workspace --lib' \
 	  '  make test-integration  cargo test --workspace --tests' \
 	  '  make contract          cargo test --workspace contract_validation -- --nocapture' \
+	  '  make schemas           cargo run -p adc-lab-core --example generate_schemas -- schemas/generated' \
 	  '  make command-smoke     scripts/resource/run-resource-smoke.sh --host-fallback' \
-	  '  make resource-smoke    compatibility alias for command-smoke; does not collect metrics' \
 	  '  make verify            build-debug + format + lint + tests + contract + docs/command smoke'
 
 build-debug:
@@ -42,17 +42,20 @@ test-integration:
 contract:
 	cargo test --workspace contract_validation -- --nocapture
 
+schemas:
+	cargo run -p adc-lab-core --example generate_schemas -- schemas/generated
+
 docs-smoke:
 	test -f README.md
 	test -f docs/architecture/privilege-model-option-a.md
 	test -f docs/architecture/safety-model.md
+	test -f docs/evidence-model.md
+	test -f docs/rules.md
 	test -f docs/getting-started/install-release-binaries.md
 	test -f reports/resource/nfr-gate-report.md
 
 command-smoke:
 	scripts/resource/run-resource-smoke.sh --host-fallback
-
-resource-smoke: command-smoke
 
 verify: build-debug format lint test-unit test-integration contract docs-smoke command-smoke
 

@@ -225,7 +225,7 @@ fn constraints_generate_writes_agent_markdown() {
 }
 
 #[test]
-fn decide_suitability_reads_run_evidence_and_keeps_thermal_target_conditioned() {
+fn decide_suitability_writes_v2_without_legacy_sidecar() {
     let temp = tempfile::tempdir().unwrap();
     let target_run = temp.path().join("target-run");
     fs::create_dir_all(target_run.join("observations")).unwrap();
@@ -252,9 +252,36 @@ fn decide_suitability_reads_run_evidence_and_keeps_thermal_target_conditioned() 
         &policy_path,
     )
     .unwrap();
-    fs::copy(
-        workspace_root().join("tests/golden/lab.target_operating_contract.v1.valid.json"),
+    fs::write(
         &contract_path,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "schema_version": "lab.target_operating_contract.v1",
+            "target_id": "raspberry_pi_4_target55",
+            "target_class": "raspberry_pi_4",
+            "contract_status": "insufficient",
+            "rules": [],
+            "boundaries": [
+                {
+                    "boundary_id": "compute_thermal",
+                    "statement": "Compute and thermal claims are bounded to measured load durations.",
+                    "status": "measured_partial",
+                    "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/pressure/cpu_pressure.result.json"],
+                    "next_evidence_needed": [
+                        {
+                            "reason": "sustained all-core thermal margin is not proven by short bounded probes",
+                            "needed_probe": "repeated CPU thermal soak with cooldown curve",
+                            "blocking_missing_evidence": ["5/15/30 minute soak", "cooldown/recovery curve"],
+                            "next_action": "run approved thermal soak probes before sustained-design claims",
+                            "owner_surface": "operator_approval"
+                        }
+                    ]
+                }
+            ],
+            "unknowns": ["composite resource coupling not measured"],
+            "next_evidence_needed": ["collect composite resource coupling evidence"],
+            "time_unix_ms": 1780000000000u64
+        }))
+        .unwrap(),
     )
     .unwrap();
 
@@ -277,18 +304,14 @@ fn decide_suitability_reads_run_evidence_and_keeps_thermal_target_conditioned() 
         ])
         .assert()
         .success()
-        .stdout(contains(
-            "\"schema_version\": \"lab.suitability_decision.v1\"",
-        ));
-    let decision: serde_json::Value = serde_json::from_slice(&fs::read(out_path).unwrap()).unwrap();
-    let thermal = decision["dimensions"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|entry| entry["dimension"] == "thermal")
-        .unwrap();
-    assert_eq!(thermal["target_conditioned"], true);
-    assert_eq!(thermal["portable_between_targets"], false);
+        .stdout(contains("\"schema\": \"lab.artifact.v2\""))
+        .stdout(contains("\"kind\": \"report.suitability\""));
+    let decision: serde_json::Value =
+        serde_json::from_slice(&fs::read(&out_path).unwrap()).unwrap();
+    assert_eq!(decision["schema"], "lab.artifact.v2");
+    assert_eq!(decision["kind"], "report.suitability");
+    assert_eq!(decision["payload"]["selection_ready"], true);
+    assert!(!temp.path().join("suitability_decision.v1.json").exists());
 }
 
 #[test]
@@ -719,7 +742,7 @@ fn pressure_network_bounded_transfer_records_generated_bytes() {
         .find(|path| {
             path.file_name()
                 .and_then(|name| name.to_str())
-                .is_some_and(|name| name.contains("network_io"))
+                .is_some_and(|name| name.contains("network_io") && name.ends_with(".result.json"))
         })
         .unwrap();
     let result: serde_json::Value =
@@ -771,24 +794,19 @@ fn report_operating_contract_writes_contract_artifacts() {
         .assert()
         .success()
         .stdout(contains("target_operating_contract_ref"))
-        .stdout(contains(
-            "\"schema_version\": \"lab.target_operating_contract.v1\"",
-        ));
+        .stdout(contains("\"schema\": \"lab.artifact.v2\""))
+        .stdout(contains("\"kind\": \"report.operating_contract\""));
 
-    for path in [
-        "reports/platform_mechanism_inventory.json",
-        "reports/boundary_probe_plan.json",
-        "reports/resource_coupling_report.json",
-        "reports/target_operating_contract.json",
-    ] {
-        assert!(temp.path().join(path).exists(), "missing {path}");
-    }
+    assert!(temp
+        .path()
+        .join("reports/target_operating_contract.v2.json")
+        .exists());
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"report.target_operating_contract\""));
 }
 
 #[test]
-fn report_operating_contract_accepts_include_run_and_writes_run_set() {
+fn report_operating_contract_accepts_include_run_in_v2_store() {
     let primary = tempfile::tempdir().unwrap();
     let included = tempfile::tempdir().unwrap();
 
@@ -844,40 +862,24 @@ fn report_operating_contract_accepts_include_run_and_writes_run_set() {
         ])
         .assert()
         .success()
-        .stdout(contains("run_set_manifest_ref"))
-        .stdout(contains("multi_run_operating_contract_ref"));
+        .stdout(contains("\"included_run_count\": 1"))
+        .stdout(contains("\"kind\": \"report.operating_contract\""));
 
-    let run_set_path = primary.path().join("reports/run_set_manifest.json");
-    let multi_path = primary
+    assert!(primary
         .path()
-        .join("reports/multi_run_operating_contract.json");
-    assert!(run_set_path.exists());
-    assert!(multi_path.exists());
-
-    let run_set: serde_json::Value =
-        serde_json::from_slice(&fs::read(run_set_path).unwrap()).unwrap();
-    assert_eq!(run_set["schema_version"], "lab.run_set_manifest.v1");
-    assert_eq!(run_set["runs"].as_array().unwrap().len(), 2);
-    assert!(run_set["evidence_refs"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|reference| reference.as_str().unwrap().contains("observer_pressure")));
-
-    let multi: serde_json::Value = serde_json::from_slice(&fs::read(multi_path).unwrap()).unwrap();
-    assert_eq!(
-        multi["schema_version"],
-        "lab.multi_run_operating_contract.v1"
-    );
-    assert!(multi["evidence_refs"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|reference| reference.as_str().unwrap().contains("observer_pressure")));
+        .join("reports/target_operating_contract.v2.json")
+        .exists());
+    assert!(!primary
+        .path()
+        .join("reports/run_set_manifest.json")
+        .exists());
+    assert!(!primary
+        .path()
+        .join("reports/multi_run_operating_contract.json")
+        .exists());
 
     let audit = fs::read_to_string(primary.path().join("audit.jsonl")).unwrap();
-    assert!(audit.contains("\"operation\":\"report.run_set_manifest\""));
-    assert!(audit.contains("\"operation\":\"report.multi_run_operating_contract\""));
+    assert!(audit.contains("\"operation\":\"report.target_operating_contract\""));
 }
 
 #[test]
@@ -911,6 +913,26 @@ fn pressure_composite_promotes_coupling_evidence_class() {
     Command::cargo_bin("adc-lab")
         .unwrap()
         .args([
+            "pressure",
+            "run",
+            "--target",
+            "local",
+            "--kind",
+            "memory_pressure",
+            "--duration",
+            "1ms",
+            "--memory-bytes",
+            "1048576",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
             "report",
             "operating-contract",
             "--run",
@@ -935,16 +957,21 @@ fn pressure_composite_promotes_coupling_evidence_class() {
             .to_string_lossy()
             .contains("memory_storage_jitter")));
 
-    let coupling: serde_json::Value = serde_json::from_slice(
-        &fs::read(temp.path().join("reports/resource_coupling_report.json")).unwrap(),
+    let contract: serde_json::Value = serde_json::from_slice(
+        &fs::read(
+            temp.path()
+                .join("reports/target_operating_contract.v2.json"),
+        )
+        .unwrap(),
     )
     .unwrap();
-    assert_eq!(coupling["report_status"], "insufficient");
-    assert!(coupling["chains"].as_array().unwrap().iter().any(|chain| {
-        chain["chain_id"] == "memory.reclaim_to_storage_latency"
-            && chain["status"] == "insufficient"
-            && chain["coupling_evidence_class"] == "composite_measured"
-    }));
+    assert!(contract["payload"]["evaluations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|evaluation| evaluation["rule_id"]
+            == "operating.memory_storage_coupling_requires_composite"
+            && evaluation["matched"] == true));
 
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"pressure.composite\""));
@@ -1224,31 +1251,10 @@ fn report_operating_point_marks_read_only_run_observational_only() {
                 .as_str()
                 .unwrap()
                 .contains("fixed CPU frequencies")));
-    let cost_model = &value["cost_model"];
-    assert_eq!(cost_model["model_status"], "host_fallback_only");
-    assert!(cost_model["capabilities"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|capability| capability["capability_id"] == "cpu_topology"
-            && capability["status"] == "observed"));
-    assert!(cost_model["architecture_options"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|option| option["option_id"] == "gpu_offload" && option["decision"] == "blocked"));
-    assert!(cost_model["blocked_claims"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|claim| claim["decision"] == "blocked"
-            && claim["claim"].as_str().unwrap().contains("GPU presence")));
 
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"report.operating_point\""));
     assert!(audit.contains("\"result\":\"observational_only\""));
-    assert!(audit.contains("\"operation\":\"report.capability_cost\""));
-    assert!(audit.contains("\"result\":\"host_fallback_only\""));
 }
 
 #[test]
@@ -1473,144 +1479,9 @@ fn report_operating_point_marks_bounded_matrix_controlled_subset() {
                 .as_str()
                 .unwrap()
                 .contains("fixed CPU frequencies")));
-    let cost_model = &value["cost_model"];
-    assert_eq!(cost_model["model_status"], "host_fallback_only");
-    assert!(cost_model["capabilities"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(
-            |capability| capability["capability_id"] == "bounded_cpu_load_response"
-                && capability["status"] == "observed"
-                && capability["evidence_refs"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .any(|artifact| artifact.as_str().unwrap().ends_with("/load_result.json"))
-        ));
-    assert!(cost_model["blocked_claims"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|claim| claim["decision"] == "blocked"
-            && claim["claim"]
-                .as_str()
-                .unwrap()
-                .contains("bounded CPU load proves production readiness")));
-
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"report.operating_point\""));
     assert!(audit.contains("\"result\":\"controlled_subset\""));
-    assert!(audit.contains("\"operation\":\"report.capability_cost\""));
-    assert!(audit.contains("\"result\":\"host_fallback_only\""));
-}
-
-#[test]
-fn report_capability_profile_links_workload_to_run_evidence_without_selection_claim() {
-    let temp = tempfile::tempdir().unwrap();
-    Command::cargo_bin("adc-lab")
-        .unwrap()
-        .args([
-            "familiarize",
-            "read-only",
-            "--target",
-            "local",
-            "--duration",
-            "0s",
-            "--run-dir",
-            temp.path().to_str().unwrap(),
-            "--json",
-        ])
-        .assert()
-        .success();
-    Command::cargo_bin("adc-lab")
-        .unwrap()
-        .args([
-            "load",
-            "cpu",
-            "--target",
-            "local",
-            "--workers",
-            "1",
-            "--duration",
-            "1s",
-            "--run-dir",
-            temp.path().to_str().unwrap(),
-            "--json",
-        ])
-        .assert()
-        .success();
-
-    let workload = workspace_root().join("examples/workloads/bounded_cpu_load_2_workers_60s.json");
-    let output = Command::cargo_bin("adc-lab")
-        .unwrap()
-        .args([
-            "report",
-            "capability-profile",
-            "--run",
-            temp.path().to_str().unwrap(),
-            "--target-id",
-            "local-target",
-            "--workload",
-            workload.to_str().unwrap(),
-            "--json",
-        ])
-        .assert()
-        .success()
-        .stdout(contains(
-            "target_capability_profile.bounded_cpu_load_2_workers_60s.json",
-        ))
-        .stdout(contains("\"selection_ready\": false"))
-        .get_output()
-        .stdout
-        .clone();
-
-    let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let artifact_ref = value["target_capability_profile_ref"].as_str().unwrap();
-    assert!(artifact_ref.starts_with("artifact://lab/runs/"));
-    assert!(!artifact_ref.contains(temp.path().to_str().unwrap()));
-    let profile = &value["profile"];
-    assert_eq!(
-        profile["schema_version"],
-        "lab.target_capability_profile.v1"
-    );
-    assert_eq!(profile["workload_id"], "bounded_cpu_load_2_workers_60s");
-    assert_eq!(profile["selection_ready"], false);
-    assert_eq!(profile["observed_results"]["load_result_count"], 1);
-    assert!(
-        profile["observed_results"]["observation_sample_count"]
-            .as_u64()
-            .unwrap()
-            > 0
-    );
-    assert!(profile["evidence_refs"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .all(|artifact| artifact
-            .as_str()
-            .unwrap()
-            .starts_with("artifact://lab/runs/")));
-    let profile_text = serde_json::to_string(profile).unwrap();
-    assert!(!profile_text.contains(temp.path().to_str().unwrap()));
-    assert!(profile["blocked_claims"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|claim| claim == "Pi4 is sufficient for this workload"));
-    assert!(profile["blocked_claims"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|claim| claim == "Pi5 is required for this workload"));
-    assert!(temp
-        .path()
-        .join("reports/target_capability_profile.bounded_cpu_load_2_workers_60s.json")
-        .exists());
-
-    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
-    assert!(audit.contains("\"operation\":\"report.target_capability_profile\""));
-    assert!(audit.contains("\"operation_id\":\"bounded_cpu_load_2_workers_60s\""));
 }
 
 #[test]

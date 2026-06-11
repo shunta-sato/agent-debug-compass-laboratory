@@ -111,11 +111,9 @@ attempt, not a network boundary measurement. A result is `boundary_probe` only
 when the bounded transfer completes and records `network_mode=bounded_transfer`
 with `traffic_generated_bytes`.
 
-For composite coupling, `resource_coupling_report` may use
-`coupling_evidence_class=composite_measured` only when a composite result
-artifact exists. The chain status can still be `insufficient` when the relevant
-pressure effect was not observed. Separate pressure results remain evidence
-ingredients.
+For composite coupling, the v2 operating-contract rules can support coupling
+claims only when the required pressure and composite evidence kinds are present.
+Separate pressure results remain evidence ingredients.
 
 ## Claim boundaries
 

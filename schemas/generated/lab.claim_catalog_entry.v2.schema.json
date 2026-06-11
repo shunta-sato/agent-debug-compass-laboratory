@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ClaimDefinition",
+  "type": "object",
+  "required": [
+    "blocked_claim",
+    "blocked_text",
+    "claim_id",
+    "default_next_evidence",
+    "supported_text"
+  ],
+  "properties": {
+    "blocked_claim": {
+      "type": "string"
+    },
+    "blocked_text": {
+      "type": "string"
+    },
+    "claim_id": {
+      "type": "string"
+    },
+    "default_next_evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "supported_text": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

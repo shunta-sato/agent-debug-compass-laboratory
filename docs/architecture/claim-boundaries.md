@@ -18,38 +18,34 @@ Next evidence needed:
   controlled operating point matrix with fixed frequency or governor-controlled conditions.
 ```
 
-## Workload And Target Capability Profiles
+## Workload Suitability
 
-`lab.workload_profile.v1` defines the workload requirement. It answers "what is
-X?" before anyone says "target can run X".
+Workload suitability is a policy decision over a target operating contract,
+workload demand profile, and suitability policy. It answers one scoped
+target/workload/policy question; it does not rank targets.
 
-`lab.target_capability_profile.v1` links a target to that workload and to the
-run artifacts that were observed. In PR11 these profiles are exploratory
-short-smoke evidence only.
-
-Allowed PR11 claims:
+Allowed claims:
 
 ```text
 - the workload profile defines a shared measurement target
-- the target produced passive observation or bounded-load artifacts for that
-  workload profile
-- the target capability profile records missing evidence and blocked claims
+- the target produced v2 evidence artifacts for that workload context
+- the suitability artifact records meet / marginal / fail / unknown under the
+  named policy
 ```
 
-Blocked PR11 claims:
+Blocked claims:
 
 ```text
 - Pi4 is sufficient for the workload
 - Pi5 is required for the workload
-- Pi4/Pi5 target selection is decided
 - battery safe
 - sustained production ready
 - fixed-frequency behavior verified
 - all operating points measured
 ```
 
-The blocked claims are intentional. PR11 creates the evidence format; later
-comparison and suitability contracts decide target selection.
+The blocked claims are intentional. The claim catalog keeps stable IDs and
+next-evidence guidance so constraints checks can reject unsupported text.
 
 `adc-lab report operating-point` creates `lab.operating_point_coverage.v1`.
 Coverage status is explicit:
@@ -76,36 +72,31 @@ workload level is bounded and audited. CPU governor and fixed frequency remain
 blocked until plan/apply/restore is wired into matrix execution. Production
 quality claims require target characterization and controlled physical evidence.
 
-## Capability Cost Model
+## Operating Contract Rules
 
-`adc-lab report operating-point` also creates
-`lab.capability_cost_model.v1`. This is an architecture evidence packet, not a
-benchmark ranking.
+`adc-lab report operating-contract` writes a v2
+`kind = report.operating_contract` artifact from Rust rule tables.
 
-Allowed PR8 claims:
+Allowed claims:
 
 ```text
-- CPU, memory, thermal, cpufreq, and bounded-load surfaces were observed when
-  matching artifacts exist.
-- CPU can be used as a lab baseline when target inventory exists.
-- Bounded load results are partial lab evidence only.
+- the named rule matched the required evidence kinds
+- blocked claims remain blocked when required evidence is missing
+- next evidence is catalog-backed and auditable
 ```
 
-Blocked PR8 claims:
+Blocked claims:
 
 ```text
-- GPU presence means GPU offload is better.
-- NPU/DSP offload is supported by this run.
-- Bounded CPU load proves production readiness.
-- Observed dynamic CPU frequency range is a fixed-frequency sweep.
+- pressure smoke alone proves production readiness
+- separate probes prove same-condition resource coupling
+- observed dynamic CPU frequency range is a fixed-frequency sweep
 ```
 
 Next evidence needed:
 
 ```text
-- qualified GPU/NPU/DSP adapters and output schemas
-- workload-specific CPU-vs-accelerator cost comparison
-- storage/write/flash, wakeup, battery, latency/jitter, and sustained thermal
-  evidence
-- controlled operating-point matrix for frequency-dependent architecture claims
+- paired or composite evidence for coupling claims
+- sustained thermal and recovery evidence for production claims
+- approved control/apply/restore evidence for controlled operating points
 ```

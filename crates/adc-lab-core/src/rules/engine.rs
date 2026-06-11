@@ -1,0 +1,127 @@
+use crate::evidence::{claim_definition, ArtifactMeta, Claim, Decision, EvidenceStore, Kind};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone)]
+pub enum Pred {
+    Present(Kind),
+    All(Vec<Pred>),
+    Any(Vec<Pred>),
+    Not(Box<Pred>),
+    Custom(&'static str, fn(&EvidenceStore) -> bool),
+}
+
+#[derive(Debug, Clone)]
+pub struct Rule {
+    pub id: &'static str,
+    pub claim_id: &'static str,
+    pub when: Pred,
+    pub on_match: Decision,
+    pub on_miss: Decision,
+    pub evidence_kinds: &'static [Kind],
+    pub next_evidence: &'static [&'static str],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RuleEvaluation {
+    pub rule_id: String,
+    pub claim_id: String,
+    pub matched: bool,
+    pub decision: Decision,
+    pub evidence_refs: Vec<String>,
+    pub missing: Vec<String>,
+    pub next_evidence: Vec<String>,
+}
+
+pub fn evaluate_rules(store: &EvidenceStore, rules: &[Rule]) -> Vec<RuleEvaluation> {
+    rules
+        .iter()
+        .map(|rule| evaluate_rule(store, rule))
+        .collect()
+}
+
+pub fn claim_for_evaluation(evaluation: &RuleEvaluation) -> Claim {
+    let mut next_evidence = claim_definition(&evaluation.claim_id)
+        .map(|definition| {
+            definition
+                .default_next_evidence
+                .iter()
+                .map(|item| (*item).to_string())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    next_evidence.extend(evaluation.next_evidence.clone());
+    next_evidence.sort();
+    next_evidence.dedup();
+    Claim {
+        claim_id: evaluation.claim_id.clone(),
+        decision: evaluation.decision.clone(),
+        evidence_refs: evaluation.evidence_refs.clone(),
+        next_evidence,
+    }
+}
+
+fn evaluate_rule(store: &EvidenceStore, rule: &Rule) -> RuleEvaluation {
+    let matched = eval_pred(store, &rule.when);
+    let evidence_refs = refs_for_kinds(store, rule.evidence_kinds);
+    let missing = rule
+        .evidence_kinds
+        .iter()
+        .filter(|kind| store.iter(**kind).next().is_none())
+        .map(kind_label)
+        .collect::<Vec<_>>();
+    let next_evidence = if matched {
+        Vec::new()
+    } else {
+        rule.next_evidence
+            .iter()
+            .map(|item| (*item).to_string())
+            .collect()
+    };
+    RuleEvaluation {
+        rule_id: rule.id.to_string(),
+        claim_id: rule.claim_id.to_string(),
+        matched,
+        decision: if matched {
+            rule.on_match.clone()
+        } else {
+            rule.on_miss.clone()
+        },
+        evidence_refs,
+        missing,
+        next_evidence,
+    }
+}
+
+fn eval_pred(store: &EvidenceStore, pred: &Pred) -> bool {
+    match pred {
+        Pred::Present(kind) => store.iter(*kind).next().is_some(),
+        Pred::All(preds) => preds.iter().all(|pred| eval_pred(store, pred)),
+        Pred::Any(preds) => preds.iter().any(|pred| eval_pred(store, pred)),
+        Pred::Not(pred) => !eval_pred(store, pred),
+        Pred::Custom(_, func) => func(store),
+    }
+}
+
+fn refs_for_kinds(store: &EvidenceStore, kinds: &[Kind]) -> Vec<String> {
+    let mut refs = kinds
+        .iter()
+        .flat_map(|kind| store.iter(*kind))
+        .map(artifact_ref)
+        .collect::<Vec<_>>();
+    refs.sort();
+    refs.dedup();
+    refs
+}
+
+fn artifact_ref(meta: &ArtifactMeta) -> String {
+    meta.artifact_ref.clone()
+}
+
+fn kind_label(kind: &Kind) -> String {
+    serde_json::to_string(kind)
+        .unwrap_or_else(|_| format!("{kind:?}"))
+        .trim_matches('"')
+        .to_string()
+}

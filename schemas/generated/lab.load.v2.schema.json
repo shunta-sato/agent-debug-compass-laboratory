@@ -1,0 +1,420 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Artifact_for_LoadPayload",
+  "type": "object",
+  "required": [
+    "claims",
+    "data_quality",
+    "evidence_refs",
+    "factors",
+    "id",
+    "kind",
+    "metrics",
+    "payload",
+    "run_id",
+    "schema",
+    "status",
+    "target_id",
+    "time_unix_ms"
+  ],
+  "properties": {
+    "bounds": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Bounds"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Claim"
+      }
+    },
+    "data_quality": {
+      "$ref": "#/definitions/DataQuality"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "factors": {
+      "$ref": "#/definitions/Factors"
+    },
+    "id": {
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/definitions/Kind"
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Metric"
+      }
+    },
+    "payload": {
+      "$ref": "#/definitions/LoadPayload"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/definitions/Status"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Bounds": {
+      "type": "object",
+      "required": [
+        "notes"
+      ],
+      "properties": {
+        "duration_seconds_max": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Claim": {
+      "type": "object",
+      "required": [
+        "claim_id",
+        "decision",
+        "evidence_refs",
+        "next_evidence"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string"
+        },
+        "decision": {
+          "$ref": "#/definitions/Decision"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "next_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "DataQuality": {
+      "type": "object",
+      "required": [
+        "level",
+        "notes"
+      ],
+      "properties": {
+        "level": {
+          "$ref": "#/definitions/DataQualityLevel"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "DataQualityLevel": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial",
+        "degraded"
+      ]
+    },
+    "Decision": {
+      "type": "string",
+      "enum": [
+        "supported",
+        "provisional",
+        "blocked"
+      ]
+    },
+    "EvidenceRefusalCode": {
+      "type": "string",
+      "enum": [
+        "invalid_artifact",
+        "policy_violation",
+        "unsupported_operation",
+        "missing_evidence"
+      ]
+    },
+    "Factors": {
+      "type": "object",
+      "required": [
+        "confounders",
+        "controlled",
+        "observed"
+      ],
+      "properties": {
+        "confounders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "controlled": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "observed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Kind": {
+      "type": "string",
+      "enum": [
+        "inventory",
+        "observation",
+        "pressure",
+        "composite",
+        "control_result",
+        "load",
+        "workload",
+        "report.run",
+        "report.operating_contract",
+        "report.suitability"
+      ]
+    },
+    "LoadPayload": {
+      "type": "object",
+      "required": [
+        "duration_ms",
+        "load_id",
+        "operator_abort_observed",
+        "source_schema_version",
+        "status",
+        "workers"
+      ],
+      "properties": {
+        "duration_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "load_id": {
+          "type": "string"
+        },
+        "max_observed_temp_c": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "operator_abort_observed": {
+          "type": "boolean"
+        },
+        "source_schema_version": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "workers": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Metric": {
+      "type": "object",
+      "required": [
+        "name",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Status": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "measured"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "measured_partial"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "insufficient"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "detail",
+            "state"
+          ],
+          "properties": {
+            "detail": {
+              "type": "object",
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              }
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "not_applicable"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "detail",
+            "state"
+          ],
+          "properties": {
+            "detail": {
+              "type": "object",
+              "required": [
+                "code",
+                "message"
+              ],
+              "properties": {
+                "code": {
+                  "$ref": "#/definitions/EvidenceRefusalCode"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "refused"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "detail",
+            "state"
+          ],
+          "properties": {
+            "detail": {
+              "type": "object",
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              }
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "unsafe_blocked"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}
