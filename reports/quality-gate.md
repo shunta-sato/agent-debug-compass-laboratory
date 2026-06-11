@@ -6,95 +6,78 @@ Findings: 0
 
 ## Checks Run
 
-- `cargo check --workspace` - pass.
-- `cargo test --workspace contract_validation -- --nocapture` - pass.
-- `cargo test -p adc-lab --test cli -- --nocapture` - pass.
+- `cargo check` - pass.
+- `cargo test -p adc-lab-core` - pass.
+- `cargo test -p adc-lab --test cli` - pass.
+- `cargo build --release -p adc-lab` - pass; used for target55 staged
+  validation.
 - `make verify` - pass.
-- `git diff --check` - pass.
 
 ## Live Discovery
 
 - Repo command surface: `COMMANDS.md` defines `make verify` as the canonical
   gate.
 - Existing implementation surfaces inspected:
-  `crates/adc-lab/src/main.rs`, `crates/adc-lab-target/src/main.rs`,
-  `crates/adc-lab-core/src/contracts.rs`, `crates/adc-lab-core/src/report.rs`,
+  `crates/adc-lab/src/main.rs`, `crates/adc-lab-core/src/contracts.rs`,
   `crates/adc-lab-core/src/load.rs`, `crates/adc-lab-core/src/observe.rs`,
-  `crates/adc-lab-core/src/target.rs`, and `crates/adc-lab-core/src/run.rs`.
-- Schema/golden validation path inspected:
-  `crates/adc-lab-core/tests/contract_validation.rs`, `schemas/`, and
-  `tests/golden/`.
-- Target55 state checked live:
-  target55 is `aarch64`, Raspberry Pi 4 Model B Rev 1.5, Debian 13. Existing
-  `/home/satoshun/.local/bin/adc-lab-target` version `0.1.11` was preserved.
-- Review-fix staged runner used for live Pi4 execution:
-  `/home/satoshun/.local/share/adc-lab/runners/20260610-platform-contract-review/adc-lab-target`
-  version `0.1.0`, release build from this worktree.
-- Target55 evidence path:
-  `lab/runs/LAB-RUN-target55-platform-contract-review-20260610`.
-- Review artifact zip:
-  `/mnt/share/target55-platform-contract-review-20260610.zip`
-  (`sha256=557f9706c17a2ce87631a6aa4804334ff4ff108ad1a705a73290a0f06dab7f2b`).
+  `crates/adc-lab-core/src/run.rs`, `crates/adc-lab-core/src/target.rs`,
+  schema fixtures, and CLI tests.
+- target55 state checked live: target and controller are `aarch64`; installed
+  target55 release remains `/home/satoshun/.local/bin/adc-lab` version
+  `0.1.16`.
+- Staged validation binary:
+  `/home/satoshun/.local/share/adc-lab/runners/20260611-workload-suitability/adc-lab`
+  (`sha256=0e084cdde7733ebd2460f0758a01c9fe202cccff62e099df856209117e5b4f10`).
+- Target-local workload run:
+  `lab/runs/LAB-RUN-target55-local-workload-suitability-20260611T015207Z`.
+  The result records `status=completed`, `execution_mode=target_local`, and
+  `target_id=target55`.
+- SSH workload refusal run:
+  `lab/runs/LAB-RUN-workload-ssh-refusal-20260611T015207Z`. The result records
+  `status=refused` and
+  `reason=remote_workload_execution_not_supported_in_v1`.
+- Artifact zip:
+  `/mnt/share/target55-local-workload-suitability-20260611.zip`
+  (`sha256=bb039e3eeeb36184973b676edaac2aede32fab45b7435d90914b6a075c9f0572`);
+  `unzip -t` passed.
 
 ## Triggered Branch Evidence
 
 - ExecPlan - present:
-  `plans/20260610-platform-operating-contract-discovery.md`.
-- Requirements engineering - present:
-  requirements and acceptance criteria recorded in the ExecPlan.
+  `plans/20260611-local-workload-suitability-loop.md`.
 - Embedded system familiarization - present:
   `docs/targets/target55/system-familiarization.md`.
-- Embedded NFR design and gate - present:
-  `docs/nfr/adc-lab-target-runtime.md`,
-  `requirements/nfr/adc-lab-target-runtime.yaml`, and
-  `reports/resource/nfr-gate-report.md`.
-- Hot-path review - present:
-  `reports/resource/hot-path-review.md`.
-- Observer-effect review - present:
-  `reports/resource/observer-effect-review.md`.
-- Harness design - present:
-  `docs/testing/resource-harness.md`.
+- Embedded NFR gate - present:
+  `reports/resource/nfr-gate-report.md`, decision `experimental-only`.
 - Function-boundary decision - present:
   `.agents/design-ledger/function-boundaries.md`.
 - Observability - present:
-  audit events and run artifacts for `pressure.run` and
-  `report.target_operating_contract`; existing observability plan remains the
-  architectural signal reference.
+  workload run audit artifact, run artifacts, structured refusal result, and
+  existing `docs/architecture/observability-plan.md`.
 
 ## Exit Criteria Review
 
 - New contracts exist with schemas and golden fixtures:
-  `lab.platform_mechanism_inventory.v1`, `lab.boundary_probe_plan.v1`,
-  `lab.resource_pressure_result.v1`, `lab.resource_coupling_report.v1`, and
-  `lab.target_operating_contract.v1`.
-- New pressure probes are fixed commands, not arbitrary shell. They are bounded
-  by duration and byte ceilings and record cleanup status.
-- `unsupported_by_adc_lab` is rejected by schema tests and did not appear in
-  target55 run artifacts.
-- Target55 Pi4 live run produced pressure results for CPU, thermal, memory,
-  storage, network, latency/jitter, and observer pressure.
-- Target55 generated a conservative Target Operating Contract with
-  `contract_status=insufficient`; pressure artifacts are explicitly classified
-  as smoke/current-condition/counter-only where appropriate.
-- Resource coupling report chains are `coupling_evidence_class=ingredients_only`
-  and `status=insufficient` until composite or phased pressure scenarios are
-  implemented and run.
-- Memory pressure effect was not observed in the 8MiB target55 allocation smoke,
-  so resident-memory and memory/storage coupling claims remain blocked.
-- Network I/O without endpoint was classified as `network_mode=counter_only`,
-  `not_applicable_with_reason`, and not a network boundary measurement.
-- cpufreq sysfs visibility is classified as a visible control surface only; it
-  does not become `platform_control_status=measured_partial` unless approved
-  apply/restore/health artifacts exist in the same run.
-- The change remains experimental-only for embedded NFR purposes. Production,
-  battery-safe, flash-safe, thermally-safe, low-overhead, suitability, and
-  real-time-ish claims remain blocked unless further evidence is collected.
-- Pi5 live evidence is not claimed; Pi5 remains API/schema-supported and
-  required pending execution.
+  `lab.workload_run_plan.v1`, `lab.workload_run_result.v1`,
+  `lab.workload_demand_profile.v1`, `lab.suitability_policy.v1`,
+  `lab.suitability_decision.v1`, and `lab.design_constraint_pack.v1`.
+- `workload run` v1 is local-target only. SSH target workload execution returns
+  structured refusal and does not transport executable paths/args to a remote
+  shell.
+- Workload demand separates process-scoped demand from target-conditioned
+  thermal/frequency response and whole-system context.
+- Thermal suitability is target-conditioned and non-portable.
+- Suitability policy cannot convert unknown evidence to meet; required unknown
+  dimensions force `selection_ready=false`.
+- Failed/refused/aborted workload evidence cannot produce a meet decision.
+- Constraint generation emits JSON and agent-facing Markdown; constraint check
+  fails on blocked claim text.
+- Target55 validation is representative bounded smoke only. It is not real app
+  performance, production readiness, sustained thermal safety, flash-wear
+  evidence, or Pi4/Pi5 selection evidence.
 
 ## Gate Decision
 
-Submit. The change adds bounded Platform Operating Contract discovery surfaces
-and target55 Pi4 smoke evidence while preserving claim boundaries: the generated
-contract remains insufficient until pressure effects, bounded network transfer,
-and composite coupling evidence exist.
+Submit. The change closes a conservative local-target evidence-to-decision loop
+for one bounded representative workload while preserving the remote-execution,
+privilege, unknown-is-not-pass, and claim-boundary rules.

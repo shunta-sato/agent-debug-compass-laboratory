@@ -39,6 +39,9 @@ adc-lab observe            -> what is visible under current policy?
 adc-lab load / pressure    -> how does it react to bounded stress?
 adc-lab control            -> what happens when an operating point is changed?
 adc-lab report             -> what claims are supported or blocked?
+adc-lab workload run       -> what demand does a bounded local workload create?
+adc-lab decide suitability -> does run-backed evidence meet policy margins?
+adc-lab constraints        -> what must implementation agents obey?
 ```
 
 Every step is meant to preserve evidence, record claim boundaries, and avoid pretending that a measurement proves more than it actually proves.
@@ -155,6 +158,8 @@ The goal is to make aggressive experiments typed, bounded, approved, audited, re
 | **Privileged helper** | A root-owned fixed-path helper at `/usr/local/libexec/adc-lab-priv-helper` used only for typed privileged operations. It is not a root shell. |
 | **Run artifact** | Structured evidence under `lab/runs/<RUN-ID>/`, including manifests, audit logs, inventory, observations, loads, pressure results, and reports. |
 | **Target Operating Contract** | A machine-readable contract describing measured mechanisms, boundaries, evidence gaps, and design rules. |
+| **Workload demand profile** | Process-scoped demand from a bounded local workload, separated from target-conditioned response and system context. |
+| **Suitability decision** | A policy-bound meet / marginal / fail / unknown decision using target run evidence, target contract rules, and workload demand. Unknown never becomes meet. |
 
 ---
 
@@ -268,6 +273,57 @@ lab/runs/LAB-RUN-.../
 ```
 
 For the full command reference, see [CLI reference](docs/reference/cli.md).
+
+---
+
+## Quick start: local workload suitability loop
+
+`workload run` v1 is local-target only. It does not run arbitrary workloads over
+SSH. For a Pi4 target, run this command on the Pi4 itself, or use SSH only to
+invoke the target-local `adc-lab` command and collect artifacts.
+
+```sh
+adc-lab workload run \
+  --target local \
+  --target-id <target-id> \
+  --execution-mode target-local \
+  --plan examples/workloads/pi4_representative_smoke.yaml \
+  --run-dir lab/runs/LAB-RUN-workload-...
+```
+
+The representative workload is a safe bounded CPU + RSS + tempfile I/O smoke.
+It is exploratory only. It is not real application performance, production
+readiness, Pi4/Pi5 selection evidence, sustained thermal safety, or flash-wear
+evidence.
+
+SSH workload transport is deliberately deferred:
+
+```sh
+adc-lab workload run --target ssh://<target-host> --plan examples/workloads/pi4_representative_smoke.yaml
+```
+
+returns a structured refusal with
+`reason=remote_workload_execution_not_supported_in_v1`.
+
+After a target operating contract run and a workload run exist:
+
+```sh
+adc-lab decide suitability \
+  --target-run lab/runs/LAB-RUN-target-contract-... \
+  --target-contract lab/runs/LAB-RUN-target-contract-.../reports/target_operating_contract.json \
+  --workload-demand lab/runs/LAB-RUN-workload-.../reports/workload_demand_profile.json \
+  --policy examples/suitability/pi4-default-policy.yaml \
+  --out lab/runs/LAB-RUN-workload-.../reports/suitability_decision.json
+
+adc-lab constraints generate \
+  --decision lab/runs/LAB-RUN-workload-.../reports/suitability_decision.json \
+  --out lab/runs/LAB-RUN-workload-.../reports/design_constraint_pack.json \
+  --agent-instructions-out lab/runs/LAB-RUN-workload-.../reports/agent_constraints.md
+```
+
+`agent_constraints.md` is intended to be pasted into an AGENTS.md, CLAUDE.md,
+or implementation-agent prompt. It is an instruction artifact, not a benchmark
+score.
 
 ---
 
@@ -459,12 +515,14 @@ The point is to keep the Agent honest.
 | Operating point experiment | `adc-lab control plan`, approve, apply, load, restore, and health-check. |
 | Operating contract generation | `adc-lab report operating-contract ...` after one or more pressure or control runs. |
 | Workload capability profile | `adc-lab report capability-profile ...` to bind a workload definition to a run. |
+| Local workload suitability | `adc-lab workload run`, `adc-lab decide suitability`, and `adc-lab constraints generate`. |
+| Constraint lint | `adc-lab constraints check ...` to fail on blocked claim text in candidate agent-facing content. |
 
-Capability profiles are exploratory until comparison and suitability contracts are added.
-They cannot say:
+Capability profiles remain exploratory. Local workload suitability decisions can
+produce meet / marginal / fail / unknown for one target/workload/policy evidence
+body, but they still cannot say:
 
 ```text
-Pi4 is sufficient.
 Pi5 is required.
 This target is production-ready.
 ```

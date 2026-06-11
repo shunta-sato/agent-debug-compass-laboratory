@@ -1,0 +1,809 @@
+use crate::contracts::{
+    DesignConstraintPack, OperatingRuleCategory, SuitabilityConfidence, SuitabilityDecision,
+    SuitabilityDecisionValue, SuitabilityDimensionDecision, SuitabilityDimensionKind,
+    SuitabilityPolicy, TargetOperatingContract, WorkloadDemandProfile,
+};
+use crate::fsutil::read_json;
+use crate::ids::{new_id, now_unix_ms};
+use crate::{LabError, LabResult};
+use serde::Serialize;
+use serde_json::Value;
+use std::collections::BTreeSet;
+use std::fs;
+use std::path::Path;
+
+#[derive(Debug, Clone, Default)]
+pub struct TargetRunNumericEvidence {
+    pub max_temp_c: Option<f64>,
+    pub memory_available_min_kb: Option<u64>,
+    pub evidence_refs: Vec<String>,
+    pub missing: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConstraintCheckResult {
+    pub schema_version: String,
+    pub status: String,
+    pub checked_path: String,
+    pub matches: Vec<ConstraintCheckMatch>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConstraintCheckMatch {
+    pub path: String,
+    pub blocked_claim: String,
+}
+
+pub fn decide_suitability(
+    target_run_dir: &Path,
+    target_contract: &TargetOperatingContract,
+    workload: &WorkloadDemandProfile,
+    policy: &SuitabilityPolicy,
+    target_contract_ref: String,
+    workload_ref: String,
+    policy_ref: String,
+) -> LabResult<SuitabilityDecision> {
+    validate_policy(policy)?;
+    let target_evidence = collect_target_run_numeric_evidence(target_run_dir);
+    let mut dimensions = Vec::new();
+    let mut seen = BTreeSet::new();
+    for dimension in policy
+        .required_dimensions
+        .iter()
+        .chain(policy.optional_dimensions.iter())
+    {
+        if seen.insert(dimension.clone()) {
+            dimensions.push(decide_dimension(
+                dimension.clone(),
+                policy,
+                workload,
+                &target_evidence,
+                vec![workload_ref.clone(), target_contract_ref.clone()],
+            ));
+        }
+    }
+    let required = dimensions
+        .iter()
+        .filter(|dimension| policy.required_dimensions.contains(&dimension.dimension))
+        .collect::<Vec<_>>();
+    let overall_decision = if required
+        .iter()
+        .any(|dimension| dimension.decision == SuitabilityDecisionValue::Fail)
+    {
+        SuitabilityDecisionValue::Fail
+    } else if required
+        .iter()
+        .any(|dimension| dimension.decision == SuitabilityDecisionValue::Unknown)
+    {
+        SuitabilityDecisionValue::Unknown
+    } else if required
+        .iter()
+        .any(|dimension| dimension.decision == SuitabilityDecisionValue::Marginal)
+    {
+        SuitabilityDecisionValue::Marginal
+    } else {
+        SuitabilityDecisionValue::Meet
+    };
+    let selection_ready = required.iter().all(|dimension| {
+        !matches!(
+            dimension.decision,
+            SuitabilityDecisionValue::Fail | SuitabilityDecisionValue::Unknown
+        )
+    });
+    let mut blocked_claims = vec![
+        "production readiness".to_string(),
+        "Pi4 is sufficient".to_string(),
+        "battery safe".to_string(),
+        "real-time safe under all pressure".to_string(),
+    ];
+    if !selection_ready {
+        blocked_claims.push("selection readiness".to_string());
+    }
+    for rule in &target_contract.rules {
+        if rule.category == OperatingRuleCategory::BlockedClaim {
+            blocked_claims.push(rule.statement.clone());
+        }
+    }
+    blocked_claims.extend(target_contract.unknowns.iter().map(|unknown| {
+        format!("target-specific claim blocked by operating contract unknown: {unknown}")
+    }));
+    blocked_claims.sort();
+    blocked_claims.dedup();
+    let mut data_quality = workload.data_quality.clone();
+    if !target_evidence.missing.is_empty() {
+        data_quality.degraded = true;
+        data_quality.missing.extend(target_evidence.missing);
+    }
+    data_quality.notes.push(
+        "suitability decision read target run numeric evidence and target operating contract rules"
+            .to_string(),
+    );
+    let mut evidence_refs = vec![target_contract_ref, workload_ref, policy_ref];
+    evidence_refs.extend(target_evidence.evidence_refs);
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    Ok(SuitabilityDecision {
+        schema_version: "lab.suitability_decision.v1".to_string(),
+        decision_id: new_id("SUITABILITY"),
+        target_id: workload.target_id.clone(),
+        workload_id: workload.workload_id.clone(),
+        policy_id: policy.policy_id.clone(),
+        overall_decision,
+        selection_ready,
+        dimensions,
+        blocked_claims,
+        data_quality,
+        evidence_refs,
+        time_unix_ms: now_unix_ms(),
+    })
+}
+
+pub fn generate_design_constraint_pack(decision: &SuitabilityDecision) -> DesignConstraintPack {
+    let mut allowed_patterns = Vec::new();
+    let mut burst_only_patterns = vec!["bounded burst workload execution only".to_string()];
+    let mut degraded_mode_triggers = Vec::new();
+    let mut forbidden_patterns = vec![
+        "unbounded all-core default loop".to_string(),
+        "unbounded workload execution without duration and output limits".to_string(),
+    ];
+    let mut budget_constraints = Vec::new();
+    let mut required_runtime_guards = vec![
+        "preserve workload duration limits".to_string(),
+        "preserve stdout/stderr byte limits".to_string(),
+        "do not use SSH workload execution in v1".to_string(),
+    ];
+    for dimension in &decision.dimensions {
+        match dimension.decision {
+            SuitabilityDecisionValue::Meet => allowed_patterns.push(format!(
+                "{:?} demand is within measured v1 policy envelope",
+                dimension.dimension
+            )),
+            SuitabilityDecisionValue::Marginal => {
+                burst_only_patterns.push(format!("{:?} remains burst-only", dimension.dimension));
+                degraded_mode_triggers.push(format!(
+                    "{:?} margin enters marginal band: {}",
+                    dimension.dimension,
+                    dimension
+                        .margin
+                        .clone()
+                        .unwrap_or_else(|| "unknown".to_string())
+                ));
+            }
+            SuitabilityDecisionValue::Fail => {
+                forbidden_patterns.push(format!(
+                    "default design relying on failed {:?} suitability",
+                    dimension.dimension
+                ));
+                degraded_mode_triggers.push(format!(
+                    "{:?} suitability fails under current evidence",
+                    dimension.dimension
+                ));
+            }
+            SuitabilityDecisionValue::Unknown => {
+                required_runtime_guards.push(format!(
+                    "collect evidence before relying on {:?} suitability",
+                    dimension.dimension
+                ));
+            }
+        }
+        if let Some(margin) = &dimension.margin {
+            budget_constraints.push(format!("{:?}: {margin}", dimension.dimension));
+        }
+    }
+    allowed_patterns.sort();
+    allowed_patterns.dedup();
+    burst_only_patterns.sort();
+    burst_only_patterns.dedup();
+    degraded_mode_triggers.sort();
+    degraded_mode_triggers.dedup();
+    forbidden_patterns.sort();
+    forbidden_patterns.dedup();
+    budget_constraints.sort();
+    budget_constraints.dedup();
+    required_runtime_guards.sort();
+    required_runtime_guards.dedup();
+    let mut agent_instructions = vec![
+        "Do not claim production readiness from this v1 workload suitability slice.".to_string(),
+        "Treat unknown suitability dimensions as blocked until new evidence exists.".to_string(),
+    ];
+    if !decision.selection_ready {
+        agent_instructions.push(
+            "Do not select this target/workload pair as ready without resolving required unknowns or failures."
+                .to_string(),
+        );
+    }
+    DesignConstraintPack {
+        schema_version: "lab.design_constraint_pack.v1".to_string(),
+        constraint_pack_id: new_id("CONSTRAINTS"),
+        target_id: decision.target_id.clone(),
+        workload_id: decision.workload_id.clone(),
+        allowed_patterns,
+        burst_only_patterns,
+        degraded_mode_triggers,
+        forbidden_patterns,
+        budget_constraints,
+        required_runtime_guards,
+        blocked_claims: decision.blocked_claims.clone(),
+        agent_instructions,
+        ci_rules: vec![
+            "blocked_claims_must_not_appear_in_agent_facing_claims".to_string(),
+            "unknown_required_dimensions_block_selection_readiness".to_string(),
+        ],
+        evidence_refs: decision.evidence_refs.clone(),
+        time_unix_ms: now_unix_ms(),
+    }
+}
+
+pub fn render_agent_constraints_markdown(
+    pack: &DesignConstraintPack,
+    decision_ref: &str,
+) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "# Target Constraints for {} / {}\n\n",
+        pack.target_id, pack.workload_id
+    ));
+    out.push_str("Source:\n");
+    out.push_str(&format!("- suitability_decision: {decision_ref}\n\n"));
+    out.push_str("## Must obey\n\n");
+    for instruction in &pack.agent_instructions {
+        out.push_str(&format!("- {instruction}\n"));
+    }
+    for guard in &pack.required_runtime_guards {
+        out.push_str(&format!("- {guard}\n"));
+    }
+    for trigger in &pack.degraded_mode_triggers {
+        out.push_str(&format!("- Add degraded mode when {trigger}\n"));
+    }
+    out.push_str("\n## Budget constraints\n\n");
+    if pack.budget_constraints.is_empty() {
+        out.push_str("- No numeric budget constraint was established by this v1 decision.\n");
+    } else {
+        for constraint in &pack.budget_constraints {
+            out.push_str(&format!("- {constraint}\n"));
+        }
+    }
+    out.push_str("\n## Forbidden patterns\n\n");
+    for pattern in &pack.forbidden_patterns {
+        out.push_str(&format!("- {pattern}\n"));
+    }
+    out.push_str("\n## Blocked claims\n\n");
+    for claim in &pack.blocked_claims {
+        out.push_str(&format!("- \"{claim}\"\n"));
+    }
+    out
+}
+
+pub fn check_constraints(
+    pack: &DesignConstraintPack,
+    path: &Path,
+) -> LabResult<ConstraintCheckResult> {
+    let mut matches = Vec::new();
+    scan_path_for_blocked_claims(pack, path, &mut matches)?;
+    Ok(ConstraintCheckResult {
+        schema_version: "lab.constraint_check_result.v1".to_string(),
+        status: if matches.is_empty() {
+            "pass".to_string()
+        } else {
+            "fail".to_string()
+        },
+        checked_path: path.display().to_string(),
+        matches,
+    })
+}
+
+fn validate_policy(policy: &SuitabilityPolicy) -> LabResult<()> {
+    if policy.schema_version != "lab.suitability_policy.v1" {
+        return Err(LabError::Validation(
+            "suitability policy schema_version must be lab.suitability_policy.v1".to_string(),
+        ));
+    }
+    if !policy.rules.unknown_required_dimension_blocks_selection
+        || !policy.rules.unknown_never_becomes_meet
+    {
+        return Err(LabError::Policy(
+            "suitability policy cannot convert unknown evidence into meet".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn decide_dimension(
+    dimension: SuitabilityDimensionKind,
+    policy: &SuitabilityPolicy,
+    workload: &WorkloadDemandProfile,
+    target_evidence: &TargetRunNumericEvidence,
+    evidence_refs: Vec<String>,
+) -> SuitabilityDimensionDecision {
+    match dimension {
+        SuitabilityDimensionKind::Cpu => decide_cpu(policy, workload, evidence_refs),
+        SuitabilityDimensionKind::Thermal => {
+            decide_thermal(policy, workload, target_evidence, evidence_refs)
+        }
+        SuitabilityDimensionKind::Memory => {
+            decide_memory(policy, workload, target_evidence, evidence_refs)
+        }
+        other => unknown_dimension(
+            other,
+            "dimension is not measured by the local workload suitability v1 slice".to_string(),
+            evidence_refs,
+            false,
+            true,
+        ),
+    }
+}
+
+fn decide_cpu(
+    policy: &SuitabilityPolicy,
+    workload: &WorkloadDemandProfile,
+    evidence_refs: Vec<String>,
+) -> SuitabilityDimensionDecision {
+    let Some(cpu_policy) = policy.cpu.as_ref() else {
+        return unknown_dimension(
+            SuitabilityDimensionKind::Cpu,
+            "cpu policy threshold is missing".to_string(),
+            evidence_refs,
+            false,
+            true,
+        );
+    };
+    if workload.data_quality.degraded {
+        return unknown_dimension(
+            SuitabilityDimensionKind::Cpu,
+            "workload run did not complete cleanly; steady demand cannot be established"
+                .to_string(),
+            evidence_refs,
+            false,
+            true,
+        );
+    }
+    let Some(avg) = workload.workload_demand.process_cpu_percent_avg else {
+        return unknown_dimension(
+            SuitabilityDimensionKind::Cpu,
+            "process-scoped CPU demand is unavailable".to_string(),
+            evidence_refs,
+            false,
+            true,
+        );
+    };
+    let margin = cpu_policy.max_process_cpu_percent_avg - avg;
+    let decision = if margin < 0.0 {
+        SuitabilityDecisionValue::Fail
+    } else if margin <= cpu_policy.max_process_cpu_percent_avg * 0.10 {
+        SuitabilityDecisionValue::Marginal
+    } else {
+        SuitabilityDecisionValue::Meet
+    };
+    SuitabilityDimensionDecision {
+        dimension: SuitabilityDimensionKind::Cpu,
+        decision,
+        requirement: format!(
+            "process_cpu_percent_avg <= {:.1}",
+            cpu_policy.max_process_cpu_percent_avg
+        ),
+        observed_demand: Some(format!("{avg:.2}% process CPU avg")),
+        target_envelope: Some("policy CPU envelope from suitability policy".to_string()),
+        margin: Some(format!("{margin:.2} percentage points")),
+        confidence: SuitabilityConfidence::Medium,
+        target_conditioned: false,
+        portable_between_targets: true,
+        evidence_refs,
+        unknown_reason: None,
+        next_evidence_needed: Vec::new(),
+    }
+}
+
+fn decide_thermal(
+    policy: &SuitabilityPolicy,
+    workload: &WorkloadDemandProfile,
+    target_evidence: &TargetRunNumericEvidence,
+    evidence_refs: Vec<String>,
+) -> SuitabilityDimensionDecision {
+    let Some(thermal_policy) = policy.thermal.as_ref() else {
+        return unknown_dimension(
+            SuitabilityDimensionKind::Thermal,
+            "thermal policy threshold is missing".to_string(),
+            evidence_refs,
+            true,
+            false,
+        );
+    };
+    if workload
+        .target_conditioned_response
+        .abort_reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("thermal"))
+    {
+        return SuitabilityDimensionDecision {
+            dimension: SuitabilityDimensionKind::Thermal,
+            decision: SuitabilityDecisionValue::Fail,
+            requirement: format!("thermal_max_c <= {:.1}", thermal_policy.max_temp_c),
+            observed_demand: workload
+                .target_conditioned_response
+                .thermal_max_c
+                .map(|temp| format!("{temp:.1}C")),
+            target_envelope: Some("target-conditioned thermal response".to_string()),
+            margin: workload
+                .target_conditioned_response
+                .thermal_max_c
+                .map(|temp| format!("{:.1}C", thermal_policy.max_temp_c - temp)),
+            confidence: SuitabilityConfidence::Medium,
+            target_conditioned: true,
+            portable_between_targets: false,
+            evidence_refs,
+            unknown_reason: None,
+            next_evidence_needed: vec![
+                "completed bounded workload run below thermal abort".to_string()
+            ],
+        };
+    }
+    let observed = workload
+        .target_conditioned_response
+        .thermal_max_c
+        .or(target_evidence.max_temp_c);
+    let Some(temp) = observed else {
+        return unknown_dimension(
+            SuitabilityDimensionKind::Thermal,
+            "thermal response was not visible in workload or target run evidence".to_string(),
+            evidence_refs,
+            true,
+            false,
+        );
+    };
+    let margin = thermal_policy.max_temp_c - temp;
+    let decision = if margin < 0.0 {
+        SuitabilityDecisionValue::Fail
+    } else if margin < thermal_policy.marginal_margin_c_below {
+        SuitabilityDecisionValue::Marginal
+    } else {
+        SuitabilityDecisionValue::Meet
+    };
+    SuitabilityDimensionDecision {
+        dimension: SuitabilityDimensionKind::Thermal,
+        decision,
+        requirement: format!("thermal_max_c <= {:.1}", thermal_policy.max_temp_c),
+        observed_demand: Some(format!("{temp:.1}C target-conditioned response")),
+        target_envelope: Some("run-backed target thermal evidence".to_string()),
+        margin: Some(format!("{margin:.1}C")),
+        confidence: SuitabilityConfidence::Medium,
+        target_conditioned: true,
+        portable_between_targets: false,
+        evidence_refs,
+        unknown_reason: None,
+        next_evidence_needed: Vec::new(),
+    }
+}
+
+fn decide_memory(
+    policy: &SuitabilityPolicy,
+    workload: &WorkloadDemandProfile,
+    target_evidence: &TargetRunNumericEvidence,
+    evidence_refs: Vec<String>,
+) -> SuitabilityDimensionDecision {
+    let Some(memory_policy) = policy.memory.as_ref() else {
+        return unknown_dimension(
+            SuitabilityDimensionKind::Memory,
+            "memory policy threshold is missing".to_string(),
+            evidence_refs,
+            false,
+            true,
+        );
+    };
+    if workload.data_quality.degraded {
+        return unknown_dimension(
+            SuitabilityDimensionKind::Memory,
+            "workload run did not complete cleanly; memory margin cannot be trusted".to_string(),
+            evidence_refs,
+            false,
+            true,
+        );
+    }
+    let available_kb = workload
+        .system_context
+        .system_memory_available_min_kb
+        .or(target_evidence.memory_available_min_kb);
+    let Some(available_kb) = available_kb else {
+        return unknown_dimension(
+            SuitabilityDimensionKind::Memory,
+            "memory availability evidence is missing".to_string(),
+            evidence_refs,
+            false,
+            true,
+        );
+    };
+    let available_mb = available_kb as f64 / 1024.0;
+    let margin = available_mb - memory_policy.min_memory_margin_mb as f64;
+    let decision = if margin < 0.0 {
+        SuitabilityDecisionValue::Fail
+    } else if margin < 128.0 {
+        SuitabilityDecisionValue::Marginal
+    } else {
+        SuitabilityDecisionValue::Meet
+    };
+    SuitabilityDimensionDecision {
+        dimension: SuitabilityDimensionKind::Memory,
+        decision,
+        requirement: format!(
+            "system_memory_available_min_mb >= {}",
+            memory_policy.min_memory_margin_mb
+        ),
+        observed_demand: workload
+            .workload_demand
+            .rss_peak_kb
+            .map(|rss| format!("{:.1}MiB RSS peak", rss as f64 / 1024.0)),
+        target_envelope: Some(format!(
+            "{available_mb:.1}MiB minimum available memory observed"
+        )),
+        margin: Some(format!("{margin:.1}MiB")),
+        confidence: SuitabilityConfidence::Medium,
+        target_conditioned: false,
+        portable_between_targets: true,
+        evidence_refs,
+        unknown_reason: None,
+        next_evidence_needed: Vec::new(),
+    }
+}
+
+fn unknown_dimension(
+    dimension: SuitabilityDimensionKind,
+    reason: String,
+    evidence_refs: Vec<String>,
+    target_conditioned: bool,
+    portable_between_targets: bool,
+) -> SuitabilityDimensionDecision {
+    SuitabilityDimensionDecision {
+        dimension,
+        decision: SuitabilityDecisionValue::Unknown,
+        requirement: "required evidence must be present".to_string(),
+        observed_demand: None,
+        target_envelope: None,
+        margin: None,
+        confidence: SuitabilityConfidence::Low,
+        target_conditioned,
+        portable_between_targets,
+        evidence_refs,
+        unknown_reason: Some(reason.clone()),
+        next_evidence_needed: vec![reason],
+    }
+}
+
+fn collect_target_run_numeric_evidence(run_dir: &Path) -> TargetRunNumericEvidence {
+    let mut evidence = TargetRunNumericEvidence::default();
+    if !run_dir.exists() {
+        evidence.missing.push(format!(
+            "target run directory not found: {}",
+            run_dir.display()
+        ));
+        return evidence;
+    }
+    collect_json_values(run_dir, run_dir, &mut evidence);
+    if evidence.max_temp_c.is_none() {
+        evidence
+            .missing
+            .push("target run thermal numeric evidence not found".to_string());
+    }
+    if evidence.memory_available_min_kb.is_none() {
+        evidence
+            .missing
+            .push("target run memory availability numeric evidence not found".to_string());
+    }
+    evidence
+}
+
+fn collect_json_values(root: &Path, path: &Path, evidence: &mut TargetRunNumericEvidence) {
+    let Ok(entries) = fs::read_dir(path) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_json_values(root, &path, evidence);
+        } else if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
+            if let Ok(value) = read_json::<Value>(&path) {
+                harvest_numeric_value(&value, evidence);
+                if let Ok(relative) = path.strip_prefix(root) {
+                    evidence
+                        .evidence_refs
+                        .push(format!("target-run://{}", relative.display()));
+                }
+            }
+        }
+    }
+}
+
+fn harvest_numeric_value(value: &Value, evidence: &mut TargetRunNumericEvidence) {
+    match value {
+        Value::Object(map) => {
+            if let Some(temp) = map
+                .get("max_observed_temp_c")
+                .or_else(|| map.get("thermal_max_c"))
+                .and_then(|value| value.as_f64())
+            {
+                evidence.max_temp_c = Some(
+                    evidence
+                        .max_temp_c
+                        .map_or(temp, |current| current.max(temp)),
+                );
+            }
+            if let Some(mem) = map
+                .get("memory_available_kb")
+                .or_else(|| map.get("memory_available_kb_min"))
+                .or_else(|| map.get("system_memory_available_min_kb"))
+                .and_then(|value| value.as_u64())
+            {
+                evidence.memory_available_min_kb = Some(
+                    evidence
+                        .memory_available_min_kb
+                        .map_or(mem, |current| current.min(mem)),
+                );
+            }
+            if map
+                .get("metric_id")
+                .and_then(|value| value.as_str())
+                .is_some_and(|id| id.contains("temp"))
+            {
+                if let Some(temp) = map.get("value").and_then(|value| value.as_f64()) {
+                    evidence.max_temp_c = Some(
+                        evidence
+                            .max_temp_c
+                            .map_or(temp, |current| current.max(temp)),
+                    );
+                }
+            }
+            for child in map.values() {
+                harvest_numeric_value(child, evidence);
+            }
+        }
+        Value::Array(values) => {
+            for child in values {
+                harvest_numeric_value(child, evidence);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn scan_path_for_blocked_claims(
+    pack: &DesignConstraintPack,
+    path: &Path,
+    matches: &mut Vec<ConstraintCheckMatch>,
+) -> LabResult<()> {
+    if path.is_dir() {
+        for entry in fs::read_dir(path).map_err(|source| LabError::IoWithPath {
+            path: path.to_path_buf(),
+            source,
+        })? {
+            let entry = entry?;
+            let child = entry.path();
+            if should_skip_path(&child) {
+                continue;
+            }
+            scan_path_for_blocked_claims(pack, &child, matches)?;
+        }
+    } else if should_scan_file(path) {
+        let Ok(text) = fs::read_to_string(path) else {
+            return Ok(());
+        };
+        for claim in &pack.blocked_claims {
+            if !claim.trim().is_empty() && text.contains(claim) {
+                matches.push(ConstraintCheckMatch {
+                    path: path.display().to_string(),
+                    blocked_claim: claim.clone(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn should_skip_path(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| matches!(name, ".git" | "target" | "lab"))
+}
+
+fn should_scan_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| matches!(ext, "md" | "txt" | "rs" | "json" | "yaml" | "yml"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::contracts::{
+        SuitabilityPolicyRules, ThermalSuitabilityPolicy, WorkloadDataQuality, WorkloadDemand,
+        WorkloadDemandScope, WorkloadExecutionMode, WorkloadSystemContext,
+        WorkloadTargetConditionedResponse,
+    };
+
+    #[test]
+    fn suitability_policy_unknown_cannot_become_meet() {
+        let temp = tempfile::tempdir().unwrap();
+        let policy = SuitabilityPolicy {
+            schema_version: "lab.suitability_policy.v1".to_string(),
+            policy_id: "test".to_string(),
+            required_dimensions: vec![SuitabilityDimensionKind::Thermal],
+            optional_dimensions: Vec::new(),
+            rules: SuitabilityPolicyRules {
+                unknown_required_dimension_blocks_selection: true,
+                unknown_never_becomes_meet: true,
+            },
+            thermal: Some(ThermalSuitabilityPolicy {
+                max_temp_c: 75.0,
+                marginal_margin_c_below: 5.0,
+            }),
+            cpu: None,
+            memory: None,
+        };
+        let workload = WorkloadDemandProfile {
+            schema_version: "lab.workload_demand_profile.v1".to_string(),
+            profile_id: "profile".to_string(),
+            run_id: "run".to_string(),
+            workload_id: "workload".to_string(),
+            target_id: "target55".to_string(),
+            execution_mode: WorkloadExecutionMode::TargetLocal,
+            demand_scope: WorkloadDemandScope::ProcessScoped,
+            workload_demand: WorkloadDemand {
+                process_cpu_utime_ticks: None,
+                process_cpu_stime_ticks: None,
+                process_cpu_time_ms: None,
+                process_cpu_percent_avg: None,
+                process_cpu_percent_peak: None,
+                rss_peak_kb: None,
+                vmhwm_peak_kb: None,
+                read_bytes: None,
+                write_bytes: None,
+                cancelled_write_bytes: None,
+                voluntary_ctxt_switches: None,
+                nonvoluntary_ctxt_switches: None,
+                duty_cycle: "bounded_burst".to_string(),
+                child_process_accounting_status: "unsupported".to_string(),
+            },
+            target_conditioned_response: WorkloadTargetConditionedResponse {
+                portable_between_targets: false,
+                thermal_max_c: None,
+                thermal_margin_c: None,
+                freq_range_khz: None,
+                abort_reason: None,
+            },
+            system_context: WorkloadSystemContext {
+                system_cpu_percent_avg: None,
+                system_memory_available_min_kb: None,
+                background_activity_confounder: "measured_partial".to_string(),
+            },
+            data_quality: WorkloadDataQuality {
+                degraded: false,
+                missing: Vec::new(),
+                notes: Vec::new(),
+            },
+            evidence_refs: Vec::new(),
+            time_unix_ms: 1,
+        };
+        let contract = TargetOperatingContract {
+            schema_version: "lab.target_operating_contract.v1".to_string(),
+            target_id: "target55".to_string(),
+            target_class: "raspberry_pi_4".to_string(),
+            contract_status: crate::contracts::TargetOperatingContractStatus::Insufficient,
+            rules: Vec::new(),
+            boundaries: Vec::new(),
+            unknowns: Vec::new(),
+            next_evidence_needed: Vec::new(),
+            time_unix_ms: 1,
+        };
+        let decision = decide_suitability(
+            temp.path(),
+            &contract,
+            &workload,
+            &policy,
+            "contract".to_string(),
+            "workload".to_string(),
+            "policy".to_string(),
+        )
+        .unwrap();
+        assert_eq!(decision.overall_decision, SuitabilityDecisionValue::Unknown);
+        assert!(!decision.selection_ready);
+    }
+}
