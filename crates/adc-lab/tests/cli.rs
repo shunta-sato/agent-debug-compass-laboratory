@@ -51,6 +51,61 @@ fn single_load_artifact_path(run_dir: &std::path::Path, suffix: &str) -> PathBuf
         .unwrap()
 }
 
+fn write_workload_plan(run_dir: &std::path::Path, adc_lab_bin: &std::path::Path) -> PathBuf {
+    let plan_path = run_dir.join("workload.yaml");
+    let working_directory = workspace_root();
+    let plan = serde_json::json!({
+        "schema_version": "lab.workload_run_plan.v1",
+        "workload_id": "cli_bounded_smoke",
+        "workload_name": "CLI bounded smoke",
+        "target": "local",
+        "execution": {
+            "executable_path": adc_lab_bin.display().to_string(),
+            "args": [
+                "workload-fixture",
+                "bounded-smoke",
+                "--duration-ms",
+                "800",
+                "--memory-bytes",
+                "1048576",
+                "--storage-bytes",
+                "4096"
+            ],
+            "working_directory": working_directory.display().to_string(),
+            "expected_executable_sha256": null,
+            "require_executable_sha256": false,
+            "reject_setuid": true,
+            "reject_world_writable": true,
+            "environment_policy": {
+                "inherit": false,
+                "allowed": [
+                    { "name": "PATH", "value": "/usr/bin:/bin:/usr/local/bin" }
+                ]
+            }
+        },
+        "bounds": {
+            "duration_seconds_max": 3,
+            "stdout_bytes_max": 65536,
+            "stderr_bytes_max": 65536,
+            "memory_bytes_max": 1048576,
+            "storage_bytes_max": 4096,
+            "thermal_abort_c": null,
+            "operator_abort_file": null
+        },
+        "observation": {
+            "sample_interval_ms": 50,
+            "process_scoped": true,
+            "system_context": true
+        },
+        "claim_boundary": [
+            "exploratory target-local capability evidence only",
+            "not production readiness"
+        ]
+    });
+    fs::write(&plan_path, serde_yaml::to_string(&plan).unwrap()).unwrap();
+    plan_path
+}
+
 #[test]
 fn cli_help_mentions_adc_lab() {
     Command::cargo_bin("adc-lab")
@@ -59,6 +114,211 @@ fn cli_help_mentions_adc_lab() {
         .assert()
         .success()
         .stdout(contains("adc-lab"));
+}
+
+#[test]
+fn workload_run_refuses_ssh_target_with_structured_artifacts() {
+    let temp = tempfile::tempdir().unwrap();
+    let adc_lab_bin = assert_cmd::cargo::cargo_bin("adc-lab");
+    let plan_path = write_workload_plan(temp.path(), &adc_lab_bin);
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "workload",
+            "run",
+            "--target",
+            "ssh://target55",
+            "--plan",
+            plan_path.to_str().unwrap(),
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("remote_workload_execution_not_supported_in_v1"));
+    let result_path = temp
+        .path()
+        .join("workloads/cli_bounded_smoke/workload_run_result.json");
+    let profile_path = temp.path().join("reports/workload_demand_profile.json");
+    assert!(result_path.exists());
+    assert!(profile_path.exists());
+    let result: serde_json::Value =
+        serde_json::from_slice(&fs::read(result_path).unwrap()).unwrap();
+    assert_eq!(result["status"], "refused");
+}
+
+#[test]
+fn workload_run_local_captures_process_scoped_demand() {
+    let temp = tempfile::tempdir().unwrap();
+    let adc_lab_bin = assert_cmd::cargo::cargo_bin("adc-lab");
+    let plan_path = write_workload_plan(temp.path(), &adc_lab_bin);
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "workload",
+            "run",
+            "--target",
+            "local",
+            "--target-id",
+            "target55",
+            "--execution-mode",
+            "target-local",
+            "--plan",
+            plan_path.to_str().unwrap(),
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("workload_demand_profile.json"));
+    let profile_path = temp.path().join("reports/workload_demand_profile.json");
+    let profile: serde_json::Value =
+        serde_json::from_slice(&fs::read(profile_path).unwrap()).unwrap();
+    assert_eq!(profile["target_id"], "target55");
+    assert_eq!(profile["execution_mode"], "target_local");
+    assert_eq!(profile["demand_scope"], "process_scoped");
+    assert!(profile["workload_demand"]["process_cpu_time_ms"]
+        .as_f64()
+        .is_some_and(|value| value >= 0.0));
+    assert_eq!(
+        profile["target_conditioned_response"]["portable_between_targets"],
+        false
+    );
+}
+
+#[test]
+fn constraints_generate_writes_agent_markdown() {
+    let temp = tempfile::tempdir().unwrap();
+    let decision_path = temp.path().join("suitability_decision.json");
+    let out_path = temp.path().join("design_constraint_pack.json");
+    let md_path = temp.path().join("agent_constraints.md");
+    fs::copy(
+        workspace_root().join("tests/golden/lab.suitability_decision.v1.valid.json"),
+        &decision_path,
+    )
+    .unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "constraints",
+            "generate",
+            "--decision",
+            decision_path.to_str().unwrap(),
+            "--out",
+            out_path.to_str().unwrap(),
+            "--agent-instructions-out",
+            md_path.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains(
+            "\"schema_version\": \"lab.design_constraint_pack.v1\"",
+        ));
+    let markdown = fs::read_to_string(md_path).unwrap();
+    assert!(markdown.contains("# Target Constraints"));
+    assert!(markdown.contains("## Blocked claims"));
+}
+
+#[test]
+fn decide_suitability_reads_run_evidence_and_keeps_thermal_target_conditioned() {
+    let temp = tempfile::tempdir().unwrap();
+    let target_run = temp.path().join("target-run");
+    fs::create_dir_all(target_run.join("observations")).unwrap();
+    fs::write(
+        target_run.join("observations/observe.json"),
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "max_observed_temp_c": 61.0,
+            "memory_available_kb": 7340032
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let demand_path = temp.path().join("workload_demand_profile.json");
+    let policy_path = temp.path().join("policy.yaml");
+    let contract_path = temp.path().join("target_operating_contract.json");
+    let out_path = temp.path().join("suitability_decision.json");
+    fs::copy(
+        workspace_root().join("tests/golden/lab.workload_demand_profile.v1.valid.json"),
+        &demand_path,
+    )
+    .unwrap();
+    fs::copy(
+        workspace_root().join("tests/golden/lab.suitability_policy.v1.valid.json"),
+        &policy_path,
+    )
+    .unwrap();
+    fs::copy(
+        workspace_root().join("tests/golden/lab.target_operating_contract.v1.valid.json"),
+        &contract_path,
+    )
+    .unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "decide",
+            "suitability",
+            "--target-run",
+            target_run.to_str().unwrap(),
+            "--target-contract",
+            contract_path.to_str().unwrap(),
+            "--workload-demand",
+            demand_path.to_str().unwrap(),
+            "--policy",
+            policy_path.to_str().unwrap(),
+            "--out",
+            out_path.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains(
+            "\"schema_version\": \"lab.suitability_decision.v1\"",
+        ));
+    let decision: serde_json::Value = serde_json::from_slice(&fs::read(out_path).unwrap()).unwrap();
+    let thermal = decision["dimensions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["dimension"] == "thermal")
+        .unwrap();
+    assert_eq!(thermal["target_conditioned"], true);
+    assert_eq!(thermal["portable_between_targets"], false);
+}
+
+#[test]
+fn constraints_check_fails_on_blocked_claim_fixture() {
+    let temp = tempfile::tempdir().unwrap();
+    let pack_path = temp.path().join("design_constraint_pack.json");
+    let claim_path = temp.path().join("CLAIMS.md");
+    fs::copy(
+        workspace_root().join("tests/golden/lab.design_constraint_pack.v1.valid.json"),
+        &pack_path,
+    )
+    .unwrap();
+    fs::write(&claim_path, "This target has production readiness.\n").unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "constraints",
+            "check",
+            "--constraints",
+            pack_path.to_str().unwrap(),
+            "--path",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stdout(contains("\"status\": \"fail\""))
+        .stdout(contains("production readiness"));
 }
 
 #[test]

@@ -1,0 +1,30 @@
+{
+  "schema_version": "lab.workload_run_result.v1",
+  "run_id": "LAB-RUN-workload-001",
+  "workload_id": "pi4_representative_smoke",
+  "target_id": "target55",
+  "execution_mode": "target_local",
+  "status": "completed",
+  "reason": null,
+  "exit_code": 0,
+  "signal": null,
+  "started_at_unix_ms": 1780000000000,
+  "ended_at_unix_ms": 1780000000500,
+  "duration_ms": 500,
+  "stdout_ref": "artifact://lab/runs/LAB-RUN-workload-001/workloads/pi4_representative_smoke/stdout.txt",
+  "stderr_ref": "artifact://lab/runs/LAB-RUN-workload-001/workloads/pi4_representative_smoke/stderr.txt",
+  "stdout_truncated": false,
+  "stderr_truncated": false,
+  "process_ids": [1234],
+  "audit_refs": [
+    "artifact://lab/runs/LAB-RUN-workload-001/audit.jsonl"
+  ],
+  "data_quality": {
+    "degraded": false,
+    "missing": [],
+    "notes": [
+      "child process demand is not aggregated in v1"
+    ]
+  },
+  "time_unix_ms": 1780000000501
+}
