@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "lab.design_constraint_pack.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "constraint_pack_id", "target_id", "workload_id", "allowed_patterns", "burst_only_patterns", "degraded_mode_triggers", "forbidden_patterns", "budget_constraints", "required_runtime_guards", "blocked_claims", "agent_instructions", "ci_rules", "evidence_refs", "time_unix_ms"],
+  "properties": {
+    "schema_version": { "const": "lab.design_constraint_pack.v1" },
+    "constraint_pack_id": { "type": "string", "minLength": 1 },
+    "target_id": { "type": "string", "minLength": 1 },
+    "workload_id": { "type": "string", "minLength": 1 },
+    "allowed_patterns": { "type": "array", "items": { "type": "string" } },
+    "burst_only_patterns": { "type": "array", "items": { "type": "string" } },
+    "degraded_mode_triggers": { "type": "array", "items": { "type": "string" } },
+    "forbidden_patterns": { "type": "array", "items": { "type": "string" } },
+    "budget_constraints": { "type": "array", "items": { "type": "string" } },
+    "required_runtime_guards": { "type": "array", "items": { "type": "string" } },
+    "blocked_claims": { "type": "array", "items": { "type": "string" } },
+    "agent_instructions": { "type": "array", "items": { "type": "string" } },
+    "ci_rules": { "type": "array", "items": { "type": "string" } },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "time_unix_ms": { "type": "integer", "minimum": 0 }
+  }
+}

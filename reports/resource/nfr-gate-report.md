@@ -42,6 +42,11 @@ Gate decision: experimental-only
   phase-based memory/storage/jitter composite runner. Target55 live evidence is
   still experimental-only: the 1MiB network transfer is LAN-confounded, and the
   128MiB composite memory phase did not show reclaim/PSI/fault pressure effect.
+- Local workload suitability v1 adds a bounded target-local workload runner,
+  process-scoped `/proc/<pid>` demand capture, suitability decisions, and
+  agent-facing constraints. It is experimental-only evidence and does not
+  enable SSH workload transport, privileged workload execution, production
+  readiness, flash-wear, sustained thermal, or Pi4/Pi5 selection claims.
 - `unsupported_by_adc_lab` is not an allowed final pressure/contract status;
   required surfaces must classify as measured, measured_partial,
   not_controllable, unsafe_to_run_with_reason, not_applicable_with_reason, or
@@ -65,6 +70,7 @@ Gate decision: experimental-only
 | Latency / jitter | no claim | not measured | unknown | `docs/testing/resource-harness.md` |
 | Observer overhead | no production overhead claim | target55 short smoke iteration delta about -0.05% | partial | `examples/demos/target55/reports/operating-envelope/observer_on.json` |
 | Platform Operating Contract pressure | explicit experimental burst only; duration <=30s, memory <=128MiB, storage <=64MiB, network <=1MiB | hardware-free CLI/schema tests; target55 bounded pressure suite; target55 1MiB network transfer; target55 phase-based memory/storage/jitter composite with memory pressure effect not observed | candidate/insufficient for reference | `schemas/lab.resource_pressure_result.v1.schema.json`; `schemas/lab.composite_boundary_result.v1.schema.json`; `crates/adc-lab/tests/cli.rs`; `lab/runs/LAB-RUN-target55-pi4-reference-v1-20260611T0030Z/reports/multi_run_operating_contract.json` |
+| Local workload suitability | explicit target-local bounded burst only; duration <=300s by runner policy; stdout/stderr bounded by plan; no SSH workload transport | hardware-free schema/core/CLI tests; target55 live validation pending in this PR | experimental-only | `schemas/lab.workload_run_plan.v1.schema.json`; `schemas/lab.workload_demand_profile.v1.schema.json`; `schemas/lab.suitability_decision.v1.schema.json`; `crates/adc-lab/tests/cli.rs` |
 
 ## Runtime Mode Classification
 
@@ -82,6 +88,9 @@ Gate decision: experimental-only
 | pressure probe suite | experimental-only burst | bounded probe loop or bounded I/O | duration <=30s | no | schema/CLI tests; target55 pressure suite candidate |
 | composite memory/storage/jitter probe | experimental-only burst | phase sequence | component duration <=30s, memory <=128MiB, storage <=64MiB | no | target55 composite scenario ran; chain remains insufficient because memory effect was not observed |
 | endpoint-backed network transfer | experimental-only burst | bounded TCP write | network <=1MiB | no | target55 1MiB LAN transfer measured; retry/backoff/loss claims blocked |
+| workload run | experimental-only target-local burst | bounded child process plus procfs sampling | plan duration <=300s, stdout/stderr bounds, optional thermal abort | no | schema/core/CLI tests; SSH target refused in v1 |
+| suitability decision | controller-side report | none on target | command lifetime | no | policy unknown cannot become meet; required unknown blocks selection readiness |
+| constraints generation/check | controller-side report/lint | none on target | command lifetime | no | Markdown constraints emitted; blocked-claim text check only |
 | operating contract report | controller-side report | none on target | command lifetime | no | schema/CLI tests |
 | target runner | command-triggered | none while idle | process lifetime | no | target55 smoke passed |
 
@@ -108,6 +117,13 @@ Gate decision: experimental-only
   `schemas/lab.composite_boundary_result.v1.schema.json`,
   `schemas/lab.resource_coupling_report.v1.schema.json`, and
   `schemas/lab.target_operating_contract.v1.schema.json`.
+- Local workload suitability contracts:
+  `schemas/lab.workload_run_plan.v1.schema.json`,
+  `schemas/lab.workload_run_result.v1.schema.json`,
+  `schemas/lab.workload_demand_profile.v1.schema.json`,
+  `schemas/lab.suitability_policy.v1.schema.json`,
+  `schemas/lab.suitability_decision.v1.schema.json`, and
+  `schemas/lab.design_constraint_pack.v1.schema.json`.
 - Target55 candidate pack:
   `/mnt/share/target55-pi4-reference-pack-v1-candidate-20260611-r2.zip`
   (`sha256=e39efaedc405dc637ce2231518f43d6de84172c1f2e4900442f173ee1274f204`).
@@ -129,6 +145,8 @@ Gate decision: experimental-only
 | Platform Operating Contract artifacts classify Pi4/Pi5 mechanism and pressure evidence without `unsupported_by_adc_lab` | `schemas/lab.*operating_contract*.schema.json`; `crates/adc-lab-core/src/platform_contract.rs`; `crates/adc-lab/tests/cli.rs` | schema fixtures, negative unsupported-status tests, pressure/report CLI tests | allowed contract/runtime claim; not a Pi4 reference contract claim |
 | Endpoint-backed bounded network transfer records generated bytes and avoids counter-only overclaim | `crates/adc-lab-core/src/platform_contract.rs`; `crates/adc-lab/tests/cli.rs`; target55 network run | CLI loopback test and target55 1MiB transfer artifact | allowed bounded-transfer claim for measured endpoint; production cadence/retry/loss claims blocked |
 | Memory/storage/jitter composite result distinguishes composite evidence class from measured degradation | `schemas/lab.composite_boundary_result.v1.schema.json`; `crates/adc-lab-core/src/platform_contract.rs`; target55 composite run | schema fixture, CLI composite test, target55 composite artifact | allowed scenario-executed claim; degradation chain remains insufficient without memory pressure effect |
+| Local workload run v1 captures process-scoped demand and refuses SSH workload transport | `crates/adc-lab-core/src/workload.rs`; `crates/adc-lab/tests/cli.rs`; `schemas/lab.workload_*` | core/CLI/schema tests; target55 target-local validation pending | allowed v1 runner claim; not remote workload, production, or Pi4/Pi5 selection evidence |
+| Suitability policy cannot convert unknown to meet | `crates/adc-lab-core/src/suitability.rs`; `schemas/lab.suitability_policy.v1.schema.json` | core and schema tests | allowed decision-semantics claim |
 | Pi4 is sufficient or Pi5 is required for a workload | none | no same-suite comparison or suitability decision evidence | blocked if introduced |
 | low overhead | none | short smoke insufficient | blocked if introduced |
 | battery safe | none | none | blocked if introduced |
@@ -166,6 +184,10 @@ Gate decision: experimental-only
   candidate pack, but reference status remains blocked by missing memory
   pressure-effect ladder, same-condition coupling evidence, retry/backoff/loss
   network evidence, and longer thermal/recovery coverage.
+- Local workload suitability v1 is not remote workload support. SSH is allowed
+  only to invoke target-local commands and retrieve artifacts during validation.
+  Child process aggregation is explicitly unsupported in v1 and must not be
+  treated as complete workload-tree demand.
 
 ## Handoff To Quality Gate
 

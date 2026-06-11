@@ -1,0 +1,20 @@
+{
+  "schema_version": "lab.suitability_policy.v1",
+  "policy_id": "pi4_default_policy",
+  "required_dimensions": ["cpu", "thermal", "memory"],
+  "optional_dimensions": ["storage_io", "network_io", "latency_jitter"],
+  "rules": {
+    "unknown_required_dimension_blocks_selection": true,
+    "unknown_never_becomes_meet": true
+  },
+  "thermal": {
+    "max_temp_c": 75.0,
+    "marginal_margin_c_below": 5.0
+  },
+  "cpu": {
+    "max_process_cpu_percent_avg": 80.0
+  },
+  "memory": {
+    "min_memory_margin_mb": 512
+  }
+}

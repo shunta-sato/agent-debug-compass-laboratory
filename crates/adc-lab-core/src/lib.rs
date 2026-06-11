@@ -15,8 +15,10 @@ pub mod privilege;
 pub mod qualification;
 pub mod report;
 pub mod run;
+pub mod suitability;
 pub mod target;
 pub mod toolchain;
+pub mod workload;
 
 pub use audit::*;
 pub use build_info::*;
@@ -34,5 +36,7 @@ pub use privilege::*;
 pub use qualification::*;
 pub use report::*;
 pub use run::*;
+pub use suitability::*;
 pub use target::*;
 pub use toolchain::*;
+pub use workload::*;
