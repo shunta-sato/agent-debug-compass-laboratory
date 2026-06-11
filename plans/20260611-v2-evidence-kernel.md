@@ -746,6 +746,8 @@ make verify
   Phase 0 safety invariant tests green.
 - Phase 4 final gate: `make verify` passed after CLI cutover, command module
   split, v2 probe sidecar writes, and updated `cli.rs` expectations.
+- Phase 4 PR: draft PR #34 opened at
+  `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/34`.
 
 ## Decision Log
 
@@ -806,12 +808,11 @@ make verify
 
 - Branch: `codex/adc-labv2-phase4-cli-cutover`.
 - Baseline commit: `543edf0`.
-- Current status: Phase 4 implemented and verified locally. Phase 0 is draft PR
-  #30; Phase 1 is stacked draft PR #31; Phase 2 is stacked draft PR #32; Phase
-  3 is stacked draft PR #33. Phase 4 should be committed, pushed, and opened as
-  a stacked draft PR based on `codex/adc-labv2-phase3-probe-artifacts`.
-- Uncommitted changes: Phase 4 CLI cutover, command module split, tests, and
-  this plan update are pending commit.
+- Current status: Phase 4 implemented, verified, pushed, and published as
+  stacked draft PR #34. Phase 0 is draft PR #30; Phase 1 is stacked draft PR
+  #31; Phase 2 is stacked draft PR #32; Phase 3 is stacked draft PR #33.
+- Uncommitted changes: none expected after the Phase 4 PR URL plan update is
+  committed and pushed.
 - Commands run so far:
   - `sed -n ...` on the request attachment, `PLANS.md`, execution-plan
     references, existing plans, `COMMANDS.md`, Cargo manifests, Makefile, and
@@ -832,10 +833,10 @@ make verify
   - `cargo test -p adc-lab --test cli -- --nocapture`.
   - `make verify`.
 - Next steps:
-  1. Commit and push Phase 4 on `codex/adc-labv2-phase4-cli-cutover`.
-  2. Open the Phase 4 draft PR against
-     `codex/adc-labv2-phase3-probe-artifacts`.
-  3. Start Phase 5 from the Phase 4 branch after the Phase 4 PR exists.
+  1. Start Phase 5 from `codex/adc-labv2-phase4-cli-cutover`.
+  2. Keep the Phase 5 PR based on the Phase 4 branch while PR #34 is open.
+  3. Delete obsolete v1 schemas/docs/surfaces and update `docs-smoke` in the
+     same commit as doc deletion.
 - Read these files first when resuming:
   - `plans/20260611-v2-evidence-kernel.md`
   - `crates/adc-lab-core/src/control.rs`
@@ -849,6 +850,5 @@ make verify
 
 ## Outcomes & Retrospective
 
-Phase 0, Phase 1, Phase 2, and Phase 3 are complete and PR'd. Phase 4 is
-complete locally. Whole-cutover outcomes remain pending until Phases 4-5 are
-implemented and PR'd.
+Phase 0 through Phase 4 are complete and PR'd. Whole-cutover outcomes remain
+pending until Phase 5 is implemented and PR'd.
