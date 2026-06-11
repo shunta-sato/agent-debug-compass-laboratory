@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -10,26 +10,41 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
+fn schema_path_for(root: &Path, contract_id: &str) -> PathBuf {
+    let ledger = fs::read_to_string(root.join("schemas/schema-ledger.tsv")).unwrap();
+    for line in ledger.lines().skip(1) {
+        if line.trim().is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let columns = line.split('\t').collect::<Vec<_>>();
+        if columns.first().copied() == Some(contract_id) {
+            let schema_file = columns.get(1).expect("schema ledger row has schema_file");
+            assert_ne!(
+                *schema_file, "-",
+                "{contract_id} must name a generated schema file"
+            );
+            return root.join("schemas").join(schema_file);
+        }
+    }
+    panic!("missing schema ledger row for {contract_id}");
+}
+
 #[test]
 fn contract_validation_schema_fixtures_validate() {
     let root = workspace_root();
-    let schema_dir = root.join("schemas");
     let golden_dir = root.join("tests/golden");
     let mut checked = 0usize;
 
-    for entry in fs::read_dir(&schema_dir).unwrap() {
-        let schema_path = entry.unwrap().path();
-        if schema_path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+    for entry in fs::read_dir(&golden_dir).unwrap() {
+        let fixture_path = entry.unwrap().path();
+        if fixture_path.extension().and_then(|ext| ext.to_str()) != Some("json") {
             continue;
         }
-        let file_name = schema_path.file_name().unwrap().to_str().unwrap();
-        let fixture_name = file_name.replace(".schema.json", ".valid.json");
-        let fixture_path = golden_dir.join(fixture_name);
-        assert!(
-            fixture_path.exists(),
-            "missing golden fixture for {}",
-            schema_path.display()
-        );
+        let file_name = fixture_path.file_name().unwrap().to_str().unwrap();
+        let Some(contract_id) = file_name.strip_suffix(".valid.json") else {
+            continue;
+        };
+        let schema_path = schema_path_for(&root, contract_id);
 
         let schema_json: serde_json::Value =
             serde_json::from_slice(&fs::read(&schema_path).unwrap()).unwrap();
@@ -42,14 +57,14 @@ fn contract_validation_schema_fixtures_validate() {
 
     assert!(
         checked >= 20,
-        "expected all active top-level schemas to be checked"
+        "expected all active golden schema fixtures to be checked"
     );
 }
 
 #[test]
 fn contract_validation_control_plan_rejects_arbitrary_shell_field() {
     let root = workspace_root();
-    let schema_path = root.join("schemas/lab.control_plan.v1.schema.json");
+    let schema_path = schema_path_for(&root, "lab.control_plan.v1");
     let fixture_path = root.join("tests/golden/lab.control_plan.v1.valid.json");
     let schema_json: serde_json::Value =
         serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
@@ -65,7 +80,7 @@ fn contract_validation_control_plan_rejects_arbitrary_shell_field() {
 #[test]
 fn contract_validation_experiment_run_accepts_not_implemented_status() {
     let root = workspace_root();
-    let schema_path = root.join("schemas/lab.experiment_run.v1.schema.json");
+    let schema_path = schema_path_for(&root, "lab.experiment_run.v1");
     let schema_json: serde_json::Value =
         serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
     let instance = serde_json::json!({
@@ -96,7 +111,7 @@ fn contract_validation_experiment_run_accepts_not_implemented_status() {
 #[test]
 fn contract_validation_tool_qualification_requires_agent_adapter_evidence_fields() {
     let root = workspace_root();
-    let schema_path = root.join("schemas/lab.tool_qualification.v1.schema.json");
+    let schema_path = schema_path_for(&root, "lab.tool_qualification.v1");
     let fixture_path = root.join("tests/golden/lab.tool_qualification.v1.valid.json");
     let schema_json: serde_json::Value =
         serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
@@ -115,7 +130,7 @@ fn contract_validation_tool_qualification_requires_agent_adapter_evidence_fields
 #[test]
 fn contract_validation_privilege_provider_rejects_unknown_availability() {
     let root = workspace_root();
-    let schema_path = root.join("schemas/lab.privilege_provider_status.v1.schema.json");
+    let schema_path = schema_path_for(&root, "lab.privilege_provider_status.v1");
     let fixture_path = root.join("tests/golden/lab.privilege_provider_status.v1.valid.json");
     let schema_json: serde_json::Value =
         serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
@@ -131,7 +146,7 @@ fn contract_validation_privilege_provider_rejects_unknown_availability() {
 #[test]
 fn contract_validation_workload_profile_rejects_unknown_claim_boundary() {
     let root = workspace_root();
-    let schema_path = root.join("schemas/lab.workload_profile.v1.schema.json");
+    let schema_path = schema_path_for(&root, "lab.workload_profile.v1");
     let fixture_path = root.join("tests/golden/lab.workload_profile.v1.valid.json");
     let schema_json: serde_json::Value =
         serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
@@ -147,7 +162,7 @@ fn contract_validation_workload_profile_rejects_unknown_claim_boundary() {
 #[test]
 fn contract_validation_workload_run_plan_rejects_shell_command_field() {
     let root = workspace_root();
-    let schema_path = root.join("schemas/lab.workload_run_plan.v1.schema.json");
+    let schema_path = schema_path_for(&root, "lab.workload_run_plan.v1");
     let fixture_path = root.join("tests/golden/lab.workload_run_plan.v1.valid.json");
     let schema_json: serde_json::Value =
         serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
@@ -164,25 +179,29 @@ fn contract_validation_workload_run_plan_rejects_shell_command_field() {
 }
 
 #[test]
-fn contract_validation_suitability_policy_schema_is_generated_snapshot() {
+fn contract_validation_handwritten_top_level_schemas_are_retired() {
     let root = workspace_root();
+    let handwritten = fs::read_dir(root.join("schemas"))
+        .unwrap()
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("json"))
+        .collect::<Vec<_>>();
     assert!(
-        !root
-            .join("schemas/lab.suitability_policy.v1.schema.json")
-            .exists(),
-        "suitability policy must not keep a handwritten top-level schema"
+        handwritten.is_empty(),
+        "top-level handwritten schema files must be retired: {handwritten:?}"
     );
     assert!(
         root.join("schemas/generated/lab.suitability_policy.v1.schema.json")
             .exists(),
-        "suitability policy generated snapshot must exist"
+        "active v1 contracts must remain as generated snapshots"
     );
 }
 
 #[test]
 fn contract_validation_privilege_doctor_rejects_unknown_status() {
     let root = workspace_root();
-    let schema_path = root.join("schemas/lab.privilege_doctor.v1.schema.json");
+    let schema_path = schema_path_for(&root, "lab.privilege_doctor.v1");
     let fixture_path = root.join("tests/golden/lab.privilege_doctor.v1.valid.json");
     let schema_json: serde_json::Value =
         serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
@@ -198,7 +217,7 @@ fn contract_validation_privilege_doctor_rejects_unknown_status() {
 #[test]
 fn contract_validation_release_manifest_rejects_missing_binary_sha() {
     let root = workspace_root();
-    let schema_path = root.join("schemas/lab.release_manifest.v1.schema.json");
+    let schema_path = schema_path_for(&root, "lab.release_manifest.v1");
     let fixture_path = root.join("tests/golden/lab.release_manifest.v1.valid.json");
     let schema_json: serde_json::Value =
         serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
@@ -224,6 +243,13 @@ fn validate_schema(
         if let Some(name) = reference.strip_prefix("#/$defs/") {
             let target = root
                 .get("$defs")
+                .and_then(|defs| defs.get(name))
+                .ok_or_else(|| format!("{path}: unresolved ref {reference}"))?;
+            return validate_schema(root, target, instance, path);
+        }
+        if let Some(name) = reference.strip_prefix("#/definitions/") {
+            let target = root
+                .get("definitions")
                 .and_then(|defs| defs.get(name))
                 .ok_or_else(|| format!("{path}: unresolved ref {reference}"))?;
             return validate_schema(root, target, instance, path);
@@ -260,19 +286,17 @@ fn validate_schema(
     }
 
     if let Some(minimum) = schema.get("minimum").and_then(|value| value.as_f64()) {
-        let value = instance
-            .as_f64()
-            .ok_or_else(|| format!("{path}: minimum requires numeric instance"))?;
-        if value < minimum {
-            return Err(format!("{path}: value {value} below minimum {minimum}"));
+        if let Some(value) = instance.as_f64() {
+            if value < minimum {
+                return Err(format!("{path}: value {value} below minimum {minimum}"));
+            }
         }
     }
     if let Some(maximum) = schema.get("maximum").and_then(|value| value.as_f64()) {
-        let value = instance
-            .as_f64()
-            .ok_or_else(|| format!("{path}: maximum requires numeric instance"))?;
-        if value > maximum {
-            return Err(format!("{path}: value {value} above maximum {maximum}"));
+        if let Some(value) = instance.as_f64() {
+            if value > maximum {
+                return Err(format!("{path}: value {value} above maximum {maximum}"));
+            }
         }
     }
 

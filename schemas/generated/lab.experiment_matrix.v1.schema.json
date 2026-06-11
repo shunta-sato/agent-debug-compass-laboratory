@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExperimentMatrix",
+  "type": "object",
+  "required": [
+    "cooldown_seconds",
+    "description",
+    "factors",
+    "matrix_id",
+    "order",
+    "repetitions",
+    "schema_version",
+    "warmup_seconds"
+  ],
+  "properties": {
+    "cooldown_seconds": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "description": {
+      "type": "string"
+    },
+    "factors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ExperimentFactor"
+      }
+    },
+    "matrix_id": {
+      "type": "string"
+    },
+    "order": {
+      "type": "string"
+    },
+    "repetitions": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "warmup_seconds": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ExperimentFactor": {
+      "type": "object",
+      "required": [
+        "kind",
+        "levels",
+        "name"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/FactorKind"
+        },
+        "levels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FactorKind": {
+      "type": "string",
+      "enum": [
+        "controlled_factor",
+        "observed_covariate",
+        "uncontrolled_confounder"
+      ]
+    }
+  }
+}

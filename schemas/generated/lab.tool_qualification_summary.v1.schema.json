@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ToolQualificationSummary",
+  "type": "object",
+  "required": [
+    "evidence_accepted_tool_ids",
+    "evidence_rejected_tool_ids",
+    "missing_tool_ids",
+    "qualification_refs",
+    "schema_version",
+    "target_id",
+    "time_unix_ms",
+    "tools"
+  ],
+  "properties": {
+    "evidence_accepted_tool_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence_rejected_tool_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "missing_tool_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "qualification_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ToolQualificationSummaryEntry"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ToolQualificationSummaryEntry": {
+      "type": "object",
+      "required": [
+        "evidence_accepted",
+        "status",
+        "tool_id"
+      ],
+      "properties": {
+        "evidence_accepted": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string"
+        },
+        "tool_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

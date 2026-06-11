@@ -156,21 +156,21 @@ pub(crate) fn command_workload_fixture_bounded_smoke(args: BoundedSmokeCommand) 
         iterations = iterations.wrapping_add(1);
         std::hint::black_box(iterations.rotate_left(7).wrapping_mul(0x9e37_79b9));
     }
-    print_json(&serde_json::json!({
-        "schema_version": "lab.workload_fixture_result.v1",
-        "fixture": "bounded_smoke",
-        "duration_ms": started.elapsed().as_millis() as u64,
-        "memory_bytes_touched": args.memory_bytes,
-        "storage_bytes_written_and_cleaned": written,
-        "iterations": iterations,
-        "claim_boundary": [
-            "exploratory target-local capability evidence only",
-            "not real application performance",
-            "not production readiness",
-            "not sustained thermal safety",
-            "not flash-wear evidence"
-        ]
-    }))
+    print_json(&WorkloadFixtureResult {
+        schema_version: "lab.workload_fixture_result.v1".to_string(),
+        fixture: "bounded_smoke".to_string(),
+        duration_ms: started.elapsed().as_millis() as u64,
+        memory_bytes_touched: args.memory_bytes,
+        storage_bytes_written_and_cleaned: written,
+        iterations,
+        claim_boundary: vec![
+            "exploratory target-local capability evidence only".to_string(),
+            "not real application performance".to_string(),
+            "not production readiness".to_string(),
+            "not sustained thermal safety".to_string(),
+            "not flash-wear evidence".to_string(),
+        ],
+    })
 }
 
 fn read_workload_plan_for_command(path: &Path) -> Result<WorkloadRunPlan> {

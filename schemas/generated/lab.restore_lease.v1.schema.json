@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RestoreLease",
+  "type": "object",
+  "required": [
+    "applied_state",
+    "captured_state",
+    "created_by_plan",
+    "lease_id",
+    "operation_id",
+    "restore_required",
+    "restore_status",
+    "schema_version",
+    "target_id",
+    "time_unix_ms"
+  ],
+  "properties": {
+    "applied_state": {
+      "$ref": "#/definitions/AppliedState"
+    },
+    "captured_state": {
+      "$ref": "#/definitions/CapturedState"
+    },
+    "created_by_plan": {
+      "type": "string"
+    },
+    "lease_id": {
+      "type": "string"
+    },
+    "operation_id": {
+      "type": "string"
+    },
+    "restore_required": {
+      "type": "boolean"
+    },
+    "restore_status": {
+      "$ref": "#/definitions/RestoreStatus"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "AppliedState": {
+      "type": "object",
+      "required": [
+        "governor"
+      ],
+      "properties": {
+        "governor": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CapturedState": {
+      "type": "object",
+      "required": [
+        "cpufreq_policies"
+      ],
+      "properties": {
+        "cpufreq_policies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CpufreqPolicyState"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "CpufreqPolicyState": {
+      "type": "object",
+      "required": [
+        "governor",
+        "policy"
+      ],
+      "properties": {
+        "governor": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "string"
+        },
+        "scaling_max_freq": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scaling_min_freq": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "RestoreStatus": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "restored",
+        "failed",
+        "dry_run"
+      ]
+    }
+  }
+}

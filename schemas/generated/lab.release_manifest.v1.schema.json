@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ReleaseManifest",
+  "type": "object",
+  "required": [
+    "binaries",
+    "git_sha",
+    "schema_version",
+    "target_triple",
+    "version"
+  ],
+  "properties": {
+    "binaries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ReleaseBinaryManifest"
+      }
+    },
+    "git_sha": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "target_triple": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ReleaseBinaryManifest": {
+      "type": "object",
+      "required": [
+        "name",
+        "sha256"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

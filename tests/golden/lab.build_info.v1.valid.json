@@ -1,0 +1,7 @@
+{
+  "name": "adc-lab",
+  "version": "0.1.0",
+  "git_sha": "abc123",
+  "target_triple": "x86_64-unknown-linux-gnu",
+  "build_profile": "debug"
+}

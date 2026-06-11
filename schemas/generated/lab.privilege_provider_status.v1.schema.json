@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PrivilegeProviderStatus",
+  "type": "object",
+  "required": [
+    "active_provider_id",
+    "providers",
+    "schema_version",
+    "target_id",
+    "time_unix_ms"
+  ],
+  "properties": {
+    "active_provider_id": {
+      "type": "string"
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PrivilegeProviderDescriptor"
+      }
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "PrivilegeProviderAvailability": {
+      "type": "string",
+      "enum": [
+        "active",
+        "installed",
+        "planned_disabled",
+        "missing",
+        "disabled"
+      ]
+    },
+    "PrivilegeProviderDescriptor": {
+      "type": "object",
+      "required": [
+        "approval_required",
+        "audit_required",
+        "availability",
+        "default_enabled",
+        "endpoint",
+        "operations_allowed",
+        "provider_id",
+        "provider_kind",
+        "restore_required",
+        "root_boundary",
+        "safety_notes",
+        "transport"
+      ],
+      "properties": {
+        "approval_required": {
+          "type": "boolean"
+        },
+        "audit_required": {
+          "type": "boolean"
+        },
+        "availability": {
+          "$ref": "#/definitions/PrivilegeProviderAvailability"
+        },
+        "default_enabled": {
+          "type": "boolean"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "operations_allowed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "provider_id": {
+          "type": "string"
+        },
+        "provider_kind": {
+          "$ref": "#/definitions/PrivilegeProviderKind"
+        },
+        "restore_required": {
+          "type": "boolean"
+        },
+        "root_boundary": {
+          "type": "string"
+        },
+        "safety_notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "transport": {
+          "$ref": "#/definitions/PrivilegeProviderTransport"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PrivilegeProviderKind": {
+      "type": "string",
+      "enum": [
+        "sudo_helper_option_a",
+        "systemd_unix_socket_option_b"
+      ]
+    },
+    "PrivilegeProviderTransport": {
+      "type": "string",
+      "enum": [
+        "sudo_exec",
+        "unix_socket"
+      ]
+    }
+  }
+}

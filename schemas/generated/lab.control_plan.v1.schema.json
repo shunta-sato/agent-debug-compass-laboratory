@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ControlPlan",
+  "type": "object",
+  "required": [
+    "approval_required",
+    "bounds",
+    "created_by",
+    "operation",
+    "plan_id",
+    "restore_required",
+    "risk_tier",
+    "run_id",
+    "schema_version",
+    "target_id",
+    "time_unix_ms"
+  ],
+  "properties": {
+    "approval_required": {
+      "type": "boolean"
+    },
+    "bounds": {
+      "$ref": "#/definitions/OperationBounds"
+    },
+    "created_by": {
+      "$ref": "#/definitions/Actor"
+    },
+    "operation": {
+      "$ref": "#/definitions/ControlOperation"
+    },
+    "plan_id": {
+      "type": "string"
+    },
+    "restore_required": {
+      "type": "boolean"
+    },
+    "risk_tier": {
+      "$ref": "#/definitions/RiskTier"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Actor": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ActorKind"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActorKind": {
+      "type": "string",
+      "enum": [
+        "agent",
+        "human",
+        "system"
+      ]
+    },
+    "ControlOperation": {
+      "type": "object",
+      "required": [
+        "desired_state",
+        "operation_id"
+      ],
+      "properties": {
+        "desired_state": {
+          "$ref": "#/definitions/CpufreqDesiredState"
+        },
+        "operation_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CpufreqDesiredState": {
+      "type": "object",
+      "required": [
+        "governor"
+      ],
+      "properties": {
+        "governor": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OperationBounds": {
+      "type": "object",
+      "required": [
+        "duration_seconds_max"
+      ],
+      "properties": {
+        "duration_seconds_max": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "thermal_celsius_abort": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RiskTier": {
+      "type": "string",
+      "enum": [
+        "tier0_read_only_observation",
+        "tier1_low_risk_reversible_non_root",
+        "tier2_privileged_reversible",
+        "tier3_hard_to_restore",
+        "tier4_normally_prohibited"
+      ]
+    }
+  }
+}

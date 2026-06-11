@@ -53,7 +53,7 @@ schemas-check:
 	trap 'rm -rf "$$tmp_dir"' EXIT; \
 	cargo run -p adc-lab-core --example generate_schemas -- "$$tmp_dir"; \
 	diff -ru schemas/generated "$$tmp_dir"
-	python3 scripts/schema/check-schema-ledger.py
+	python3 scripts/schema/check-schema-ledger.py --enforce-final
 
 schema-ledger-check:
 	python3 scripts/schema/check-schema-ledger.py

@@ -199,6 +199,16 @@ pub struct TargetInventory {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub struct HealthCheck {
+    pub schema_version: String,
+    pub target_id: String,
+    pub status: String,
+    pub inventory_available: bool,
+    pub toolchain_available: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ToolInfo {
     pub tool_id: String,
     pub category: ToolCategory,
@@ -924,6 +934,18 @@ pub struct WorkloadDemandProfile {
     pub data_quality: WorkloadDataQuality,
     pub evidence_refs: Vec<String>,
     pub time_unix_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct WorkloadFixtureResult {
+    pub schema_version: String,
+    pub fixture: String,
+    pub duration_ms: u64,
+    pub memory_bytes_touched: u64,
+    pub storage_bytes_written_and_cleaned: u64,
+    pub iterations: u64,
+    pub claim_boundary: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, PartialOrd, Ord)]

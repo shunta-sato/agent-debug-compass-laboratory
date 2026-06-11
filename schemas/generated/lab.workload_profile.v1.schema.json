@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WorkloadProfile",
+  "type": "object",
+  "required": [
+    "claim_boundary",
+    "description",
+    "duration_seconds",
+    "measurement_requirements",
+    "requirements",
+    "schema_version",
+    "workload_class",
+    "workload_id"
+  ],
+  "properties": {
+    "claim_boundary": {
+      "$ref": "#/definitions/WorkloadClaimBoundary"
+    },
+    "description": {
+      "type": "string"
+    },
+    "duration_seconds": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "measurement_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "requirements": {
+      "$ref": "#/definitions/WorkloadRequirements"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "workload_class": {
+      "$ref": "#/definitions/WorkloadClass"
+    },
+    "workload_id": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "WorkloadClaimBoundary": {
+      "type": "string",
+      "enum": [
+        "exploratory_only",
+        "synthetic_short_smoke_only",
+        "not_selection_evidence"
+      ]
+    },
+    "WorkloadClass": {
+      "type": "string",
+      "enum": [
+        "idle_observe",
+        "synthetic_cpu",
+        "application_workload"
+      ]
+    },
+    "WorkloadRequirements": {
+      "type": "object",
+      "properties": {
+        "latency_p95_ms_max": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "max_abort_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "memory_mb_max": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "thermal_celsius_max": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

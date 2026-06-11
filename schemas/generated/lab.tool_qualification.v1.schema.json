@@ -1,0 +1,169 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ToolQualification",
+  "type": "object",
+  "required": [
+    "available",
+    "category",
+    "checks",
+    "dry_run_required",
+    "evidence_accepted",
+    "evidence_refs",
+    "limitations",
+    "privilege",
+    "qualification_scope",
+    "reason",
+    "schema_version",
+    "source",
+    "status",
+    "time_unix_ms",
+    "tool_id"
+  ],
+  "properties": {
+    "available": {
+      "type": "boolean"
+    },
+    "category": {
+      "$ref": "#/definitions/ToolCategory"
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dry_run_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "dry_run_required": {
+      "type": "boolean"
+    },
+    "evidence_accepted": {
+      "type": "boolean"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "manual_comparison_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "output_schema_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "privilege": {
+      "$ref": "#/definitions/PrivilegeLevel"
+    },
+    "qualification_scope": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/definitions/ToolSource"
+    },
+    "static_safety_review_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "$ref": "#/definitions/QualificationStatus"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "tool_id": {
+      "type": "string"
+    },
+    "tool_sha256": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tool_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "validated_output_bytes": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "PrivilegeLevel": {
+      "type": "string",
+      "enum": [
+        "none",
+        "user",
+        "sudo_helper",
+        "root"
+      ]
+    },
+    "QualificationStatus": {
+      "type": "string",
+      "enum": [
+        "builtin",
+        "needs_control_test",
+        "external_unqualified",
+        "agent_created_unqualified",
+        "qualified",
+        "refused"
+      ]
+    },
+    "ToolCategory": {
+      "type": "string",
+      "enum": [
+        "observation",
+        "control",
+        "load",
+        "probe",
+        "report_normalizer",
+        "restore",
+        "health_check",
+        "observation_control"
+      ]
+    },
+    "ToolSource": {
+      "type": "string",
+      "enum": [
+        "builtin",
+        "external",
+        "agent_created",
+        "missing"
+      ]
+    }
+  }
+}

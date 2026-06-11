@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BuildInfo",
+  "type": "object",
+  "required": [
+    "build_profile",
+    "git_sha",
+    "name",
+    "target_triple",
+    "version"
+  ],
+  "properties": {
+    "build_profile": {
+      "type": "string"
+    },
+    "git_sha": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "target_triple": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

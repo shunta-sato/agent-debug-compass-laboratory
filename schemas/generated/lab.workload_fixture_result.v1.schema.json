@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WorkloadFixtureResult",
+  "type": "object",
+  "required": [
+    "claim_boundary",
+    "duration_ms",
+    "fixture",
+    "iterations",
+    "memory_bytes_touched",
+    "schema_version",
+    "storage_bytes_written_and_cleaned"
+  ],
+  "properties": {
+    "claim_boundary": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "duration_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "fixture": {
+      "type": "string"
+    },
+    "iterations": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "memory_bytes_touched": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "storage_bytes_written_and_cleaned": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false
+}

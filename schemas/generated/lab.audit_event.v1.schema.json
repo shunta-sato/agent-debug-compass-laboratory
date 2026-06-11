@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuditEvent",
+  "type": "object",
+  "required": [
+    "actor",
+    "event_id",
+    "operation",
+    "policy_version",
+    "result",
+    "risk_tier",
+    "run_id",
+    "schema_version",
+    "target_id",
+    "time_unix_ms"
+  ],
+  "properties": {
+    "actor": {
+      "$ref": "#/definitions/Actor"
+    },
+    "approval_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "event_id": {
+      "type": "string"
+    },
+    "operation": {
+      "type": "string"
+    },
+    "operation_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "policy_version": {
+      "type": "string"
+    },
+    "restore_lease_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "result": {
+      "type": "string"
+    },
+    "risk_tier": {
+      "$ref": "#/definitions/RiskTier"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Actor": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ActorKind"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActorKind": {
+      "type": "string",
+      "enum": [
+        "agent",
+        "human",
+        "system"
+      ]
+    },
+    "RiskTier": {
+      "type": "string",
+      "enum": [
+        "tier0_read_only_observation",
+        "tier1_low_risk_reversible_non_root",
+        "tier2_privileged_reversible",
+        "tier3_hard_to_restore",
+        "tier4_normally_prohibited"
+      ]
+    }
+  }
+}

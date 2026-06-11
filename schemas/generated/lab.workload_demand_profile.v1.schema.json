@@ -1,0 +1,288 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WorkloadDemandProfile",
+  "type": "object",
+  "required": [
+    "data_quality",
+    "demand_scope",
+    "evidence_refs",
+    "execution_mode",
+    "profile_id",
+    "run_id",
+    "schema_version",
+    "system_context",
+    "target_conditioned_response",
+    "target_id",
+    "time_unix_ms",
+    "workload_demand",
+    "workload_id"
+  ],
+  "properties": {
+    "data_quality": {
+      "$ref": "#/definitions/WorkloadDataQuality"
+    },
+    "demand_scope": {
+      "$ref": "#/definitions/WorkloadDemandScope"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "execution_mode": {
+      "$ref": "#/definitions/WorkloadExecutionMode"
+    },
+    "profile_id": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "system_context": {
+      "$ref": "#/definitions/WorkloadSystemContext"
+    },
+    "target_conditioned_response": {
+      "$ref": "#/definitions/WorkloadTargetConditionedResponse"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "workload_demand": {
+      "$ref": "#/definitions/WorkloadDemand"
+    },
+    "workload_id": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "WorkloadDataQuality": {
+      "type": "object",
+      "required": [
+        "degraded",
+        "missing",
+        "notes"
+      ],
+      "properties": {
+        "degraded": {
+          "type": "boolean"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkloadDemand": {
+      "type": "object",
+      "required": [
+        "child_process_accounting_status",
+        "duty_cycle"
+      ],
+      "properties": {
+        "cancelled_write_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "child_process_accounting_status": {
+          "type": "string"
+        },
+        "duty_cycle": {
+          "type": "string"
+        },
+        "nonvoluntary_ctxt_switches": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "process_cpu_percent_avg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "process_cpu_percent_peak": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "process_cpu_stime_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "process_cpu_time_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "process_cpu_utime_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "read_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "rss_peak_kb": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "vmhwm_peak_kb": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "voluntary_ctxt_switches": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "write_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkloadDemandScope": {
+      "type": "string",
+      "enum": [
+        "process_scoped",
+        "system_wide_only"
+      ]
+    },
+    "WorkloadExecutionMode": {
+      "type": "string",
+      "enum": [
+        "local",
+        "target_local"
+      ]
+    },
+    "WorkloadSystemContext": {
+      "type": "object",
+      "required": [
+        "background_activity_confounder"
+      ],
+      "properties": {
+        "background_activity_confounder": {
+          "type": "string"
+        },
+        "system_cpu_percent_avg": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "system_memory_available_min_kb": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkloadTargetConditionedResponse": {
+      "type": "object",
+      "required": [
+        "portable_between_targets"
+      ],
+      "properties": {
+        "abort_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "freq_range_khz": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          }
+        },
+        "portable_between_targets": {
+          "type": "boolean"
+        },
+        "thermal_margin_c": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "thermal_max_c": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

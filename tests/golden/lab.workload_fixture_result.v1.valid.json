@@ -1,0 +1,15 @@
+{
+  "schema_version": "lab.workload_fixture_result.v1",
+  "fixture": "bounded_smoke",
+  "duration_ms": 100,
+  "memory_bytes_touched": 4096,
+  "storage_bytes_written_and_cleaned": 8192,
+  "iterations": 12345,
+  "claim_boundary": [
+    "exploratory target-local capability evidence only",
+    "not real application performance",
+    "not production readiness",
+    "not sustained thermal safety",
+    "not flash-wear evidence"
+  ]
+}
