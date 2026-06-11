@@ -116,6 +116,7 @@ Phase contribution actuals:
 | Phase 1 report.run | -200 total Rust LoC (`17,939` -> `17,739`) | top-level `32` -> `29`, generated `9` -> `10`, maintained-by-hand `32` -> `29` | Remaining phases now forecast final total around `16,939-17,739` unless later phases delete more code than expected. |
 | Phase 2 probe cutover | +117 total Rust LoC (`17,739` -> `17,856`) | top-level `29` -> `25`, generated `10` -> `14`, maintained-by-hand `29` -> `25` | Remaining phases now forecast final total around `17,556-18,156`; v2 public payload and generated v1 wire snapshots offset deleted schemas. |
 | Phase 3 suitability/constraints | +68 total Rust LoC (`17,856` -> `17,924`) | top-level `25` -> `22`, generated `14` -> `17`, maintained-by-hand `25` -> `22` | Remaining phases now forecast final total around `18,024-18,424`; LoC is effectively neutral while schema maintenance drops. |
+| Phase 4 CLI module split | +84 total Rust LoC (`17,924` -> `18,008`) | no schema change | In forecast. `main.rs` dropped to 605 lines and all production Rust files are under budget. |
 
 ## Context & Orientation
 
@@ -406,6 +407,7 @@ Move command implementation out of `adc-lab/src/main.rs`.
 
 Target modules:
 
+- `commands/common.rs`
 - `commands/load.rs`
 - `commands/pressure.rs`
 - `commands/workload.rs`
@@ -413,6 +415,9 @@ Target modules:
 - `commands/experiment.rs`
 - `commands/control.rs`
 - `commands/privilege.rs`
+- `commands/familiarize.rs`
+- `commands/target.rs`
+- `commands/tool.rs`
 - existing `commands/decide.rs` and `commands/report.rs`
 
 Rules:
@@ -431,6 +436,59 @@ Acceptance:
 - `main.rs` <= 800 lines.
 - `make file-budgets` exists and is wired into `make verify`.
 - No command behavior changes except those already covered by Phases 1-3.
+
+Phase 4 dev workflow route:
+
+- Risk route: high. Rationale: broad CLI implementation refactor across command
+  modules, with safety/audit command surfaces preserved.
+- Required branches: `design-balance`, `implementation-economy`, ExecPlan
+  update, and final `quality-gate`.
+- Verification depth: full `make verify`, plus focused `cargo check` and
+  `make file-budgets` before the final gate.
+
+Phase 4 responsibility map:
+
+| Unit | Name | Responsibility sentence | Reason to change | Dependency direction |
+|---|---|---|---|---|
+| module | `main.rs` | Own CLI type definitions, parsing, version handling, and dispatch. | CLI surface changes. | Depends on command modules only for execution entry points. |
+| module | `commands/common.rs` | Own shared run/artifact/audit, SSH argument, and persistence helpers used by multiple command groups. | Shared command IO or artifact boundary changes. | Command modules depend on it; it depends on core contracts. |
+| module | `commands/control.rs` | Execute control plan/approve/apply/restore and control-specific helper invocation. | Privileged control workflow changes. | Depends on common helpers and control core. |
+| module | `commands/load.rs` | Execute `load cpu` and persist v2 load artifacts. | Load command behavior or output changes. | Depends on common helpers and load core. |
+| module | `commands/pressure.rs` | Execute pressure and composite probes, including SSH pressure runners. | Pressure command behavior or output changes. | Depends on common helpers and pressure core. |
+| module | `commands/workload.rs` | Execute workload runs and bounded workload fixtures. | Workload command behavior changes. | Depends on common helpers and workload core. |
+| module | `commands/constraints.rs` | Generate/check v2 constraints artifacts and Markdown. | Constraints public contract changes. | Depends on common helpers and suitability core. |
+| module | `commands/experiment.rs` | Execute experiment matrices and trials. | Experiment execution behavior changes. | Depends on common helpers and experiment/load/observe core. |
+| module | `commands/familiarize.rs` | Orchestrate read-only familiarization output. | Familiarization workflow changes. | Depends on common persistence helpers. |
+| module | `commands/target.rs` | Execute inventory, toolchain discovery, observe, and health-check command wrappers. | Target read-only command behavior changes. | Depends on common helpers and target core. |
+| module | `commands/privilege.rs` | Execute privilege provider/doctor/install-plan/uninstall-plan wrappers. | Privilege planning/report behavior changes. | Depends on common helpers and privilege core. |
+| module | `commands/tool.rs` | Execute tool qualification and toolchain inventory qualification. | Tool qualification evidence handling changes. | Depends on common helpers and qualification core. |
+| module | `commands/report.rs` | Execute report pack/operating-point/operating-contract wrappers. | Report command behavior changes. | Depends on common helpers and report/rules core. |
+
+Phase 4 complexity budget:
+
+- Changed files target: 16-18 files.
+- New modules target: 11 command modules plus `common.rs`; no new runtime layer.
+- New helper/wrapper target: 0 net new behavior helpers; moved helpers only.
+- Production LoC budget: expected +0 to +100 from module headers/imports.
+- Test budget: no new behavior tests required; existing CLI/safety tests are
+  the regression harness.
+
+Phase 4 post-implementation economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| command modules under `commands/` | Separate command execution reasons-to-change from CLI parsing and keep `main.rs` below the budget. | keep | `main.rs` is 605 lines; CLI and safety tests pass. |
+| `commands/common.rs` | Centralizes shared run/artifact/audit, SSH, and persistence helpers used by multiple command modules. Single-use helpers were moved back to owning modules during review. | keep | `commands/common.rs` is 362 lines; `make file-budgets` reports 0 violations. |
+
+Phase 4 smells and anti-patterns review:
+
+- Scope: `main.rs` command split, new command modules, and
+  `Makefile`/`COMMANDS.md` file-budget enforcement.
+- Findings: 0 new or worsened maintainability issues found.
+- Boundary check: dependency direction remains CLI dispatch -> command modules
+  -> common/core. Core crates do not depend on CLI modules. `common.rs` stays
+  below budget and contains shared command concerns rather than command-specific
+  behavior.
 
 ### Phase 5: Generated Schema Source of Truth
 
@@ -477,6 +535,9 @@ Tasks:
 - Add a docs index that marks normative, reference, and archived documents.
 - Move duplicated architecture narrative into the four normative docs or mark it
   as reference-only.
+- Document public output file names against artifact `kind`, or rename
+  examples/defaults where safe, so v2 artifacts no longer look like v1 payloads
+  in user-facing docs.
 - Update `Makefile docs-smoke` in the same commit as path changes.
 
 Acceptance:
@@ -556,11 +617,13 @@ Quality gate rule:
 - [x] Phase 3: Make constraints generation/checking v2-native.
 - [x] Phase 3: Retire v1 suitability/constraint schemas where public producers
       are gone.
-- [ ] Phase 4: Split remaining command groups out of `main.rs`.
-- [ ] Phase 4: Wire `make file-budgets` into `make verify`.
+- [x] Phase 4: Split remaining command groups out of `main.rs`.
+- [x] Phase 4: Wire `make file-budgets` into `make verify`.
 - [ ] Phase 5: Convert non-control active schemas to generated snapshots.
 - [ ] Phase 5: Convert control schemas last after compatibility tests.
 - [ ] Phase 6: Normalize docs and update `docs-smoke`.
+- [ ] Phase 6: Document or rename public output file names whose v2 artifact
+      kind no longer matches legacy v1 file names.
 - [ ] Run final `make verify` and record final measurements.
 - [ ] Record final Outcomes against file budgets, schema classification,
       contribution forecast, and any missed target disposition in the Decision
@@ -677,6 +740,18 @@ Quality gate rule:
   a compatibility projection. Rationale: public suitability output is already a
   v2 artifact, so generating v1 design packs would keep the public loop split
   and retain prose-derived constraint state.
+- 2026-06-11: Keep CLI type definitions in `main.rs` during Phase 4.
+  Rationale: `main.rs` is now below the 800-line budget while preserving the
+  public Clap surface in one place; command modules own execution, file IO, and
+  audit work.
+- 2026-06-11: Enforce file budgets through `make verify` after the Phase 4
+  split. Rationale: all production Rust files are under configured budgets, so
+  renewed file growth should fail CI unless a future PR records a temporary
+  exemption.
+- 2026-06-11: Defer public output filename/artifact-kind cleanup to Phase 6.
+  Rationale: the Phase 3 review identified confusing legacy names for v2
+  artifacts, but Phase 4 is a behavior-preserving module split and docs
+  normalization is already scoped to Phase 6.
 
 ## Verification Log
 
@@ -838,27 +913,63 @@ Quality gate rule:
   `make verify` passed. The gate covered workspace build, format check, clippy,
   generated schema drift plus ledger coverage, unit tests, integration tests,
   safety invariants, contract validation, docs smoke, and command smoke.
+- Phase 4 branch setup:
+  `git fetch origin --prune` updated `origin/main` to `8c529fe`; `git switch
+  -c codex/adc-labv21-cli-module-split origin/main` created the Phase 4 branch.
+- Phase 4 focused verification:
+  `cargo check --workspace` passed.
+- Phase 4 focused verification:
+  `cargo test -p adc-lab --test cli -- --nocapture` passed; 32 tests.
+- Phase 4 focused verification:
+  `cargo test -p adc-lab --test safety_invariants -- --nocapture` passed; 7
+  tests.
+- Phase 4 focused verification:
+  `make file-budgets` passed with
+  `file budgets: enforced checked=50 violations=0`.
+- Phase 4 focused verification:
+  `cargo clippy --workspace --all-targets -- -D warnings` passed.
+- Phase 4 focused verification:
+  `make schemas-check` passed with
+  `top_level=22 no_schema_wire=9 maintained_by_hand=22`.
+- Phase 4 focused verification:
+  `cargo test --workspace contract_validation -- --nocapture` passed.
+- Phase 4 final gate:
+  `make verify` passed. The gate covered workspace build, format check, clippy,
+  generated schema drift plus ledger coverage, enforced file budgets, unit
+  tests, integration tests, safety invariants, contract validation, docs smoke,
+  and command smoke.
+- Phase 4 final measurements:
+  total Rust lines `18,008`; top-level schemas `22`; generated schemas `17`;
+  `main.rs` `605`; `commands/common.rs` `362`; largest command module
+  `common.rs`; `make file-budgets` enforced with 0 violations.
+- Phase 4 quality gate:
+  submit. Acceptance criteria are met: `main.rs <= 800`, `make file-budgets`
+  is part of `make verify`, and command behavior is covered by the existing CLI
+  and safety regression suites.
 
 ## Handoff
 
-- Branch: `codex/adc-labv21-suitability-constraints`.
-- Base commit: `206db6b` (`origin/main` after PR #43).
-- Current status: Phase 3 implementation is complete locally with `make verify`
+- Branch: `codex/adc-labv21-cli-module-split`.
+- Base commit: `8c529fe` (`origin/main` after PR #44 / Phase 3 merge).
+- Current status: Phase 4 implementation is complete locally with `make verify`
   passing. Commit and PR publication are next.
 - Untracked local files exist and were not staged:
   `.DS_Store`, `._.DS_Store`,
-  `reports/._20260611-v2-evidence-kernel-outcome-review.md`, and
+  `plans/._20260611-v21-kernel-completion.md`,
+  `reports/._20260611-planning-skills-improvement-proposal.md`,
+  `reports/._20260611-v2-evidence-kernel-outcome-review.md`,
+  `reports/20260611-planning-skills-improvement-proposal.md`, and
   `reports/20260611-v2-evidence-kernel-outcome-review.md`.
 - Next steps:
-  1. Commit and publish the Phase 3 PR.
-  2. Start Phase 4 after Phase 3 lands, keeping the neutral LoC trend visible
-     in the actuals table.
+  1. Commit and publish the Phase 4 PR.
+  2. Start Phase 5 after Phase 4 lands, with file budgets enforced in CI.
 - Read first when resuming:
   - this plan,
   - `reports/20260611-v2-evidence-kernel-outcome-review.md`,
   - `plans/20260611-v2-evidence-kernel.md`,
   - `crates/adc-lab/src/main.rs`,
-  - `crates/adc-lab-core/src/report.rs`.
+  - `crates/adc-lab/src/commands/`,
+  - `schemas/schema-ledger.tsv`.
 
 ## Outcomes & Retrospective
 
@@ -913,3 +1024,14 @@ Phase 3 outcome:
 - Phase 3 landed at +68 Rust lines while reducing maintained-by-hand schemas
   from 25 to 22. LoC remains a guardrail; schema maintenance is the primary
   completed objective for this phase.
+
+Phase 4 outcome:
+
+- `main.rs` now owns CLI structs, parsing, version handling, and dispatch only;
+  command execution moved to focused modules under `crates/adc-lab/src/commands/`.
+- File-budget enforcement is active: `make file-budgets` runs with `--enforce`
+  and is part of `make verify`.
+- `main.rs` dropped from 2,482 lines at the Phase 3 baseline to 605 lines.
+  Every production Rust file is under the configured budget.
+- Phase 4 landed at +84 Rust lines, inside the -100 to +100 forecast window,
+  with no schema-count change.

@@ -1,4 +1,5 @@
 use super::super::*;
+use super::common::*;
 
 pub(crate) fn command_decide_suitability(args: SuitabilityCommand) -> Result<()> {
     let target_contract = read_operating_contract_artifact(&args.target_contract)?;

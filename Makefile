@@ -15,7 +15,7 @@ help:
 	  '  make schemas           cargo run -p adc-lab-core --example generate_schemas -- schemas/generated' \
 	  '  make schemas-check     regenerate schemas and fail on generated drift' \
 	  '  make schema-ledger-check validate schema classification coverage' \
-	  '  make file-budgets      report production Rust file budget status' \
+	  '  make file-budgets      enforce production Rust file budgets' \
 	  '  make command-smoke     scripts/resource/run-resource-smoke.sh --host-fallback' \
 	  '  make verify            build-debug + format + lint + schemas-check + tests + contract + docs/command smoke'
 
@@ -59,7 +59,7 @@ schema-ledger-check:
 	python3 scripts/schema/check-schema-ledger.py
 
 file-budgets:
-	python3 scripts/ci/check-file-budgets.py
+	python3 scripts/ci/check-file-budgets.py --enforce
 
 docs-smoke:
 	test -f README.md
@@ -73,7 +73,7 @@ docs-smoke:
 command-smoke:
 	scripts/resource/run-resource-smoke.sh --host-fallback
 
-verify: build-debug format lint schemas-check test-unit test-integration contract docs-smoke command-smoke
+verify: build-debug format lint schemas-check file-budgets test-unit test-integration contract docs-smoke command-smoke
 
 clean:
 	cargo clean
