@@ -1,5 +1,6 @@
 use crate::contracts::{
-    ApprovalRecord, BoundaryProbe, BoundaryProbePlan, ContractConfidence, ContractEvidenceGap,
+    ApprovalRecord, BoundaryProbe, BoundaryProbePlan, CompositeBoundaryPhase,
+    CompositeBoundaryResult, CompositeBoundaryScenario, ContractConfidence, ContractEvidenceGap,
     ContractEvidenceStatus, ContractFactor, ControlPlan, ControlResult, ControlResultStatus,
     MultiRunOperatingContract, NetworkPressureEvidence, NetworkPressureMode, OperatingBoundary,
     OperatingContractPackStatus, OperatingContractRule, OperatingRuleCategory, OperatingRuleSource,
@@ -22,7 +23,7 @@ use crate::{LabError, LabResult};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::net::{Shutdown, SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::thread;
@@ -93,6 +94,27 @@ impl FromStr for ResourcePressureKind {
     }
 }
 
+impl CompositeBoundaryScenario {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::MemoryStorageJitter => "memory_storage_jitter",
+        }
+    }
+}
+
+impl FromStr for CompositeBoundaryScenario {
+    type Err = LabError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "memory_storage_jitter" => Ok(Self::MemoryStorageJitter),
+            other => Err(LabError::Validation(format!(
+                "unknown composite scenario {other}"
+            ))),
+        }
+    }
+}
+
 pub fn run_resource_pressure(
     target_id: String,
     pressure_kind: ResourcePressureKind,
@@ -107,6 +129,19 @@ pub fn run_resource_pressure(
         ResourcePressureKind::CpuPressure => run_cpu_pressure(target_id, options),
         ResourcePressureKind::ThermalPressure => run_thermal_pressure(target_id, options),
         ResourcePressureKind::ObserverPressure => run_observer_pressure(target_id, options),
+    }
+}
+
+pub fn run_composite_boundary(
+    target_id: String,
+    scenario: CompositeBoundaryScenario,
+    options: &PressureProbeOptions,
+) -> LabResult<CompositeBoundaryResult> {
+    validate_pressure_options(options)?;
+    match scenario {
+        CompositeBoundaryScenario::MemoryStorageJitter => {
+            run_memory_storage_jitter_composite(target_id, options)
+        }
     }
 }
 
@@ -451,9 +486,20 @@ pub fn resource_coupling_report_for_run(
     let run_dir = run_dir.as_ref();
     let run_id = run_id_from_run_dir(run_dir);
     let refs = pressure_result_refs(run_dir, &run_id)?;
+    let composite_refs = composite_result_refs(run_dir, &run_id)?;
+    let composite_results = composite_results_by_scenario(run_dir)?;
     let has = |kind: &str| refs.contains_key(kind);
     let mut evidence_refs = refs.values().cloned().collect::<Vec<_>>();
+    evidence_refs.extend(composite_refs.values().cloned());
     evidence_refs.sort();
+    evidence_refs.dedup();
+    let has_memory_storage_jitter =
+        composite_refs.contains_key(CompositeBoundaryScenario::MemoryStorageJitter.as_str());
+    let memory_storage_jitter_effect_measured = composite_results
+        .get(CompositeBoundaryScenario::MemoryStorageJitter.as_str())
+        .into_iter()
+        .flatten()
+        .any(memory_storage_jitter_effect_measured);
 
     let chains = vec![
         coupling_chain(
@@ -463,16 +509,51 @@ pub fn resource_coupling_report_for_run(
             "storage latency and CPU wait side effects",
             "workload tail latency can increase when cache/reclaim competes with I/O",
             "process exit releases anonymous pressure; storage cache recovery remains platform-managed",
-            coupling_status_for_required(&refs, &["memory_pressure", "storage_io", "latency_jitter"]),
-            coupling_class_for_required(&refs, &["memory_pressure", "storage_io", "latency_jitter"]),
-            refs_for_required(&refs, &["memory_pressure", "storage_io", "latency_jitter"]),
-            vec![evidence_gap(
-                "individual memory, storage, and jitter artifacts are ingredients only; no simultaneous or phased memory+storage+jitter scenario was run",
-                "phase-based memory+storage+jitter coupling probe",
-                &["baseline storage latency", "memory pressure only", "storage I/O under memory pressure", "recovery phase"],
-                "run a composite boundary probe before marking memory-to-storage coupling measured",
-                "adc-lab",
-            )],
+            if memory_storage_jitter_effect_measured {
+                ContractEvidenceStatus::MeasuredPartial
+            } else if has_memory_storage_jitter {
+                ContractEvidenceStatus::Insufficient
+            } else {
+                coupling_status_for_required(&refs, &["memory_pressure", "storage_io", "latency_jitter"])
+            },
+            if has_memory_storage_jitter {
+                ResourceCouplingEvidenceClass::CompositeMeasured
+            } else {
+                coupling_class_for_required(&refs, &["memory_pressure", "storage_io", "latency_jitter"])
+            },
+            if has_memory_storage_jitter {
+                refs_for_composite(
+                    &composite_refs,
+                    CompositeBoundaryScenario::MemoryStorageJitter.as_str(),
+                )
+            } else {
+                refs_for_required(&refs, &["memory_pressure", "storage_io", "latency_jitter"])
+            },
+            if memory_storage_jitter_effect_measured {
+                vec![evidence_gap(
+                    "phase-based memory+storage+jitter coupling was measured, but resident memory ladder and concurrent storage+jitter tails remain open",
+                    "approved memory ladder and concurrent storage+jitter probe",
+                    &["512MiB+ memory ladder", "storage I/O while jitter loop runs", "recovery repeat"],
+                    "collect follow-up evidence before sustained memory/storage design budgets",
+                    "adc-lab",
+                )]
+            } else if has_memory_storage_jitter {
+                vec![evidence_gap(
+                    "a phase-based memory+storage+jitter scenario ran, but the memory phase did not show reclaim/PSI/fault pressure effect",
+                    "larger approved memory ladder plus storage/jitter phase",
+                    &["memory pressure effect", "storage I/O under observed pressure", "recovery repeat"],
+                    "do not mark memory-to-storage degradation measured until pressure effect is observed",
+                    "operator_approval",
+                )]
+            } else {
+                vec![evidence_gap(
+                    "individual memory, storage, and jitter artifacts are ingredients only; no simultaneous or phased memory+storage+jitter scenario was run",
+                    "phase-based memory+storage+jitter coupling probe",
+                    &["baseline storage latency", "memory pressure only", "storage I/O under memory pressure", "recovery phase"],
+                    "run a composite boundary probe before marking memory-to-storage coupling measured",
+                    "adc-lab",
+                )]
+            },
         ),
         coupling_chain(
             "storage.io_to_latency_thermal",
@@ -553,18 +634,36 @@ pub fn resource_coupling_report_for_run(
         .filter(|kind| !has(kind))
         .map(|kind| format!("{kind} pressure result"))
         .collect::<Vec<_>>();
-    let report_status = ContractEvidenceStatus::Insufficient;
+    let report_status = if memory_storage_jitter_effect_measured {
+        ContractEvidenceStatus::MeasuredPartial
+    } else {
+        ContractEvidenceStatus::Insufficient
+    };
     let mut unknowns = missing;
-    unknowns.push(
-        "composite resource-coupling phases were not run; individual pressure artifacts are evidence ingredients only".to_string(),
-    );
+    if !has_memory_storage_jitter {
+        unknowns.push(
+            "composite resource-coupling phases were not run; individual pressure artifacts are evidence ingredients only".to_string(),
+        );
+    } else if !memory_storage_jitter_effect_measured {
+        unknowns.push(
+            "memory/storage/jitter composite ran, but memory pressure effect was not observed"
+                .to_string(),
+        );
+    }
     let mut next_evidence_needed = unknowns
         .iter()
         .map(|entry| format!("resolve {entry}"))
         .collect::<Vec<_>>();
-    next_evidence_needed.push(
-        "run baseline -> pressure -> paired pressure -> recovery scenarios before marking coupling measured".to_string(),
-    );
+    if has_memory_storage_jitter {
+        next_evidence_needed.push(
+            "repeat composite coupling with memory ladder and concurrent storage+jitter phase"
+                .to_string(),
+        );
+    } else {
+        next_evidence_needed.push(
+            "run baseline -> pressure -> paired pressure -> recovery scenarios before marking coupling measured".to_string(),
+        );
+    }
 
     Ok(ResourceCouplingReport {
         schema_version: "lab.resource_coupling_report.v1".to_string(),
@@ -663,9 +762,16 @@ pub fn multi_run_operating_contract_for_runs(
     )?;
     let run_dirs = run_set_paths(primary_run_dir, include_run_dirs);
     let refs = aggregate_pressure_result_refs(&run_dirs)?;
+    let composite_refs = aggregate_composite_result_refs(&run_dirs)?;
     let pressure_results = aggregate_pressure_results_by_kind(&run_dirs)?;
     let composite_coupling_measured = run_dirs.iter().any(|run_dir| {
-        read_json_if_exists::<ResourceCouplingReport>(
+        composite_results_by_scenario(run_dir).is_ok_and(|results| {
+            results
+                .get(CompositeBoundaryScenario::MemoryStorageJitter.as_str())
+                .into_iter()
+                .flatten()
+                .any(memory_storage_jitter_effect_measured)
+        }) || read_json_if_exists::<ResourceCouplingReport>(
             &run_dir.join("reports/resource_coupling_report.json"),
         )
         .ok()
@@ -675,7 +781,7 @@ pub fn multi_run_operating_contract_for_runs(
                 matches!(
                     chain.coupling_evidence_class,
                     ResourceCouplingEvidenceClass::CompositeMeasured
-                )
+                ) && measuredish_status(&chain.status)
             })
         })
     });
@@ -688,6 +794,7 @@ pub fn multi_run_operating_contract_for_runs(
     apply_aggregate_contract_evidence(
         &mut base,
         &refs,
+        &composite_refs,
         &pressure_results,
         composite_coupling_measured,
     );
@@ -718,6 +825,8 @@ pub fn target_operating_contract_for_run(
     let run_dir = run_dir.as_ref();
     let run_id = run_id_from_run_dir(run_dir);
     let refs = pressure_result_refs(run_dir, &run_id)?;
+    let composite_refs = composite_result_refs(run_dir, &run_id)?;
+    let composite_results = composite_results_by_scenario(run_dir)?;
     let pressure_results = pressure_results_by_kind(run_dir)?;
     let network_boundary_measured = pressure_results
         .get("network_io")
@@ -738,15 +847,23 @@ pub fn target_operating_contract_for_run(
     let coupling_report = read_json_if_exists::<ResourceCouplingReport>(
         &run_dir.join("reports/resource_coupling_report.json"),
     )?;
-    let composite_coupling_measured = coupling_report.as_ref().is_some_and(|report| {
-        report.chains.iter().any(|chain| {
-            matches!(
-                chain.coupling_evidence_class,
-                ResourceCouplingEvidenceClass::CompositeMeasured
-            )
-        })
-    });
+    let composite_evidence_present = !composite_refs.is_empty();
+    let raw_composite_coupling_measured = composite_results
+        .get(CompositeBoundaryScenario::MemoryStorageJitter.as_str())
+        .into_iter()
+        .flatten()
+        .any(memory_storage_jitter_effect_measured);
+    let composite_coupling_measured = raw_composite_coupling_measured
+        || coupling_report.as_ref().is_some_and(|report| {
+            report.chains.iter().any(|chain| {
+                matches!(
+                    chain.coupling_evidence_class,
+                    ResourceCouplingEvidenceClass::CompositeMeasured
+                ) && measuredish_status(&chain.status)
+            })
+        });
     let mut all_refs = refs.values().cloned().collect::<Vec<_>>();
+    all_refs.extend(composite_refs.values().cloned());
     if let Some(reference) = coupling_ref.clone() {
         all_refs.push(reference);
     }
@@ -758,9 +875,14 @@ pub fn target_operating_contract_for_run(
         .map(|kind| format!("{kind} result"))
         .collect::<Vec<_>>();
     let mut unknowns = missing.clone();
-    if !composite_coupling_measured {
+    if !composite_evidence_present {
         unknowns.push(
             "composite resource coupling not measured; pressure artifacts are ingredients only"
+                .to_string(),
+        );
+    } else if !composite_coupling_measured {
+        unknowns.push(
+            "composite resource coupling scenario exists, but pressure effect needed for measured degradation was not observed"
                 .to_string(),
         );
     }
@@ -797,8 +919,18 @@ pub fn target_operating_contract_for_run(
             OperatingRuleCategory::DegradedModeTrigger,
             "Storage-heavy work must reduce cadence under memory pressure until reclaim/cache side effects are measured safe.",
             OperatingRuleSource::EvidenceNeededRule,
-            "Memory, storage, and jitter artifacts are separate ingredients; no paired memory+storage pressure phase proves the coupling yet.",
-            refs_for_required(&refs, &["memory_pressure", "storage_io", "latency_jitter"]),
+            if composite_coupling_measured {
+                "Phase-based memory+storage+jitter evidence exists, but memory ladder and concurrent storage+jitter tail behavior remain needed before target-specific budgets."
+            } else if composite_evidence_present {
+                "Phase-based memory+storage+jitter scenario evidence exists, but it did not observe the pressure effect needed to derive a target-specific degradation rule."
+            } else {
+                "Memory, storage, and jitter artifacts are separate ingredients; no paired memory+storage pressure phase proves the coupling yet."
+            },
+            if composite_evidence_present {
+                refs_for_composite(&composite_refs, CompositeBoundaryScenario::MemoryStorageJitter.as_str())
+            } else {
+                refs_for_required(&refs, &["memory_pressure", "storage_io", "latency_jitter"])
+            },
             ContractConfidence::Low,
             &["bounded resident set", "coalesced writes", "drop or defer nonessential work"],
             &["page-cache-dependent default path without pressure evidence"],
@@ -865,9 +997,23 @@ pub fn target_operating_contract_for_run(
         ),
         operating_boundary(
             "memory_cache_storage",
-            "Memory/cache/storage coupling is not measured by separate bounded smoke artifacts.",
-            ContractEvidenceStatus::Insufficient,
-            refs_for_required(&refs, &["memory_pressure", "storage_io"]),
+            if composite_coupling_measured {
+                "Memory/cache/storage coupling has phase-based evidence, with resident-budget and concurrent-tail limits still open."
+            } else if composite_evidence_present {
+                "Memory/cache/storage composite phases ran, but measured degradation remains insufficient because the required memory pressure effect was not observed."
+            } else {
+                "Memory/cache/storage coupling is not measured by separate bounded smoke artifacts."
+            },
+            if composite_coupling_measured {
+                ContractEvidenceStatus::MeasuredPartial
+            } else {
+                ContractEvidenceStatus::Insufficient
+            },
+            if composite_evidence_present {
+                refs_for_composite(&composite_refs, CompositeBoundaryScenario::MemoryStorageJitter.as_str())
+            } else {
+                refs_for_required(&refs, &["memory_pressure", "storage_io"])
+            },
             vec![evidence_gap(
                 "memory pressure effect and storage latency under that pressure need paired phases",
                 "memory pressure + storage I/O + jitter composite probe",
@@ -963,6 +1109,95 @@ pub fn pressure_result_refs(run_dir: &Path, run_id: &str) -> LabResult<BTreeMap<
     Ok(refs)
 }
 
+pub fn composite_result_refs(run_dir: &Path, run_id: &str) -> LabResult<BTreeMap<String, String>> {
+    let mut refs = BTreeMap::new();
+    let composite_dir = run_dir.join("composite");
+    if !composite_dir.exists() {
+        return Ok(refs);
+    }
+    for entry in fs::read_dir(&composite_dir)? {
+        let path = entry?.path();
+        let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        if !name.ends_with(".result.json") {
+            continue;
+        }
+        let result: CompositeBoundaryResult = serde_json::from_slice(&fs::read(&path)?)?;
+        let base_key = result.scenario.as_str().to_string();
+        let key = if refs.contains_key(&base_key) {
+            format!(
+                "{base_key}#{}",
+                refs.keys()
+                    .filter(
+                        |key| key.as_str() == base_key || key.starts_with(&format!("{base_key}#"))
+                    )
+                    .count()
+            )
+        } else {
+            base_key
+        };
+        refs.insert(key, artifact_uri_for_run(run_id, run_dir, path)?);
+    }
+    Ok(refs)
+}
+
+fn composite_results_by_scenario(
+    run_dir: &Path,
+) -> LabResult<BTreeMap<String, Vec<CompositeBoundaryResult>>> {
+    let mut results: BTreeMap<String, Vec<CompositeBoundaryResult>> = BTreeMap::new();
+    let composite_dir = run_dir.join("composite");
+    if !composite_dir.exists() {
+        return Ok(results);
+    }
+    for entry in fs::read_dir(&composite_dir)? {
+        let path = entry?.path();
+        let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        if !name.ends_with(".result.json") {
+            continue;
+        }
+        let result: CompositeBoundaryResult = serde_json::from_slice(&fs::read(&path)?)?;
+        results
+            .entry(result.scenario.as_str().to_string())
+            .or_default()
+            .push(result);
+    }
+    Ok(results)
+}
+
+fn memory_storage_jitter_effect_measured(result: &CompositeBoundaryResult) -> bool {
+    if !matches!(
+        result.scenario,
+        CompositeBoundaryScenario::MemoryStorageJitter
+    ) {
+        return false;
+    }
+    let has_memory_pressure_effect = result
+        .phases
+        .iter()
+        .any(|phase| phase.phase_id == "memory_hold" && measuredish_status(&phase.status));
+    let has_storage_under_memory = result
+        .phases
+        .iter()
+        .any(|phase| phase.phase_id == "storage_under_memory" && measuredish_status(&phase.status));
+    let has_jitter_after_storage = result.phases.iter().any(|phase| {
+        phase.phase_id == "jitter_after_memory_storage" && measuredish_status(&phase.status)
+    });
+    measuredish_status(&result.status)
+        && has_memory_pressure_effect
+        && has_storage_under_memory
+        && has_jitter_after_storage
+}
+
+fn measuredish_status(status: &ContractEvidenceStatus) -> bool {
+    matches!(
+        status,
+        ContractEvidenceStatus::Measured | ContractEvidenceStatus::MeasuredPartial
+    )
+}
+
 fn pressure_results_by_kind(
     run_dir: &Path,
 ) -> LabResult<BTreeMap<String, Vec<ResourcePressureResult>>> {
@@ -998,6 +1233,7 @@ fn run_set_paths(primary_run_dir: &Path, include_run_dirs: &[PathBuf]) -> Vec<Pa
 fn run_evidence_refs(run_dir: &Path, run_id: &str) -> LabResult<Vec<String>> {
     let mut refs = Vec::new();
     refs.extend(pressure_result_refs(run_dir, run_id)?.into_values());
+    refs.extend(composite_result_refs(run_dir, run_id)?.into_values());
     refs.extend(cpufreq_control_evidence_refs(run_dir, run_id)?);
     for relative_path in [
         "inventory/target_inventory.json",
@@ -1024,6 +1260,10 @@ fn run_operations_summary(run_dir: &Path, run_id: &str) -> LabResult<BTreeMap<St
     for key in pressure_result_refs(run_dir, run_id)?.keys() {
         let base = key.split('#').next().unwrap_or(key);
         summary.insert(format!("pressure.{base}"), "present".to_string());
+    }
+    for key in composite_result_refs(run_dir, run_id)?.keys() {
+        let base = key.split('#').next().unwrap_or(key);
+        summary.insert(format!("composite.{base}"), "present".to_string());
     }
     if !cpufreq_control_evidence_refs(run_dir, run_id)?.is_empty() {
         summary.insert(
@@ -1085,8 +1325,12 @@ fn pack_status_for_runs(runs: &[RunSetEntry]) -> LabResult<OperatingContractPack
         .any(|run| run.operations_summary.contains_key("governor_control"));
     let has_composite = runs.iter().any(|run| {
         run.operations_summary
-            .get("resource_coupling")
-            .is_some_and(|status| status == "composite_measured")
+            .keys()
+            .any(|key| key.starts_with("composite."))
+            || run
+                .operations_summary
+                .get("resource_coupling")
+                .is_some_and(|status| status == "composite_measured")
     });
     let has_all_pressure = required_pressure_kinds().iter().all(|kind| {
         runs.iter().any(|run| {
@@ -1128,6 +1372,17 @@ fn aggregate_pressure_result_refs(run_dirs: &[PathBuf]) -> LabResult<BTreeMap<St
     Ok(refs)
 }
 
+fn aggregate_composite_result_refs(run_dirs: &[PathBuf]) -> LabResult<BTreeMap<String, String>> {
+    let mut refs = BTreeMap::new();
+    for run_dir in run_dirs {
+        let run_id = run_id_from_run_dir(run_dir);
+        for (key, reference) in composite_result_refs(run_dir, &run_id)? {
+            insert_pressure_ref(&mut refs, key.split('#').next().unwrap_or(&key), reference);
+        }
+    }
+    Ok(refs)
+}
+
 fn insert_pressure_ref(refs: &mut BTreeMap<String, String>, base_key: &str, reference: String) {
     let key = if refs.contains_key(base_key) {
         format!(
@@ -1157,6 +1412,7 @@ fn aggregate_pressure_results_by_kind(
 fn apply_aggregate_contract_evidence(
     contract: &mut TargetOperatingContract,
     refs: &BTreeMap<String, String>,
+    composite_refs: &BTreeMap<String, String>,
     pressure_results: &BTreeMap<String, Vec<ResourcePressureResult>>,
     composite_coupling_measured: bool,
 ) {
@@ -1191,9 +1447,13 @@ fn apply_aggregate_contract_evidence(
     };
 
     let mut unknowns = missing;
-    if !composite_coupling_measured {
+    if composite_refs.is_empty() {
         unknowns.push(
             "composite resource coupling not measured in a single phased run; multi-run evidence remains ingredients only".to_string(),
+        );
+    } else if !composite_coupling_measured {
+        unknowns.push(
+            "composite resource coupling scenario exists, but pressure effect needed for measured degradation was not observed".to_string(),
         );
     }
     if !memory_pressure_effect_observed {
@@ -1223,7 +1483,14 @@ fn apply_aggregate_contract_evidence(
                 refs_for_required(refs, &["cpu_pressure", "thermal_pressure"])
             }
             "memory.pressure_limits_storage_heavy_work" => {
-                refs_for_required(refs, &["memory_pressure", "storage_io", "latency_jitter"])
+                if composite_coupling_measured {
+                    refs_for_composite(
+                        composite_refs,
+                        CompositeBoundaryScenario::MemoryStorageJitter.as_str(),
+                    )
+                } else {
+                    refs_for_required(refs, &["memory_pressure", "storage_io", "latency_jitter"])
+                }
             }
             "storage.default_writes_must_be_bounded" => refs_for_required(refs, &["storage_io"]),
             "network.background_io_requires_backoff" => {
@@ -1252,8 +1519,14 @@ fn apply_aggregate_contract_evidence(
                 } else {
                     ContractEvidenceStatus::Insufficient
                 };
-                boundary.evidence_refs =
-                    refs_for_required(refs, &["memory_pressure", "storage_io", "latency_jitter"]);
+                boundary.evidence_refs = if composite_coupling_measured {
+                    refs_for_composite(
+                        composite_refs,
+                        CompositeBoundaryScenario::MemoryStorageJitter.as_str(),
+                    )
+                } else {
+                    refs_for_required(refs, &["memory_pressure", "storage_io", "latency_jitter"])
+                };
             }
             "network_latency" => {
                 boundary.status = if network_boundary_measured {
@@ -1298,6 +1571,211 @@ fn validate_pressure_options(options: &PressureProbeOptions) -> LabResult<()> {
         return Err(LabError::Validation("workers must be >= 1".to_string()));
     }
     Ok(())
+}
+
+fn run_memory_storage_jitter_composite(
+    target_id: String,
+    options: &PressureProbeOptions,
+) -> LabResult<CompositeBoundaryResult> {
+    let started = Instant::now();
+    let baseline = run_latency_jitter(target_id.clone(), options)?;
+
+    let before_mem = meminfo_values();
+    let before_vm = vmstat_values();
+    let before_psi = memory_psi_avg10();
+    let bytes = options.memory_bytes as usize;
+    let mut pressure_buffer = vec![0u8; bytes];
+    for chunk in pressure_buffer.chunks_mut(4096) {
+        chunk[0] = chunk[0].wrapping_add(1);
+    }
+    let touched_checksum = pressure_buffer
+        .iter()
+        .step_by(4096)
+        .fold(0u64, |acc, value| acc.wrapping_add(*value as u64));
+    let after_touch_mem = meminfo_values();
+    let after_touch_vm = vmstat_values();
+    let after_touch_psi = memory_psi_avg10();
+    let mem_available_delta = optional_delta_u64(
+        before_mem.get("MemAvailable").copied(),
+        after_touch_mem.get("MemAvailable").copied(),
+    );
+    let pgscan_delta = optional_delta_u64(
+        before_vm.get("pgscan_kswapd").copied(),
+        after_touch_vm.get("pgscan_kswapd").copied(),
+    );
+    let pgsteal_delta = optional_delta_u64(
+        before_vm.get("pgsteal_kswapd").copied(),
+        after_touch_vm.get("pgsteal_kswapd").copied(),
+    );
+    let major_faults_delta = optional_delta_u64(
+        before_vm.get("pgmajfault").copied(),
+        after_touch_vm.get("pgmajfault").copied(),
+    );
+    let psi_delta = optional_delta_f64(before_psi, after_touch_psi);
+    let memory_pressure_effect_observed = positive_delta(pgscan_delta)
+        || positive_delta(pgsteal_delta)
+        || positive_delta(major_faults_delta)
+        || positive_delta(psi_delta);
+
+    let storage = run_storage_io(target_id.clone(), options)?;
+    let jitter_under_pressure = run_latency_jitter(target_id.clone(), options)?;
+    drop(pressure_buffer);
+    thread::sleep(Duration::from_millis(250));
+    let recovery_mem = meminfo_values();
+    let recovery_delta = optional_delta_u64(
+        before_mem.get("MemAvailable").copied(),
+        recovery_mem.get("MemAvailable").copied(),
+    );
+
+    let baseline_p99 = metric_value(&baseline.metrics, "jitter_p99_ms");
+    let pressure_p99 = metric_value(&jitter_under_pressure.metrics, "jitter_p99_ms");
+    let jitter_p99_delta = optional_delta_f64(baseline_p99, pressure_p99);
+    let storage_effect = storage.pressure_effect.observed;
+    let composite_effect_observed =
+        memory_pressure_effect_observed && (storage_effect || positive_delta(jitter_p99_delta));
+
+    let phases = vec![
+        CompositeBoundaryPhase {
+            phase_id: "baseline_jitter".to_string(),
+            pressure_kind: "latency_jitter".to_string(),
+            status: baseline.status.clone(),
+            summary: "baseline monotonic jitter before memory/storage pressure".to_string(),
+            metrics: baseline.metrics.clone(),
+        },
+        CompositeBoundaryPhase {
+            phase_id: "memory_hold".to_string(),
+            pressure_kind: "memory_pressure".to_string(),
+            status: if memory_pressure_effect_observed {
+                ContractEvidenceStatus::MeasuredPartial
+            } else {
+                ContractEvidenceStatus::Insufficient
+            },
+            summary: "anonymous memory was allocated, touched, and held while storage and jitter phases ran".to_string(),
+            metrics: vec![
+                metric("anonymous_bytes_touched", Some(bytes as f64), "bytes", None),
+                metric("mem_available_delta_kb", mem_available_delta, "KiB", None),
+                metric("pgscan_delta", pgscan_delta, "count", None),
+                metric("pgsteal_delta", pgsteal_delta, "count", None),
+                metric("major_faults_delta", major_faults_delta, "count", None),
+                metric(
+                    "memory_psi_some_avg10_delta",
+                    psi_delta,
+                    "ratio",
+                    Some("null when /proc/pressure/memory is unavailable".to_string()),
+                ),
+                metric("touch_checksum", Some(touched_checksum as f64), "count", None),
+            ],
+        },
+        CompositeBoundaryPhase {
+            phase_id: "storage_under_memory".to_string(),
+            pressure_kind: "storage_io".to_string(),
+            status: storage.status.clone(),
+            summary: "bounded tempfile write/read ran while anonymous memory allocation was held".to_string(),
+            metrics: storage.metrics.clone(),
+        },
+        CompositeBoundaryPhase {
+            phase_id: "jitter_after_memory_storage".to_string(),
+            pressure_kind: "latency_jitter".to_string(),
+            status: jitter_under_pressure.status.clone(),
+            summary: "monotonic jitter ran while anonymous allocation remained held after storage I/O".to_string(),
+            metrics: {
+                let mut metrics = jitter_under_pressure.metrics.clone();
+                metrics.push(metric(
+                    "jitter_p99_delta_ms",
+                    jitter_p99_delta,
+                    "ms",
+                    Some("under-pressure p99 minus baseline p99".to_string()),
+                ));
+                metrics
+            },
+        },
+        CompositeBoundaryPhase {
+            phase_id: "recovery".to_string(),
+            pressure_kind: "recovery".to_string(),
+            status: ContractEvidenceStatus::MeasuredPartial,
+            summary: "memory allocation was released and MemAvailable was sampled after a short recovery pause".to_string(),
+            metrics: vec![metric(
+                "mem_available_recovery_delta_kb",
+                recovery_delta,
+                "KiB",
+                Some("post-release MemAvailable minus baseline MemAvailable".to_string()),
+            )],
+        },
+    ];
+
+    let status = if composite_effect_observed {
+        ContractEvidenceStatus::MeasuredPartial
+    } else {
+        ContractEvidenceStatus::Insufficient
+    };
+    let duration_ms = started.elapsed().as_millis() as u64;
+    Ok(CompositeBoundaryResult {
+        schema_version: "lab.composite_boundary_result.v1".to_string(),
+        result_id: new_id("COMPOSITE"),
+        target_id,
+        scenario: CompositeBoundaryScenario::MemoryStorageJitter,
+        status,
+        coupling_evidence_class: ResourceCouplingEvidenceClass::CompositeMeasured,
+        duration_ms,
+        controlled_factors: vec![
+            factor("anonymous_memory_bytes", bytes.to_string()),
+            factor("tempfile_bytes", options.storage_bytes.to_string()),
+            factor("jitter_interval_ms", "1".to_string()),
+        ],
+        observed_covariates: vec![
+            factor("meminfo", "before_touch_recovery".to_string()),
+            factor("vmstat", "before_after_touch".to_string()),
+            factor("storage_latency", "write_read_ms".to_string()),
+            factor("jitter", "baseline_and_under_pressure".to_string()),
+        ],
+        uncontrolled_confounders: vec![
+            "kernel reclaim policy".to_string(),
+            "filesystem cache state".to_string(),
+            "background scheduler and interrupt load".to_string(),
+        ],
+        phases,
+        safety: PressureSafety {
+            duration_seconds_max: duration_ms.div_ceil(1000),
+            memory_bytes_max: options.memory_bytes,
+            storage_bytes_max: options.storage_bytes,
+            network_bytes_max: 0,
+            abort_conditions: vec![
+                "duration ceiling for each component phase".to_string(),
+                "operator can terminate adc-lab command".to_string(),
+            ],
+            cleanup: vec![
+                "allocation released by process scope".to_string(),
+                "storage tempfile cleanup delegated to storage phase".to_string(),
+            ],
+            cleanup_verified: storage.safety.cleanup_verified,
+        },
+        evidence_refs: Vec::new(),
+        claim_supported: vec![
+            "phase-based memory+storage+jitter composite probe completed in one target process"
+                .to_string(),
+        ],
+        claim_blocked: vec![
+            "memory resident budget remains blocked until laddered pressure produces reclaim/PSI/fault evidence".to_string(),
+            "simultaneous storage+jitter execution and sustained storage cadence remain unmeasured".to_string(),
+        ],
+        next_evidence_needed: vec![
+            evidence_gap(
+                "memory pressure effect was not necessarily induced by the bounded allocation",
+                "larger approved memory ladder with recovery",
+                &["pressure_effect_observed", "recovery repeat", "page-cache side effect"],
+                "run approved ladder before resident-memory design budgets",
+                "operator_approval",
+            ),
+            evidence_gap(
+                "storage and jitter phases are sequential under held memory, not concurrent",
+                "concurrent storage+jitter composite runner",
+                &["storage I/O while jitter loop runs", "tail latency under active I/O"],
+                "add a concurrent paired-pressure runner before real-time-ish storage claims",
+                "adc-lab",
+            ),
+        ],
+        time_unix_ms: now_unix_ms(),
+    })
 }
 
 fn run_memory_pressure(
@@ -1597,7 +2075,8 @@ fn run_network_io(
     let mut endpoint_status = "not_configured".to_string();
     let mut connect_latency_ms = None;
     let mut endpoint_available = false;
-    let network_mode = if options.network_endpoint.is_some() {
+    let mut generated_bytes = 0u64;
+    let mut network_mode = if options.network_endpoint.is_some() {
         NetworkPressureMode::EndpointAttempt
     } else {
         NetworkPressureMode::CounterOnly
@@ -1607,11 +2086,39 @@ fn run_network_io(
         match resolve_socket_addr(endpoint).and_then(|addr| {
             TcpStream::connect_timeout(&addr, Duration::from_millis(500)).map_err(LabError::from)
         }) {
-            Ok(stream) => {
+            Ok(mut stream) => {
                 endpoint_status = "connected".to_string();
                 endpoint_available = true;
                 connect_latency_ms = Some(connect_started.elapsed().as_secs_f64() * 1000.0);
-                drop(stream);
+                if options.network_bytes > 0 {
+                    let _ = stream.set_write_timeout(Some(Duration::from_millis(500)));
+                    let buffer = [0x5au8; 8192];
+                    while generated_bytes < options.network_bytes {
+                        let remaining = (options.network_bytes - generated_bytes) as usize;
+                        let chunk_len = remaining.min(buffer.len());
+                        match stream.write(&buffer[..chunk_len]) {
+                            Ok(0) => {
+                                endpoint_status =
+                                    format!("transfer_stalled_after_{generated_bytes}_bytes");
+                                break;
+                            }
+                            Ok(written) => {
+                                generated_bytes += written as u64;
+                            }
+                            Err(error) => {
+                                endpoint_status = format!(
+                                    "transfer_failed_after_{generated_bytes}_bytes:{error}"
+                                );
+                                break;
+                            }
+                        }
+                    }
+                    let _ = stream.shutdown(Shutdown::Write);
+                    if generated_bytes == options.network_bytes {
+                        endpoint_status = format!("bounded_transfer_completed:{generated_bytes}");
+                        network_mode = NetworkPressureMode::BoundedTransfer;
+                    }
+                }
             }
             Err(error) => {
                 endpoint_status = format!("connect_failed:{error}");
@@ -1623,21 +2130,27 @@ fn run_network_io(
     let after = netdev_totals();
     let rx_delta = optional_delta_u64(before.map(|v| v.0), after.map(|v| v.0));
     let tx_delta = optional_delta_u64(before.map(|v| v.1), after.map(|v| v.1));
+    let bounded_transfer_completed = matches!(network_mode, NetworkPressureMode::BoundedTransfer);
     let status = if options.network_endpoint.is_none() {
         ContractEvidenceStatus::NotApplicableWithReason
-    } else if endpoint_available && before.is_some() && after.is_some() {
+    } else if bounded_transfer_completed && before.is_some() && after.is_some() {
         ContractEvidenceStatus::MeasuredPartial
-    } else if before.is_some() && after.is_some() {
+    } else if endpoint_available || (before.is_some() && after.is_some()) {
         ContractEvidenceStatus::Insufficient
     } else {
         ContractEvidenceStatus::NotApplicableWithReason
     };
-    let generated_bytes = 0u64;
-    let pressure_effect_observed = endpoint_available && connect_latency_ms.is_some();
+    let pressure_effect_observed = bounded_transfer_completed;
 
     let metrics = vec![
         metric("rx_bytes_delta", rx_delta, "bytes", None),
         metric("tx_bytes_delta", tx_delta, "bytes", None),
+        metric(
+            "traffic_generated_bytes",
+            Some(generated_bytes as f64),
+            "bytes",
+            None,
+        ),
         metric(
             "connect_latency_ms",
             connect_latency_ms,
@@ -1670,13 +2183,21 @@ fn run_network_io(
         vec![
             side_effect(
                 "cpu",
-                ContractEvidenceStatus::MeasuredPartial,
-                "network counter polling and optional connect attempt execute on CPU",
+                if bounded_transfer_completed {
+                    ContractEvidenceStatus::MeasuredPartial
+                } else {
+                    ContractEvidenceStatus::Insufficient
+                },
+                "bounded network transfer executes socket writes on CPU when endpoint-backed",
                 Vec::new(),
             ),
             side_effect(
                 "latency",
-                ContractEvidenceStatus::MeasuredPartial,
+                if connect_latency_ms.is_some() {
+                    ContractEvidenceStatus::MeasuredPartial
+                } else {
+                    ContractEvidenceStatus::NotApplicableWithReason
+                },
                 "connect latency is recorded when an endpoint is configured",
                 Vec::new(),
             ),
@@ -1686,8 +2207,10 @@ fn run_network_io(
             true,
             vec!["closed optional TCP socket".to_string()],
         ),
-        if options.network_endpoint.is_some() {
-            vec!["network endpoint attempt completed; no bounded transfer was generated".to_string()]
+        if bounded_transfer_completed {
+            vec!["endpoint-backed bounded network transfer completed".to_string()]
+        } else if options.network_endpoint.is_some() {
+            vec!["network endpoint attempt completed, but bounded transfer evidence remains insufficient".to_string()]
         } else {
             vec!["network interface rx/tx counters were observed; network I/O boundary was not measured without an endpoint".to_string()]
         },
@@ -1697,15 +2220,19 @@ fn run_network_io(
             "bounded transfer, packet loss, and retry behavior are not measured by counter-only evidence".to_string(),
         ],
     );
-    result.evidence_class = if options.network_endpoint.is_some() {
+    result.evidence_class = if bounded_transfer_completed {
+        ResourcePressureEvidenceClass::BoundaryProbe
+    } else if options.network_endpoint.is_some() {
         ResourcePressureEvidenceClass::Smoke
     } else {
         ResourcePressureEvidenceClass::NotApplicable
     };
     result.intensity = PressureIntensity {
         requested: format!("network_bytes_max={}", options.network_bytes),
-        relative_to_target: if options.network_endpoint.is_some() {
-            "endpoint attempt only; no bounded transfer generated".to_string()
+        relative_to_target: if bounded_transfer_completed {
+            "endpoint-backed bounded transfer; LAN topology and endpoint behavior remain confounders".to_string()
+        } else if options.network_endpoint.is_some() {
+            "endpoint attempt only; bounded transfer did not complete".to_string()
         } else {
             "counter-only observation; no endpoint configured".to_string()
         },
@@ -2196,6 +2723,13 @@ fn metric(metric_id: &str, value: Option<f64>, unit: &str, note: Option<String>)
     }
 }
 
+fn metric_value(metrics: &[ResourceMetric], metric_id: &str) -> Option<f64> {
+    metrics
+        .iter()
+        .find(|metric| metric.metric_id == metric_id)
+        .and_then(|metric| metric.value)
+}
+
 fn optional_delta_u64(before: Option<u64>, after: Option<u64>) -> Option<f64> {
     Some(after? as f64 - before? as f64)
 }
@@ -2599,6 +3133,10 @@ fn refs_for_required(refs: &BTreeMap<String, String>, required: &[&str]) -> Vec<
         .iter()
         .flat_map(|kind| refs_for_kind(refs, kind, None))
         .collect()
+}
+
+fn refs_for_composite(refs: &BTreeMap<String, String>, scenario: &str) -> Vec<String> {
+    refs_for_kind(refs, scenario, None)
 }
 
 #[allow(clippy::too_many_arguments)]

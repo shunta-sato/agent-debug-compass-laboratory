@@ -28,6 +28,46 @@ adc-lab pressure run --target ssh://target55 --kind observer_pressure --duration
 adc-lab report operating-contract --run lab/runs/LAB-RUN-target55-platform-contract --target-id target55 --target-class raspberry_pi_4
 ```
 
+Endpoint-backed bounded network transfer requires an operator-provided receiver
+on the controller or LAN. Use a target-local alias in your own environment;
+`target55` is only an example target identifier:
+
+```sh
+adc-lab pressure run \
+  --target ssh://<target-alias> \
+  --kind network_io \
+  --duration 3s \
+  --network-endpoint <controller-host-or-ip>:<port> \
+  --network-bytes 1048576 \
+  --run-dir lab/runs/LAB-RUN-<target>-network-bounded-transfer
+```
+
+Composite coupling evidence requires a composite probe artifact, not just
+separate memory, storage, and jitter pressure results:
+
+```sh
+adc-lab pressure composite \
+  --target ssh://<target-alias> \
+  --scenario memory_storage_jitter \
+  --duration 3s \
+  --memory-bytes 134217728 \
+  --storage-bytes 67108864 \
+  --run-dir lab/runs/LAB-RUN-<target>-composite-memory-storage-jitter
+```
+
+Multi-run aggregation can combine the pressure suite, governor-control run,
+composite run, and network-transfer run into a candidate pack:
+
+```sh
+adc-lab report operating-contract \
+  --run lab/runs/LAB-RUN-<target>-platform-contract \
+  --include-run lab/runs/LAB-RUN-<target>-governor-control \
+  --include-run lab/runs/LAB-RUN-<target>-composite-memory-storage-jitter \
+  --include-run lab/runs/LAB-RUN-<target>-network-bounded-transfer \
+  --target-id <target-id> \
+  --target-class raspberry_pi_4
+```
+
 ## Required Scenarios
 
 - idle baseline
@@ -48,6 +88,8 @@ adc-lab report operating-contract --run lab/runs/LAB-RUN-target55-platform-contr
   - network interface I/O/counter probe
   - latency/jitter loop
   - observer pressure
+  - endpoint-backed bounded network transfer when a receiver is available
+  - memory/storage/jitter composite boundary probe
   - resource coupling and target operating contract report
 
 ## Report Paths
@@ -59,7 +101,9 @@ adc-lab report operating-contract --run lab/runs/LAB-RUN-target55-platform-contr
   `reports/platform_mechanism_inventory.json`,
   `reports/boundary_probe_plan.json`,
   `reports/resource_coupling_report.json`,
-  `reports/target_operating_contract.json`
+  `reports/target_operating_contract.json`,
+  `reports/run_set_manifest.json`,
+  `reports/multi_run_operating_contract.json`
 
 ## Limits
 
@@ -74,4 +118,12 @@ adc-lab report operating-contract --run lab/runs/LAB-RUN-target55-platform-contr
 - Target55 smoke proves only the short bounded target scenarios captured here.
 - Platform Operating Contract pressure probes are bounded smoke evidence unless
   repeated under controlled operating points and longer approved soak windows.
+- Endpoint-backed bounded transfer is still LAN-confounded and does not prove
+  production network cadence, retry/backoff safety, packet loss behavior, or
+  target suitability.
+- The initial `memory_storage_jitter` composite scenario is phase-based. It can
+  record `coupling_evidence_class=composite_measured`, but the chain status
+  remains `insufficient` unless the relevant pressure effect is observed.
+  Larger memory ladders, concurrent storage/jitter tails, and sustained storage
+  cadence remain blocked.
 - Manual measurement is required before production physical-footprint claims.
