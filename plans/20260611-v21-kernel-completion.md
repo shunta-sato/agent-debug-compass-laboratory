@@ -108,6 +108,12 @@ Phase contribution forecast:
 | Phase 6 docs | 0 | 0 | Documentation-only. |
 | Total forecast | -900 to -1,500 | maintained-by-hand -> 0 | Expected landing: 16,400-17,000 Rust lines. |
 
+Phase contribution actuals:
+
+| Phase | Actual LoC effect | Schema effect | Reforecast |
+|---|---:|---:|---|
+| Phase 1 report.run | -200 total Rust LoC (`17,939` -> `17,739`) | top-level `32` -> `29`, generated `9` -> `10`, maintained-by-hand `32` -> `29` | Remaining phases now forecast final total around `16,939-17,739` unless later phases delete more code than expected. |
+
 ## Context & Orientation
 
 Current baseline from `origin/main` after PR #40:
@@ -251,6 +257,47 @@ Acceptance:
 - Schemas removed: 3.
 - Deleted schema references do not remain in `tests/golden`, `Makefile`,
   `COMMANDS.md`, or active CLI expectations.
+
+Phase 1 dev-workflow route:
+
+- Risk: high. The phase changes public CLI report artifacts, schema inventory,
+  generated schemas, and core report aggregation behavior.
+- Required branches: default implementation lane, `implementation-economy`,
+  `design-balance`, and final `quality-gate`.
+- Not triggered: concurrency, embedded NFR, performance hot path, UI, and
+  destructive-refactor branches. This phase does not alter target-local
+  execution, control, restore, helper, SSH, or sampling behavior.
+- Verification depth: focused report/experiment CLI regressions, schema ledger
+  and schema drift checks, full `make verify`, and phase-exit measurements.
+
+Phase 1 responsibility map:
+
+| Unit | Responsibility sentence | Reason to change | Dependency direction |
+|---|---|---|---|
+| `rules/run_report.rs` | Own v2 `report.run` payloads, rules, claim IDs, and report-run evaluation from indexed evidence. | v2 report claim semantics change. | Depends on `EvidenceStore`, `rules::engine`, and catalog claim IDs. |
+| `report.rs` | Retain shared run evidence summary and run manifest identity/quality helpers while v1 report DTO generators are retired. | Run-manifest identity or legacy report cleanup changes. | Depended on by CLI and `rules/run_report.rs`; avoids depending on CLI. |
+| `main.rs` report/experiment paths | Persist v2 `report.run` artifacts and audit events for familiarization, report pack, operating-point, and experiment runs. | CLI routing or public artifact paths change. | Depends on core report/run-report APIs. |
+| `schemas/schema-ledger.tsv` | Classify deleted Phase 1 v1 report schemas and keep no-schema contracts visible. | Schema source-of-truth status changes. | Checked by `scripts/schema/check-schema-ledger.py`. |
+
+Phase 1 complexity budget:
+
+- Changed files target: 10-14 files, including tests, schemas, generator, and
+  this plan.
+- New modules/classes target: 1 Rust module (`rules/run_report.rs`) and small
+  payload structs only.
+- New helpers/wrappers/adapters target: reuse existing `run_evidence_summary`
+  and rule engine; add only persistence helpers needed to replace v1 producers.
+- New indirection layers target: 0.
+- Rough line budget: production Rust net -300 to -700, tests +100 to +250,
+  schema snapshots +1 generated v2 file, top-level schema files -3.
+
+Phase 1 post-implementation economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `rules/run_report.rs` | Centralizes v2 report-run claims and operating-point summary so CLI/report/experiment producers do not keep separate v1 generators. | keep | `make verify`; `report.rs` dropped to 827 lines and CLI tests cover read-only, report-pack, operating-point, and experiment paths. |
+| `RunReportPayload` and operating-point payload structs | Replaces three v1 report DTO families with one generated v2 envelope payload while preserving structured operating-point evidence. | keep | `schemas/generated/lab.report.run.v2.schema.json`; CLI assertions inspect `kind=report.run` and stable claim IDs. |
+| `deleted` schema-ledger state | Lets the ledger retain explicit retired-schema history while mechanically proving deleted files are absent. | keep | `make schemas-check` reports top-level=29 and maintained_by_hand=29. |
 
 ### Phase 2: Probe Public Cutover
 
@@ -458,11 +505,13 @@ Quality gate rule:
 - [x] Phase 0: Add file-budget check command, initially informational.
 - [x] Phase 0: Add the contribution forecast table as a maintained
       forecast-vs-actual record.
-- [ ] Phase 1: Design and implement `rules/run_report.rs`.
-- [ ] Phase 1: Cut report CLI paths over to v2 `report.run`.
-- [ ] Phase 1: Move or explicitly defer experiment claim-trace output before
+- [x] Phase 1: Record high-risk route, responsibility map, and complexity
+      budget before implementation.
+- [x] Phase 1: Design and implement `rules/run_report.rs`.
+- [x] Phase 1: Cut report CLI paths over to v2 `report.run`.
+- [x] Phase 1: Move or explicitly defer experiment claim-trace output before
       deleting `lab.claim_evidence_trace.v1.schema.json`.
-- [ ] Phase 1: Delete or retire familiarization/claim-trace/coverage v1
+- [x] Phase 1: Delete or retire familiarization/claim-trace/coverage v1
       schemas after parity.
 - [ ] Phase 2: Make load/pressure/composite v2 artifacts primary CLI outputs.
 - [ ] Phase 2: Remove or generated-convert probe v1 schemas.
@@ -507,6 +556,9 @@ Quality gate rule:
 - `make file-budgets` currently reports two informational violations:
   `adc-lab/src/main.rs` at 2,595 lines over the future 800-line budget and
   `adc-lab-core/src/report.rs` at 1,527 lines over the future 900-line budget.
+- Phase 1 checkout starts from `origin/main` at `76707e9`, after the Phase 0
+  guardrail PR was merged. Local untracked files remain present and must stay
+  unstaged unless the user asks otherwise.
 
 ## Decision Log
 
@@ -539,6 +591,17 @@ Quality gate rule:
 - 2026-06-11: Keep `make file-budgets` informational until the command split
   phase. Rationale: current over-budget files are known planned targets, and
   failing `make verify` before their owning phases would block unrelated work.
+- 2026-06-11: Treat `report.rs` run-summary helpers as reusable core
+  aggregation during Phase 1 instead of duplicating filesystem scans in
+  `rules/run_report.rs`. Rationale: this keeps the v2 report implementation
+  small and makes `run_manifest` and `report.run` derive from the same observed
+  operation facts.
+- 2026-06-11: Accept the Phase 1 LoC forecast miss instead of shrinking v2
+  report semantics. Rationale: replacing three v1 report contracts with one v2
+  artifact required stable claim IDs, catalog entries, generated schema, and
+  report/experiment parity tests; `report.rs` met its file budget and schema
+  deletion target, but total Rust LoC only dropped by 200. Reforecast final
+  landing to roughly 16,939-17,739 unless later phases over-delete.
 
 ## Verification Log
 
@@ -584,21 +647,70 @@ Quality gate rule:
   `make verify` passed. The gate ran workspace build, format check, clippy,
   generated schema drift plus ledger coverage, unit tests, integration tests,
   contract validation, docs smoke, and command smoke.
+- Phase 1 branch setup:
+  `git fetch --prune origin` updated `origin/main` to `76707e9`; `git switch
+  -c codex/adc-labv21-report-run origin/main` created the Phase 1 branch.
+- Phase 1 initial measurements:
+  `wc -l crates/adc-lab-core/src/report.rs crates/adc-lab/src/main.rs
+  crates/adc-lab-core/src/contracts.rs schemas/schema-ledger.tsv
+  crates/adc-lab/tests/cli.rs`: `report.rs` 1,527; `main.rs` 2,595;
+  `contracts.rs` 1,321; ledger 39; CLI tests 1,962.
+- Phase 1 initial schema counts:
+  top-level schemas 32; generated schemas 9.
+- Phase 1 focused verification:
+  `make schemas-check` passed with
+  `top_level=29 no_schema_wire=6 maintained_by_hand=29`.
+- Phase 1 focused verification:
+  `cargo test -p adc-lab-core run_report -- --nocapture` passed; 2 tests.
+- Phase 1 focused verification:
+  `cargo test -p adc-lab-core report::tests -- --nocapture` passed; 5 tests.
+- Phase 1 focused verification:
+  `cargo test -p adc-lab --test cli experiment_real_run_executes_supported_bounded_matrix -- --nocapture`
+  passed.
+- Phase 1 focused verification:
+  CLI focused tests for `familiarize_read_only_writes_manifest_run_report_and_audit`,
+  `experiment_real_run_blocks_unsupported_controlled_factor`,
+  `report_operating_point_marks_read_only_run_observational_only`,
+  `report_operating_point_marks_bounded_matrix_controlled_subset`, and
+  `experiment_dry_run_and_report_pack_work` passed.
+- Phase 1 lint/contract verification:
+  `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D
+  warnings`, and `cargo test --workspace contract_validation -- --nocapture`
+  passed.
+- Phase 1 structural scan:
+  code-smells/anti-patterns review found no new or worsened maintainability
+  issues. Checked changed units `rules/run_report.rs`, `report.rs`,
+  `main.rs`, schema ledger/checker, generated schema registration, and CLI
+  tests. Dependency direction remains CLI -> core -> evidence/report helpers;
+  the new module has one reason to change: v2 report-run claim semantics.
+- Phase 1 final gate:
+  `make verify` passed. The gate covered build, format, clippy, generated schema
+  drift plus ledger, unit tests, integration tests, safety invariants, contract
+  validation, docs smoke, and command smoke.
+- Phase 1 final measurements:
+  total Rust lines `17,739`; Rust test lines `4,006`; top-level schemas `29`;
+  generated schemas `10`; `main.rs` `2,470`; `report.rs` `827`;
+  `rules/run_report.rs` `727`; `contracts.rs` `1,211`; CLI tests `1,940`.
+- Phase 1 file-budget check:
+  `make file-budgets` passed in informational mode with one remaining future
+  violation, `crates/adc-lab/src/main.rs` at 2,470 lines over the Phase 4
+  budget.
 
 ## Handoff
 
-- Branch: `codex/adc-labv21-plan`.
-- Base commit: `01f9085` (`origin/main` after PR #40).
-- Current status: Phase 0 guardrail implementation is complete locally with
-  `make verify` passing. Behavior implementation has not started.
+- Branch: `codex/adc-labv21-report-run`.
+- Base commit: `76707e9` (`origin/main` after PR #41).
+- Current status: Phase 1 implementation is complete locally with `make verify`
+  passing. Commit/PR publication is next.
 - Untracked local files exist and were not staged:
   `.DS_Store`, `._.DS_Store`,
   `reports/._20260611-v2-evidence-kernel-outcome-review.md`, and
   `reports/20260611-v2-evidence-kernel-outcome-review.md`.
 - Next steps:
-  1. Commit and publish the Phase 0 guardrail PR.
-  2. Start Phase 1 only after Phase 0 lands.
-  3. Keep forecast-vs-actual and schema ledger entries current in each phase.
+  1. Commit and publish the Phase 1 PR.
+  2. Start Phase 2 after Phase 1 lands.
+  3. Keep the Phase 1 LoC forecast miss visible when updating later phase
+     actuals.
 - Read first when resuming:
   - this plan,
   - `reports/20260611-v2-evidence-kernel-outcome-review.md`,
@@ -618,3 +730,14 @@ Phase 0 outcome:
 - Final maintained-by-hand enforcement is mechanically available through
   `scripts/schema/check-schema-ledger.py --enforce-final`; it currently fails
   as expected because 32 handwritten schemas remain.
+
+Phase 1 outcome:
+
+- `familiarize read-only`, `report pack`, `report operating-point`, and
+  `experiment run` now persist v2 `report.run` artifacts as the report/claim
+  surface.
+- `lab.familiarization_pack.v1`, `lab.claim_evidence_trace.v1`, and
+  `lab.operating_point_coverage.v1` schemas and golden fixtures were deleted
+  after report and experiment producers moved.
+- `report.rs` is below the 900-line Phase 1 budget; `main.rs` remains a Phase 4
+  file-budget target.

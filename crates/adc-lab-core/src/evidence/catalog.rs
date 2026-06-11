@@ -12,6 +12,19 @@ pub mod claim {
     pub const BATTERY_SAFE: &str = "target.selection.battery_safe";
     pub const REAL_TIME_PRESSURE_SAFE: &str = "target.selection.real_time_pressure_safe";
     pub const SELECTION_READY: &str = "target.selection.selection_ready";
+    pub const RUN_TARGET_INVENTORY_COLLECTED: &str = "run.target_inventory_collected";
+    pub const RUN_TOOLCHAIN_INVENTORY_COLLECTED: &str = "run.toolchain_inventory_collected";
+    pub const RUN_TOOL_QUALIFICATION_SUMMARY_GENERATED: &str =
+        "run.tool_qualification_summary_generated";
+    pub const RUN_PASSIVE_OBSERVATION_COLLECTED: &str = "run.passive_observation_collected";
+    pub const RUN_BOUNDED_LOAD_COMPLETED: &str = "run.bounded_load_completed";
+    pub const RUN_EXPERIMENT_BOUNDED_MATRIX_EXECUTED: &str =
+        "run.experiment_bounded_matrix_executed";
+    pub const OPERATING_POINT_BOUNDED_WORKLOAD_MEASURED: &str =
+        "operating_point.bounded_workload_measured";
+    pub const OPERATING_POINT_FIXED_CPU_FREQUENCY_VERIFIED: &str =
+        "operating_point.fixed_cpu_frequency_verified";
+    pub const OPERATING_POINT_ALL_POINTS_MEASURED: &str = "operating_point.all_points_measured";
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
@@ -125,6 +138,76 @@ const CLAIMS: &[ClaimDefinition] = &[
             "resolve unknown required suitability dimensions",
             "rerun suitability policy after missing evidence is collected",
         ],
+    },
+    ClaimDefinition {
+        claim_id: claim::RUN_TARGET_INVENTORY_COLLECTED,
+        supported_text: "Target inventory was collected through read-only surfaces.",
+        blocked_text: "Do not claim target identity or hardware capability without read-only target inventory.",
+        blocked_claim: "target inventory collected",
+        default_next_evidence: &["collect read-only target inventory"],
+    },
+    ClaimDefinition {
+        claim_id: claim::RUN_TOOLCHAIN_INVENTORY_COLLECTED,
+        supported_text: "Toolchain inventory was collected through read-only discovery.",
+        blocked_text: "Do not claim tool availability without read-only toolchain inventory.",
+        blocked_claim: "toolchain inventory collected",
+        default_next_evidence: &["collect read-only toolchain inventory"],
+    },
+    ClaimDefinition {
+        claim_id: claim::RUN_TOOL_QUALIFICATION_SUMMARY_GENERATED,
+        supported_text: "Tool qualification summary was generated for discovered tools.",
+        blocked_text: "Do not treat tool output as qualified evidence without a qualification summary.",
+        blocked_claim: "tool qualification summary generated",
+        default_next_evidence: &["generate tool qualification summary"],
+    },
+    ClaimDefinition {
+        claim_id: claim::RUN_PASSIVE_OBSERVATION_COLLECTED,
+        supported_text: "Passive resource signals were sampled under the current target policy.",
+        blocked_text: "Do not claim passive resource behavior without observation evidence.",
+        blocked_claim: "passive observation collected",
+        default_next_evidence: &[
+            "collect passive observation",
+            "run controlled operating point matrix before stronger claims",
+        ],
+    },
+    ClaimDefinition {
+        claim_id: claim::RUN_BOUNDED_LOAD_COMPLETED,
+        supported_text: "Bounded CPU load completed under configured safety bounds.",
+        blocked_text: "Do not claim bounded workload completion without a load result artifact.",
+        blocked_claim: "bounded workload completion",
+        default_next_evidence: &["run bounded CPU load with safety monitor"],
+    },
+    ClaimDefinition {
+        claim_id: claim::RUN_EXPERIMENT_BOUNDED_MATRIX_EXECUTED,
+        supported_text: "A bounded non-privileged experiment matrix completed at least one trial.",
+        blocked_text: "Do not claim experiment execution when all trials are planned, blocked, or failed.",
+        blocked_claim: "bounded experiment matrix executed",
+        default_next_evidence: &["execute a supported cpu_load_workers matrix"],
+    },
+    ClaimDefinition {
+        claim_id: claim::OPERATING_POINT_BOUNDED_WORKLOAD_MEASURED,
+        supported_text: "Bounded workload operating points were measured for completed trials.",
+        blocked_text: "Do not claim measured workload operating points without completed trial evidence.",
+        blocked_claim: "bounded workload operating points measured",
+        default_next_evidence: &["execute a supported controlled workload matrix"],
+    },
+    ClaimDefinition {
+        claim_id: claim::OPERATING_POINT_FIXED_CPU_FREQUENCY_VERIFIED,
+        supported_text: "Fixed CPU frequency behavior was verified under controlled conditions.",
+        blocked_text: "Do not claim fixed CPU frequency behavior from passive frequency variation.",
+        blocked_claim: "fixed CPU frequency behavior",
+        default_next_evidence: &[
+            "approved privileged control plan",
+            "controlled fixed-frequency matrix",
+            "restore verification per point",
+        ],
+    },
+    ClaimDefinition {
+        claim_id: claim::OPERATING_POINT_ALL_POINTS_MEASURED,
+        supported_text: "All required operating points were measured with controlled factors.",
+        blocked_text: "Do not claim all operating points were measured from observational or subset evidence.",
+        blocked_claim: "all operating points measured",
+        default_next_evidence: &["controlled operating point matrix across required factors"],
     },
 ];
 

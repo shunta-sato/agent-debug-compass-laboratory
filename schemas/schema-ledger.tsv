@@ -1,7 +1,7 @@
 contract_id	schema_file	current_state	target_state	phase	owner	notes
 lab.approval_record.v1	lab.approval_record.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	safety-critical approval record; generate only after compatibility checks
 lab.audit_event.v1	lab.audit_event.v1.schema.json	handwritten_schema	generated_checked	phase5-infra	audit	active audit stream, including evidence.write events
-lab.claim_evidence_trace.v1	lab.claim_evidence_trace.v1.schema.json	handwritten_schema	delete	phase1-report-run	reporting	delete only after report and experiment trace producers move to v2
+lab.claim_evidence_trace.v1	lab.claim_evidence_trace.v1.schema.json	deleted	delete	phase1-report-run	reporting	report and experiment trace producers moved to v2 report.run
 lab.composite_boundary_result.v1	lab.composite_boundary_result.v1.schema.json	handwritten_schema	delete	phase2-probe-cutover	probe	replace public composite output with v2 Artifact<CompositePayload>
 lab.control_plan.v1	lab.control_plan.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	safety-critical plan contract; keep semantics frozen
 lab.control_result.v1	lab.control_result.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	control status vocabulary is not equivalent to evidence Status
@@ -9,11 +9,11 @@ lab.control_surface.v1	lab.control_surface.v1.schema.json	handwritten_schema	gen
 lab.design_constraint_pack.v1	lab.design_constraint_pack.v1.schema.json	handwritten_schema	delete	phase3-suitability-constraints	suitability	replace public JSON with v2 constraints artifact
 lab.experiment_matrix.v1	lab.experiment_matrix.v1.schema.json	handwritten_schema	generated_checked	phase5-experiment	experiment	active experiment planning contract
 lab.experiment_run.v1	lab.experiment_run.v1.schema.json	handwritten_schema	generated_checked	phase5-experiment	experiment	active experiment result contract
-lab.familiarization_pack.v1	lab.familiarization_pack.v1.schema.json	handwritten_schema	delete	phase1-report-run	reporting	replace with v2 report.run
+lab.familiarization_pack.v1	lab.familiarization_pack.v1.schema.json	deleted	delete	phase1-report-run	reporting	replaced by v2 report.run
 lab.health_check.v1	lab.health_check.v1.schema.json	handwritten_schema	generated_checked	phase5-infra	core	active health check contract
 lab.load_plan.v1	lab.load_plan.v1.schema.json	handwritten_schema	generated_checked	phase2-probe-cutover	load	active typed safety plan unless public producer disappears
 lab.load_result.v1	lab.load_result.v1.schema.json	handwritten_schema	delete	phase2-probe-cutover	load	replace public load output with v2 Artifact<LoadPayload>
-lab.operating_point_coverage.v1	lab.operating_point_coverage.v1.schema.json	handwritten_schema	delete	phase1-report-run	reporting	replace with v2 report.run
+lab.operating_point_coverage.v1	lab.operating_point_coverage.v1.schema.json	deleted	delete	phase1-report-run	reporting	replaced by v2 report.run
 lab.privilege_doctor.v1	lab.privilege_doctor.v1.schema.json	handwritten_schema	generated_checked	phase5-privilege	privilege	active privilege readiness contract
 lab.privilege_provider_status.v1	lab.privilege_provider_status.v1.schema.json	handwritten_schema	generated_checked	phase5-privilege	privilege	active provider status contract
 lab.privilege_setup_plan.v1	lab.privilege_setup_plan.v1.schema.json	handwritten_schema	generated_checked	phase5-privilege	privilege	instruction-only setup plan contract

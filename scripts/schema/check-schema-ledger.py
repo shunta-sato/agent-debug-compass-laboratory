@@ -19,6 +19,7 @@ ALLOWED_CURRENT_STATES = {
     "handwritten_schema",
     "generated_snapshot",
     "no_schema_wire_contract",
+    "deleted",
 }
 ALLOWED_TARGET_STATES = {"delete", "generated_checked", "exempt"}
 WIRE_RE = re.compile(r"lab\.[a-z0-9_]+(?:\.[a-z0-9_]+)*\.v1(?:\.[a-z0-9_]+)*")
@@ -129,6 +130,12 @@ def main() -> int:
             errors.append(f"{contract_id}: invalid current_state {row['current_state']}")
         if row["target_state"] not in ALLOWED_TARGET_STATES:
             errors.append(f"{contract_id}: invalid target_state {row['target_state']}")
+        if row["current_state"] == "deleted":
+            if row["schema_file"] == "-":
+                errors.append(f"{contract_id}: deleted schema row must name the retired schema file")
+            elif (root / "schemas" / row["schema_file"]).exists():
+                errors.append(f"{contract_id}: deleted schema file still exists: {row['schema_file']}")
+            continue
         if row["current_state"] != "no_schema_wire_contract":
             if row["schema_file"] == "-":
                 errors.append(f"{contract_id}: schema-backed row must name a schema file")

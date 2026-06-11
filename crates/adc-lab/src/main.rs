@@ -542,9 +542,8 @@ struct ReadOnlyFamiliarizeOutput {
     run_id: String,
     target_id: String,
     run_manifest_ref: String,
-    familiarization_pack_ref: String,
-    claim_trace_ref: String,
-    value: FamiliarizationPack,
+    run_report_ref: String,
+    value: Artifact<RunReportPayload>,
 }
 
 #[derive(Debug, Serialize)]
@@ -1220,7 +1219,7 @@ fn command_experiment_run(args: ExperimentRunCommand) -> Result<()> {
     let run = create_or_open_run(args.run_dir)?;
     persist_target_runner_version_if_absent(&run, &target)?;
     let matrix: ExperimentMatrix = read_yaml(&args.matrix)?;
-    let (experiment_run, claim_trace) = if args.dry_run {
+    let experiment_run = if args.dry_run {
         run_experiment_matrix(&matrix, run.run_id.clone(), target.target_id.clone(), true)?
     } else {
         let config = ExperimentRuntimeConfig {
@@ -1234,9 +1233,8 @@ fn command_experiment_run(args: ExperimentRunCommand) -> Result<()> {
     };
     let audit_result = experiment_run_result(&experiment_run);
     let run_path = run.run_dir.join("experiments/experiment_run.json");
-    let trace_path = run.run_dir.join("reports/claim_evidence_trace.json");
     write_json_artifact(&run, &run_path, &experiment_run)?;
-    write_json_artifact(&run, &trace_path, &claim_trace)?;
+    persist_run_report(&run, target.target_id.clone())?;
     append_audit_event(
         &run,
         AuditInput {
@@ -1267,7 +1265,7 @@ fn execute_experiment_matrix(
     target: &TargetSpec,
     matrix: &ExperimentMatrix,
     config: &ExperimentRuntimeConfig,
-) -> Result<(ExperimentRun, ClaimEvidenceTrace)> {
+) -> Result<ExperimentRun> {
     validate_experiment_matrix_bounds(matrix)?;
     let combinations = expand_factors(matrix)?;
     let mut trials = Vec::new();
@@ -1314,7 +1312,7 @@ fn execute_experiment_matrix(
         }
     }
 
-    let experiment_run = ExperimentRun {
+    Ok(ExperimentRun {
         schema_version: "lab.experiment_run.v1".to_string(),
         run_id: run.run_id.clone(),
         matrix_id: matrix.matrix_id.clone(),
@@ -1322,9 +1320,7 @@ fn execute_experiment_matrix(
         dry_run: false,
         trials,
         time_unix_ms: now_unix_ms(),
-    };
-    let claim_trace = real_experiment_claim_trace(&experiment_run);
-    Ok((experiment_run, claim_trace))
+    })
 }
 
 fn execute_supported_experiment_trial(
@@ -1443,84 +1439,6 @@ fn trial_artifact_dir(run: &RunContext, trial_id: &str) -> PathBuf {
         .join(safe_artifact_id(trial_id, "TRIAL"))
 }
 
-fn real_experiment_claim_trace(run: &ExperimentRun) -> ClaimEvidenceTrace {
-    let experiment_ref = format!(
-        "artifact://lab/runs/{}/experiments/experiment_run.json",
-        run.run_id
-    );
-    let completed = run
-        .trials
-        .iter()
-        .filter(|trial| trial.status == "completed")
-        .count();
-    let blocked_or_failed = run
-        .trials
-        .iter()
-        .filter(|trial| trial.status == "blocked" || trial.status == "failed")
-        .count();
-    ClaimEvidenceTrace {
-        schema_version: "lab.claim_evidence_trace.v1".to_string(),
-        run_id: run.run_id.clone(),
-        target_id: run.target_id.clone(),
-        claims: vec![
-            ClaimTraceEntry {
-                claim: format!(
-                    "Bounded non-privileged experiment matrix executed {completed} completed trial(s)."
-                ),
-                decision: if completed > 0 {
-                    ClaimDecision::Supported
-                } else {
-                    ClaimDecision::Blocked
-                },
-                evidence_refs: if completed > 0 {
-                    vec![experiment_ref.clone()]
-                } else {
-                    Vec::new()
-                },
-                next_evidence_needed: if completed > 0 {
-                    vec![
-                        "controlled privileged factors require approval/apply/restore wiring"
-                            .to_string(),
-                    ]
-                } else {
-                    vec!["execute a supported cpu_load_workers matrix".to_string()]
-                },
-            },
-            ClaimTraceEntry {
-                claim: format!(
-                    "{blocked_or_failed} trial(s) were blocked or failed and cannot support claims."
-                ),
-                decision: if blocked_or_failed > 0 {
-                    ClaimDecision::Blocked
-                } else {
-                    ClaimDecision::Provisional
-                },
-                evidence_refs: vec![experiment_ref.clone()],
-                next_evidence_needed: vec![
-                    "inspect per-trial failure reasons and artifacts".to_string(),
-                ],
-            },
-            ClaimTraceEntry {
-                claim: "adc-lab verified behavior across all fixed CPU frequencies.".to_string(),
-                decision: ClaimDecision::Blocked,
-                evidence_refs: Vec::new(),
-                next_evidence_needed: vec![
-                    "controlled operating point matrix with fixed frequency support".to_string(),
-                ],
-            },
-            ClaimTraceEntry {
-                claim: "experiment matrix proves production physical-footprint safety".to_string(),
-                decision: ClaimDecision::Blocked,
-                evidence_refs: Vec::new(),
-                next_evidence_needed: vec![
-                    "target-specific sustained thermal, wakeup, power, storage, flash, latency, and observer-effect evidence".to_string(),
-                ],
-            },
-        ],
-        time_unix_ms: now_unix_ms(),
-    }
-}
-
 fn experiment_run_result(run: &ExperimentRun) -> String {
     if run.dry_run {
         return "planned".to_string();
@@ -1556,7 +1474,7 @@ fn command_familiarize_read_only(args: FamiliarizeReadOnlyCommand) -> Result<()>
     let (toolchain, _, toolchain_ref) = persist_toolchain(&run, &target)?;
     persist_toolchain_qualifications(&run, &toolchain, Some(toolchain_ref))?;
     persist_observation(&run, &target, duration, interval, signals)?;
-    let (_, _, claim_trace_ref) = persist_read_only_claim_trace(&run, target.target_id.clone())?;
+    let (run_report, _, run_report_ref) = persist_run_report(&run, target.target_id.clone())?;
     let ended_at = now_unix_ms();
     let (_, _, run_manifest_ref) = persist_run_manifest(
         &run,
@@ -1565,53 +1483,28 @@ fn command_familiarize_read_only(args: FamiliarizeReadOnlyCommand) -> Result<()>
         started_at,
         ended_at,
     )?;
-    let (pack, _, familiarization_pack_ref) =
-        persist_familiarization_pack(&run, target.target_id.clone())?;
 
     print_json(&ReadOnlyFamiliarizeOutput {
         run_id: run.run_id,
         target_id: target.target_id,
         run_manifest_ref,
-        familiarization_pack_ref,
-        claim_trace_ref,
-        value: pack,
+        run_report_ref,
+        value: run_report,
     })
 }
 
 fn command_report_pack(args: ReportPackCommand) -> Result<()> {
     let run = existing_run_context(args.run);
-    persist_read_only_claim_trace(&run, args.target_id.clone())?;
+    let (report, path, _) = persist_run_report(&run, args.target_id.clone())?;
     let now = now_unix_ms();
     persist_run_manifest(&run, args.target_id.clone(), args.target, now, now)?;
-    let (pack, path, _) = persist_familiarization_pack(&run, args.target_id)?;
-    print_artifact(&run, &path, pack)
+    print_artifact(&run, &path, report)
 }
 
 fn command_report_operating_point(args: ReportPackCommand) -> Result<()> {
     let run = existing_run_context(args.run);
-    let coverage = operating_point_coverage(&run.run_dir, args.target_id)?;
-    let coverage_path = run.run_dir.join("reports/operating_point_coverage.json");
-    let coverage_ref = write_json_artifact(&run, &coverage_path, &coverage)?;
-    append_audit_event(
-        &run,
-        AuditInput {
-            target_id: coverage.target_id.clone(),
-            actor: Actor::codex(),
-            operation: "report.operating_point".to_string(),
-            operation_id: None,
-            risk_tier: RiskTier::Tier0ReadOnlyObservation,
-            approval_ref: None,
-            restore_lease_ref: None,
-            result: serde_json::to_string(&coverage.coverage_status)
-                .unwrap_or_else(|_| "unknown".to_string())
-                .trim_matches('"')
-                .to_string(),
-        },
-    )?;
-    print_json(&serde_json::json!({
-        "operating_point_coverage_ref": coverage_ref,
-        "coverage": coverage
-    }))
+    let (report, path, _) = persist_run_report(&run, args.target_id)?;
+    print_artifact(&run, &path, report)
 }
 
 fn command_health_check(args: TargetCommand) -> Result<()> {
@@ -2059,27 +1952,32 @@ fn persist_observation(
     Ok((observation, path, artifact_ref))
 }
 
-fn persist_read_only_claim_trace(
+fn persist_run_report(
     run: &RunContext,
     target_id: String,
-) -> Result<(ClaimEvidenceTrace, PathBuf, String)> {
-    let trace = read_only_claim_trace(&run.run_dir, target_id.clone())?;
-    let path = run.run_dir.join("reports/claim_evidence_trace.json");
-    let artifact_ref = write_json_artifact(run, &path, &trace)?;
+) -> Result<(Artifact<RunReportPayload>, PathBuf, String)> {
+    let mut store = evidence_store_for_run(run)?;
+    let report = evaluate_run_report_v2(&store, &run.run_dir, target_id.clone())?;
+    let relative_path = Path::new(RUN_REPORT_RELATIVE_PATH);
+    let artifact_ref = store.write(&run.run_dir, relative_path, &report)?;
+    let path = run.run_dir.join(relative_path);
     append_audit_event(
         run,
         AuditInput {
             target_id,
             actor: Actor::codex(),
-            operation: "report.claim_trace".to_string(),
-            operation_id: None,
+            operation: "report.run".to_string(),
+            operation_id: Some(report.id.clone()),
             risk_tier: RiskTier::Tier0ReadOnlyObservation,
             approval_ref: None,
             restore_lease_ref: None,
-            result: "recorded".to_string(),
+            result: serde_json::to_string(&report.status)
+                .unwrap_or_else(|_| "unknown".to_string())
+                .trim_matches('"')
+                .to_string(),
         },
     )?;
-    Ok((trace, path, artifact_ref))
+    Ok((report, path, artifact_ref))
 }
 
 fn persist_run_manifest(
@@ -2159,29 +2057,6 @@ fn persist_target_runner_version_if_absent(run: &RunContext, target: &TargetSpec
         },
     )?;
     Ok(())
-}
-
-fn persist_familiarization_pack(
-    run: &RunContext,
-    target_id: String,
-) -> Result<(FamiliarizationPack, PathBuf, String)> {
-    append_audit_event(
-        run,
-        AuditInput {
-            target_id: target_id.clone(),
-            actor: Actor::codex(),
-            operation: "report.pack".to_string(),
-            operation_id: None,
-            risk_tier: RiskTier::Tier0ReadOnlyObservation,
-            approval_ref: None,
-            restore_lease_ref: None,
-            result: "recorded".to_string(),
-        },
-    )?;
-    let pack = pack_run(&run.run_dir, target_id)?;
-    let path = run.run_dir.join("reports/familiarization_pack.json");
-    let artifact_ref = write_json_artifact(run, &path, &pack)?;
-    Ok((pack, path, artifact_ref))
 }
 
 fn persist_control_result(
