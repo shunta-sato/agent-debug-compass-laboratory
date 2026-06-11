@@ -776,6 +776,8 @@ make verify
   profile module, capability cost model generator, public v1 report sidecars,
   v1 report schemas/goldens, v1 demo packs, resource-smoke alias, and stale
   docs.
+- Phase 5 PR: draft PR #36 opened at
+  `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/36`.
 
 ## Decision Log
 
@@ -843,10 +845,9 @@ make verify
 - Baseline commit: `543edf0`.
 - Current status: Phase 5 implemented and verified locally. Phase 0 is draft
   PR #30; Phase 1 is stacked draft PR #31; Phase 2 is stacked draft PR #32;
-  Phase 3 is stacked draft PR #33; Phase 4 is stacked draft PR #34. Phase 5 PR
-  publication is next.
-- Uncommitted changes: Phase 5 implementation and this plan update, pending
-  commit.
+  Phase 3 is stacked draft PR #33; Phase 4 is stacked draft PR #34; Phase 5 is
+  stacked draft PR #36.
+- Uncommitted changes: this plan update, pending handoff commit.
 - Commands run so far:
   - `sed -n ...` on the request attachment, `PLANS.md`, execution-plan
     references, existing plans, `COMMANDS.md`, Cargo manifests, Makefile, and
@@ -867,10 +868,8 @@ make verify
   - `cargo test -p adc-lab --test cli -- --nocapture`.
   - `make verify`.
 - Next steps:
-  1. Commit Phase 5 cleanup.
-  2. Push `codex/adc-labv2-phase5-cleanup`.
-  3. Open the stacked Phase 5 draft PR against
-     `codex/adc-labv2-phase4-cli-cutover`.
+  1. Review/merge stacked PRs in order from #30 through #36.
+  2. Regenerate fresh v2 demo evidence if target-specific evidence is needed.
 - Read these files first when resuming:
   - `plans/20260611-v2-evidence-kernel.md`
   - `crates/adc-lab-core/src/control.rs`
@@ -884,5 +883,5 @@ make verify
 
 ## Outcomes & Retrospective
 
-Phase 0 through Phase 5 are implemented and locally verified. Whole-cutover
-outcomes remain pending only until the Phase 5 PR is published.
+Phase 0 through Phase 5 are implemented, locally verified, pushed, and
+published as stacked draft PRs.
