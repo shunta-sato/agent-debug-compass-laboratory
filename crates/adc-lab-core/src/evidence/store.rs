@@ -87,7 +87,7 @@ impl EvidenceStore {
         let meta = ArtifactMeta {
             path: path.clone(),
             artifact_ref: artifact_ref.clone(),
-            kind: artifact.kind.clone(),
+            kind: artifact.kind,
             id: artifact.id.clone(),
             run_id: artifact.run_id.clone(),
             target_id: artifact.target_id.clone(),
@@ -99,7 +99,7 @@ impl EvidenceStore {
                 schema_version: "lab.evidence_store_audit.v1",
                 operation: "evidence.write",
                 artifact_ref: artifact_ref.clone(),
-                kind: artifact.kind.clone(),
+                kind: artifact.kind,
                 time_unix_ms: now_unix_ms(),
             },
         )?;

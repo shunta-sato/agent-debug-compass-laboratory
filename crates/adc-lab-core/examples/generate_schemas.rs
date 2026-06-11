@@ -1,4 +1,4 @@
-use adc_lab_core::{Artifact, ClaimDefinition};
+use adc_lab_core::{Artifact, ClaimDefinition, OperatingContractPayload, SuitabilityPayload};
 use schemars::schema_for;
 use std::fs;
 use std::path::PathBuf;
@@ -20,6 +20,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(
         out_dir.join("lab.claim_catalog_entry.v2.schema.json"),
         serde_json::to_vec_pretty(&claim_schema)?,
+    )?;
+
+    let operating_contract_schema = schema_for!(Artifact<OperatingContractPayload>);
+    fs::write(
+        out_dir.join("lab.report.operating_contract.v2.schema.json"),
+        serde_json::to_vec_pretty(&operating_contract_schema)?,
+    )?;
+
+    let suitability_schema = schema_for!(Artifact<SuitabilityPayload>);
+    fs::write(
+        out_dir.join("lab.report.suitability.v2.schema.json"),
+        serde_json::to_vec_pretty(&suitability_schema)?,
     )?;
 
     Ok(())
