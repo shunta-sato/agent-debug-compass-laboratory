@@ -228,11 +228,21 @@
         "duration_ms",
         "load_id",
         "operator_abort_observed",
+        "restore_on_abort_status",
+        "safety_monitor_samples",
         "source_schema_version",
         "status",
+        "thermal_surface_available",
+        "worker_iterations",
         "workers"
       ],
       "properties": {
+        "abort_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "duration_ms": {
           "type": "integer",
           "format": "uint64",
@@ -251,11 +261,30 @@
         "operator_abort_observed": {
           "type": "boolean"
         },
+        "restore_on_abort_status": {
+          "type": "string"
+        },
+        "safety_monitor_samples": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
         "source_schema_version": {
           "type": "string"
         },
         "status": {
           "type": "string"
+        },
+        "thermal_surface_available": {
+          "type": "boolean"
+        },
+        "worker_iterations": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          }
         },
         "workers": {
           "type": "integer",

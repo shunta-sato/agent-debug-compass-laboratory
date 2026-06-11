@@ -863,27 +863,32 @@ fn command_load_cpu(args: LoadCpuCommand) -> Result<()> {
             args.operator_abort_file.as_deref(),
         )?,
     };
-    let path = run
-        .run_dir
-        .join("loads")
-        .join(format!("{}.result.json", result.load_id));
-    write_json_artifact(&run, &path, &result)?;
+    let result_status = result.status.clone();
+    let target_id = result.target_id.clone();
+    let relative = PathBuf::from("load").join(format!(
+        "cpu.{}.v2.json",
+        safe_artifact_id(&result.result_id, "LOAD-RESULT")
+    ));
+    let artifact = load_artifact_v2(run.run_id.clone(), result);
     let mut store = evidence_store_for_run(&run)?;
-    write_load_artifact_v2(&mut store, &run.run_dir, result.clone())?;
+    let artifact_ref = store.write(&run.run_dir, &relative, &artifact)?;
     append_audit_event(
         &run,
         AuditInput {
-            target_id: result.target_id.clone(),
+            target_id,
             actor: Actor::codex(),
             operation: "load.cpu".to_string(),
             operation_id: None,
             risk_tier: RiskTier::Tier1LowRiskReversibleNonRoot,
             approval_ref: None,
             restore_lease_ref: None,
-            result: result.status.clone(),
+            result: result_status,
         },
     )?;
-    print_artifact(&run, &path, result)
+    print_json(&ArtifactOutput {
+        artifact_ref,
+        value: artifact,
+    })
 }
 
 fn command_pressure_run(args: PressureRunCommand) -> Result<()> {
@@ -906,32 +911,37 @@ fn command_pressure_run(args: PressureRunCommand) -> Result<()> {
         }
         TargetTransport::Ssh => pressure_ssh(&target, args.kind.clone(), &options)?,
     };
-    let file_name = format!(
-        "{}.{}.result.json",
+    let operation_id = result.pressure_kind.as_str().to_string();
+    let target_id = result.target_id.clone();
+    let result_status = serde_json::to_string(&result.status)
+        .unwrap_or_else(|_| "unknown".to_string())
+        .trim_matches('"')
+        .to_string();
+    let relative = PathBuf::from("pressure").join(format!(
+        "{}.{}.v2.json",
         result.pressure_kind.as_str(),
         safe_artifact_id(&result.result_id, "PRESSURE")
-    );
-    let path = run.run_dir.join("pressure").join(file_name);
-    write_json_artifact(&run, &path, &result)?;
+    ));
+    let artifact = pressure_artifact_v2(run.run_id.clone(), result);
     let mut store = evidence_store_for_run(&run)?;
-    write_pressure_artifact_v2(&mut store, &run.run_dir, result.clone())?;
+    let artifact_ref = store.write(&run.run_dir, &relative, &artifact)?;
     append_audit_event(
         &run,
         AuditInput {
-            target_id: result.target_id.clone(),
+            target_id,
             actor: Actor::codex(),
             operation: "pressure.run".to_string(),
-            operation_id: Some(result.pressure_kind.as_str().to_string()),
+            operation_id: Some(operation_id),
             risk_tier: RiskTier::Tier1LowRiskReversibleNonRoot,
             approval_ref: None,
             restore_lease_ref: None,
-            result: serde_json::to_string(&result.status)
-                .unwrap_or_else(|_| "unknown".to_string())
-                .trim_matches('"')
-                .to_string(),
+            result: result_status,
         },
     )?;
-    print_artifact(&run, &path, result)
+    print_json(&ArtifactOutput {
+        artifact_ref,
+        value: artifact,
+    })
 }
 
 fn command_pressure_composite(args: PressureCompositeCommand) -> Result<()> {
@@ -954,32 +964,37 @@ fn command_pressure_composite(args: PressureCompositeCommand) -> Result<()> {
         }
         TargetTransport::Ssh => composite_ssh(&target, args.scenario.clone(), &options)?,
     };
-    let file_name = format!(
-        "{}.{}.result.json",
+    let operation_id = result.scenario.as_str().to_string();
+    let target_id = result.target_id.clone();
+    let result_status = serde_json::to_string(&result.status)
+        .unwrap_or_else(|_| "unknown".to_string())
+        .trim_matches('"')
+        .to_string();
+    let relative = PathBuf::from("composite").join(format!(
+        "{}.{}.v2.json",
         result.scenario.as_str(),
         safe_artifact_id(&result.result_id, "COMPOSITE")
-    );
-    let path = run.run_dir.join("composite").join(file_name);
-    write_json_artifact(&run, &path, &result)?;
+    ));
+    let artifact = composite_artifact_v2(run.run_id.clone(), result);
     let mut store = evidence_store_for_run(&run)?;
-    write_composite_artifact_v2(&mut store, &run.run_dir, result.clone())?;
+    let artifact_ref = store.write(&run.run_dir, &relative, &artifact)?;
     append_audit_event(
         &run,
         AuditInput {
-            target_id: result.target_id.clone(),
+            target_id,
             actor: Actor::codex(),
             operation: "pressure.composite".to_string(),
-            operation_id: Some(result.scenario.as_str().to_string()),
+            operation_id: Some(operation_id),
             risk_tier: RiskTier::Tier1LowRiskReversibleNonRoot,
             approval_ref: None,
             restore_lease_ref: None,
-            result: serde_json::to_string(&result.status)
-                .unwrap_or_else(|_| "unknown".to_string())
-                .trim_matches('"')
-                .to_string(),
+            result: result_status,
         },
     )?;
-    print_artifact(&run, &path, result)
+    print_json(&ArtifactOutput {
+        artifact_ref,
+        value: artifact,
+    })
 }
 
 fn command_workload_run(args: WorkloadRunCommand) -> Result<()> {
@@ -1359,10 +1374,16 @@ fn execute_supported_experiment_trial(
                     config.operator_abort_file.as_deref(),
                 )?,
             };
-            let result_path = trial_dir.join("load_result.json");
             let result_status = load_result.status.clone();
             let abort_reason = load_result.abort_reason.clone();
-            let result_ref = write_json_artifact(run, &result_path, &load_result)?;
+            let relative = PathBuf::from("load").join("experiments").join(format!(
+                "{}.{}.v2.json",
+                safe_artifact_id(&trial.trial_id, "TRIAL"),
+                safe_artifact_id(&load_result.result_id, "LOAD-RESULT")
+            ));
+            let artifact = load_artifact_v2(run.run_id.clone(), load_result);
+            let mut store = evidence_store_for_run(run)?;
+            let result_ref = store.write(&run.run_dir, &relative, &artifact)?;
             trial.artifact_refs.push(result_ref);
             if result_status != "completed" {
                 anyhow::bail!(

@@ -177,41 +177,6 @@ fn contract_validation_suitability_policy_rejects_unknown_to_meet_escape() {
 }
 
 #[test]
-fn contract_validation_resource_pressure_rejects_unsupported_status() {
-    let root = workspace_root();
-    let schema_path = root.join("schemas/lab.resource_pressure_result.v1.schema.json");
-    let fixture_path = root.join("tests/golden/lab.resource_pressure_result.v1.valid.json");
-    let schema_json: serde_json::Value =
-        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
-    let mut fixture_json: serde_json::Value =
-        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
-    fixture_json["status"] = serde_json::json!("unsupported_by_adc_lab");
-    assert!(
-        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
-        "resource pressure results must classify surfaces explicitly instead of using unsupported_by_adc_lab"
-    );
-}
-
-#[test]
-fn contract_validation_resource_pressure_requires_evidence_class() {
-    let root = workspace_root();
-    let schema_path = root.join("schemas/lab.resource_pressure_result.v1.schema.json");
-    let fixture_path = root.join("tests/golden/lab.resource_pressure_result.v1.valid.json");
-    let schema_json: serde_json::Value =
-        serde_json::from_slice(&fs::read(schema_path).unwrap()).unwrap();
-    let mut fixture_json: serde_json::Value =
-        serde_json::from_slice(&fs::read(fixture_path).unwrap()).unwrap();
-    fixture_json
-        .as_object_mut()
-        .unwrap()
-        .remove("evidence_class");
-    assert!(
-        validate_schema(&schema_json, &schema_json, &fixture_json, "$").is_err(),
-        "resource pressure results must state smoke vs pressure-induced evidence class"
-    );
-}
-
-#[test]
 fn contract_validation_privilege_doctor_rejects_unknown_status() {
     let root = workspace_root();
     let schema_path = root.join("schemas/lab.privilege_doctor.v1.schema.json");

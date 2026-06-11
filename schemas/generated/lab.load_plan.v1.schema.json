@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LoadPlan",
+  "type": "object",
+  "required": [
+    "created_by",
+    "duration_seconds",
+    "load_id",
+    "load_kind",
+    "safety_monitor",
+    "schema_version",
+    "target_id",
+    "time_unix_ms",
+    "workers"
+  ],
+  "properties": {
+    "abort_temp_c": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "double"
+    },
+    "created_by": {
+      "$ref": "#/definitions/Actor"
+    },
+    "duration_seconds": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "load_id": {
+      "type": "string"
+    },
+    "load_kind": {
+      "type": "string"
+    },
+    "safety_monitor": {
+      "$ref": "#/definitions/LoadSafetyMonitorPlan"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "workers": {
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Actor": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ActorKind"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActorKind": {
+      "type": "string",
+      "enum": [
+        "agent",
+        "human",
+        "system"
+      ]
+    },
+    "LoadRestoreOnAbortPolicy": {
+      "type": "string",
+      "enum": [
+        "not_required"
+      ]
+    },
+    "LoadSafetyMonitorPlan": {
+      "type": "object",
+      "required": [
+        "operator_abort_enabled",
+        "restore_on_abort",
+        "sample_interval_ms"
+      ],
+      "properties": {
+        "operator_abort_enabled": {
+          "type": "boolean"
+        },
+        "restore_on_abort": {
+          "$ref": "#/definitions/LoadRestoreOnAbortPolicy"
+        },
+        "sample_interval_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "thermal_abort_c": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

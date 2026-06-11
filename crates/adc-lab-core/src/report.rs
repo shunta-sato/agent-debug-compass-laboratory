@@ -102,7 +102,8 @@ fn load_result_artifact_refs(run_dir: &Path, run_id: &str) -> LabResult<Vec<Stri
     Ok(collect_artifact_refs(run_dir, run_id)?
         .into_iter()
         .filter(|artifact| {
-            artifact.ends_with("/load_result.json")
+            (artifact.contains("/load/") && artifact.ends_with(".v2.json"))
+                || artifact.ends_with("/load_result.json")
                 || (artifact.contains("/loads/") && artifact.ends_with(".result.json"))
         })
         .collect())
@@ -655,27 +656,36 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let run_dir = temp.path().join("LAB-RUN-001");
         create_completed_core_artifacts(&run_dir);
-        fs::create_dir_all(run_dir.join("loads")).unwrap();
+        fs::create_dir_all(run_dir.join("load")).unwrap();
         fs::write(
-            run_dir.join("loads/LOAD-001.result.json"),
+            run_dir.join("load/cpu.LOAD-RESULT-001.v2.json"),
             serde_json::json!({
-                "schema_version": "lab.load_result.v1",
-                "result_id": "LOAD-RESULT-001",
-                "load_id": "LOAD-001",
+                "schema": "lab.artifact.v2",
+                "kind": "load",
+                "id": "LOAD-RESULT-001",
+                "run_id": "LAB-RUN-001",
                 "target_id": "local-target",
-                "status": "completed",
-                "workers": 2,
-                "duration_ms": 60000,
-                "abort_reason": null,
-                "max_observed_temp_c": 54.5,
-                "worker_iterations": [1, 2],
-                "safety_monitor": {
-                    "sample_interval_ms": 100,
-                    "samples": 600,
-                    "thermal_surface_available": true,
+                "status": {"state": "measured"},
+                "payload": {
+                    "source_schema_version": "lab.load_result.v1",
+                    "load_id": "LOAD-001",
+                    "status": "completed",
+                    "abort_reason": null,
+                    "workers": 2,
+                    "duration_ms": 60000,
+                    "max_observed_temp_c": 54.5,
                     "operator_abort_observed": false,
-                    "restore_on_abort_status": "not_required"
+                    "safety_monitor_samples": 600,
+                    "thermal_surface_available": true,
+                    "restore_on_abort_status": "not_required",
+                    "worker_iterations": [1, 2]
                 },
+                "bounds": null,
+                "factors": {"controlled": [], "observed": [], "confounders": []},
+                "metrics": [],
+                "evidence_refs": [],
+                "claims": [],
+                "data_quality": {"level": "complete", "notes": []},
                 "time_unix_ms": 3
             })
             .to_string(),

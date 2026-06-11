@@ -1,0 +1,424 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ResourcePressureResult",
+  "type": "object",
+  "required": [
+    "claim_blocked",
+    "claim_supported",
+    "condition",
+    "controlled_factors",
+    "duration_ms",
+    "evidence_class",
+    "evidence_refs",
+    "intensity",
+    "metrics",
+    "next_evidence_needed",
+    "observed_covariates",
+    "pressure_effect",
+    "pressure_kind",
+    "result_id",
+    "safety",
+    "schema_version",
+    "side_effects",
+    "status",
+    "target_id",
+    "time_unix_ms",
+    "uncontrolled_confounders"
+  ],
+  "properties": {
+    "claim_blocked": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_supported": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "condition": {
+      "$ref": "#/definitions/PressureCondition"
+    },
+    "controlled_factors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ContractFactor"
+      }
+    },
+    "duration_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "evidence_class": {
+      "$ref": "#/definitions/ResourcePressureEvidenceClass"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "intensity": {
+      "$ref": "#/definitions/PressureIntensity"
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ResourceMetric"
+      }
+    },
+    "network_evidence": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/NetworkPressureEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "next_evidence_needed": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ContractEvidenceGap"
+      }
+    },
+    "observed_covariates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ContractFactor"
+      }
+    },
+    "pressure_effect": {
+      "$ref": "#/definitions/PressureEffect"
+    },
+    "pressure_kind": {
+      "$ref": "#/definitions/ResourcePressureKind"
+    },
+    "result_id": {
+      "type": "string"
+    },
+    "safety": {
+      "$ref": "#/definitions/PressureSafety"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "side_effects": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ResourceSideEffect"
+      }
+    },
+    "status": {
+      "$ref": "#/definitions/ContractEvidenceStatus"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "uncontrolled_confounders": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ContractEvidenceGap": {
+      "type": "object",
+      "required": [
+        "blocking_missing_evidence",
+        "needed_probe",
+        "next_action",
+        "owner_surface",
+        "reason"
+      ],
+      "properties": {
+        "blocking_missing_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "needed_probe": {
+          "type": "string"
+        },
+        "next_action": {
+          "type": "string"
+        },
+        "owner_surface": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ContractEvidenceStatus": {
+      "type": "string",
+      "enum": [
+        "measured",
+        "measured_partial",
+        "not_controllable",
+        "unsafe_to_run_with_reason",
+        "not_applicable_with_reason",
+        "insufficient"
+      ]
+    },
+    "ContractFactor": {
+      "type": "object",
+      "required": [
+        "factor_id",
+        "value"
+      ],
+      "properties": {
+        "factor_id": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "NetworkPressureEvidence": {
+      "type": "object",
+      "required": [
+        "endpoint_available",
+        "network_mode",
+        "selection_claim_allowed",
+        "traffic_generated_bytes"
+      ],
+      "properties": {
+        "endpoint_available": {
+          "type": "boolean"
+        },
+        "network_mode": {
+          "$ref": "#/definitions/NetworkPressureMode"
+        },
+        "selection_claim_allowed": {
+          "type": "boolean"
+        },
+        "traffic_generated_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "NetworkPressureMode": {
+      "type": "string",
+      "enum": [
+        "counter_only",
+        "endpoint_attempt",
+        "bounded_transfer"
+      ]
+    },
+    "PressureCondition": {
+      "type": "object",
+      "required": [
+        "duration",
+        "pressure_kind"
+      ],
+      "properties": {
+        "duration": {
+          "type": "string"
+        },
+        "governor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pressure_kind": {
+          "type": "string"
+        },
+        "workers": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "PressureEffect": {
+      "type": "object",
+      "required": [
+        "basis",
+        "observed"
+      ],
+      "properties": {
+        "basis": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "observed": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PressureIntensity": {
+      "type": "object",
+      "required": [
+        "pressure_effect_observed",
+        "relative_to_target",
+        "requested"
+      ],
+      "properties": {
+        "pressure_effect_observed": {
+          "type": "boolean"
+        },
+        "relative_to_target": {
+          "type": "string"
+        },
+        "requested": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PressureSafety": {
+      "type": "object",
+      "required": [
+        "abort_conditions",
+        "cleanup",
+        "cleanup_verified",
+        "duration_seconds_max",
+        "memory_bytes_max",
+        "network_bytes_max",
+        "storage_bytes_max"
+      ],
+      "properties": {
+        "abort_conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cleanup": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cleanup_verified": {
+          "type": "boolean"
+        },
+        "duration_seconds_max": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "memory_bytes_max": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "network_bytes_max": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "storage_bytes_max": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "ResourceMetric": {
+      "type": "object",
+      "required": [
+        "metric_id",
+        "unit"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ResourcePressureEvidenceClass": {
+      "type": "string",
+      "enum": [
+        "smoke",
+        "pressure_induced",
+        "paired_pressure",
+        "boundary_probe",
+        "not_applicable"
+      ]
+    },
+    "ResourcePressureKind": {
+      "type": "string",
+      "enum": [
+        "memory_pressure",
+        "storage_io",
+        "network_io",
+        "latency_jitter",
+        "cpu_pressure",
+        "thermal_pressure",
+        "observer_pressure"
+      ]
+    },
+    "ResourceSideEffect": {
+      "type": "object",
+      "required": [
+        "metrics",
+        "resource",
+        "status",
+        "summary"
+      ],
+      "properties": {
+        "metrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ResourceMetric"
+          }
+        },
+        "resource": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/ContractEvidenceStatus"
+        },
+        "summary": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

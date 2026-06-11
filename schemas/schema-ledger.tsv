@@ -2,7 +2,7 @@ contract_id	schema_file	current_state	target_state	phase	owner	notes
 lab.approval_record.v1	lab.approval_record.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	safety-critical approval record; generate only after compatibility checks
 lab.audit_event.v1	lab.audit_event.v1.schema.json	handwritten_schema	generated_checked	phase5-infra	audit	active audit stream, including evidence.write events
 lab.claim_evidence_trace.v1	lab.claim_evidence_trace.v1.schema.json	deleted	delete	phase1-report-run	reporting	report and experiment trace producers moved to v2 report.run
-lab.composite_boundary_result.v1	lab.composite_boundary_result.v1.schema.json	handwritten_schema	delete	phase2-probe-cutover	probe	replace public composite output with v2 Artifact<CompositePayload>
+lab.composite_boundary_result.v1	generated/lab.composite_boundary_result.v1.schema.json	generated_snapshot	generated_checked	phase2-probe-cutover	probe	public composite output moved to v2 Artifact<CompositePayload>; v1 DTO remains internal/SSH wire and is generated
 lab.control_plan.v1	lab.control_plan.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	safety-critical plan contract; keep semantics frozen
 lab.control_result.v1	lab.control_result.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	control status vocabulary is not equivalent to evidence Status
 lab.control_surface.v1	lab.control_surface.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	control discovery contract
@@ -11,14 +11,14 @@ lab.experiment_matrix.v1	lab.experiment_matrix.v1.schema.json	handwritten_schema
 lab.experiment_run.v1	lab.experiment_run.v1.schema.json	handwritten_schema	generated_checked	phase5-experiment	experiment	active experiment result contract
 lab.familiarization_pack.v1	lab.familiarization_pack.v1.schema.json	deleted	delete	phase1-report-run	reporting	replaced by v2 report.run
 lab.health_check.v1	lab.health_check.v1.schema.json	handwritten_schema	generated_checked	phase5-infra	core	active health check contract
-lab.load_plan.v1	lab.load_plan.v1.schema.json	handwritten_schema	generated_checked	phase2-probe-cutover	load	active typed safety plan unless public producer disappears
-lab.load_result.v1	lab.load_result.v1.schema.json	handwritten_schema	delete	phase2-probe-cutover	load	replace public load output with v2 Artifact<LoadPayload>
+lab.load_plan.v1	generated/lab.load_plan.v1.schema.json	generated_snapshot	generated_checked	phase2-probe-cutover	load	active typed safety plan remains public but is generated
+lab.load_result.v1	generated/lab.load_result.v1.schema.json	generated_snapshot	generated_checked	phase2-probe-cutover	load	public load output moved to v2 Artifact<LoadPayload>; v1 DTO remains internal/SSH wire and is generated
 lab.operating_point_coverage.v1	lab.operating_point_coverage.v1.schema.json	deleted	delete	phase1-report-run	reporting	replaced by v2 report.run
 lab.privilege_doctor.v1	lab.privilege_doctor.v1.schema.json	handwritten_schema	generated_checked	phase5-privilege	privilege	active privilege readiness contract
 lab.privilege_provider_status.v1	lab.privilege_provider_status.v1.schema.json	handwritten_schema	generated_checked	phase5-privilege	privilege	active provider status contract
 lab.privilege_setup_plan.v1	lab.privilege_setup_plan.v1.schema.json	handwritten_schema	generated_checked	phase5-privilege	privilege	instruction-only setup plan contract
 lab.release_manifest.v1	lab.release_manifest.v1.schema.json	handwritten_schema	generated_checked	phase5-infra	release	active release manifest contract
-lab.resource_pressure_result.v1	lab.resource_pressure_result.v1.schema.json	handwritten_schema	delete	phase2-probe-cutover	pressure	replace public pressure output with v2 Artifact<PressurePayload>
+lab.resource_pressure_result.v1	generated/lab.resource_pressure_result.v1.schema.json	generated_snapshot	generated_checked	phase2-probe-cutover	pressure	public pressure output moved to v2 Artifact<PressurePayload>; v1 DTO remains internal/SSH wire and is generated
 lab.restore_lease.v1	lab.restore_lease.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	safety-critical restore lease contract
 lab.run_manifest.v1	lab.run_manifest.v1.schema.json	handwritten_schema	generated_checked	phase5-infra	runfs	dedicated identity artifact; keep but generate-check
 lab.suitability_decision.v1	lab.suitability_decision.v1.schema.json	handwritten_schema	delete	phase3-suitability-constraints	suitability	public suitability output is v2 artifact
