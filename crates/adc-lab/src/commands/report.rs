@@ -1,4 +1,6 @@
 use super::super::*;
+use super::common::*;
+use adc_lab_core::ids::now_unix_ms;
 
 pub(crate) fn command_report_operating_contract(args: OperatingContractCommand) -> Result<()> {
     let run = existing_run_context(args.run);
@@ -33,4 +35,18 @@ pub(crate) fn command_report_operating_contract(args: OperatingContractCommand) 
         "included_run_count": args.include_runs.len(),
         "target_operating_contract": v2_contract
     }))
+}
+
+pub(crate) fn command_report_pack(args: ReportPackCommand) -> Result<()> {
+    let run = existing_run_context(args.run);
+    let (report, path, _) = persist_run_report(&run, args.target_id.clone())?;
+    let now = now_unix_ms();
+    persist_run_manifest(&run, args.target_id.clone(), args.target, now, now)?;
+    print_artifact(&run, &path, report)
+}
+
+pub(crate) fn command_report_operating_point(args: ReportPackCommand) -> Result<()> {
+    let run = existing_run_context(args.run);
+    let (report, path, _) = persist_run_report(&run, args.target_id)?;
+    print_artifact(&run, &path, report)
 }
