@@ -113,6 +113,7 @@ Phase contribution actuals:
 | Phase | Actual LoC effect | Schema effect | Reforecast |
 |---|---:|---:|---|
 | Phase 1 report.run | -200 total Rust LoC (`17,939` -> `17,739`) | top-level `32` -> `29`, generated `9` -> `10`, maintained-by-hand `32` -> `29` | Remaining phases now forecast final total around `16,939-17,739` unless later phases delete more code than expected. |
+| Phase 2 probe cutover | +117 total Rust LoC (`17,739` -> `17,856`) | top-level `29` -> `25`, generated `10` -> `14`, maintained-by-hand `29` -> `25` | Remaining phases now forecast final total around `17,556-18,156`; v2 public payload and generated v1 wire snapshots offset deleted schemas. |
 
 ## Context & Orientation
 
@@ -298,6 +299,41 @@ Phase 1 post-implementation economy audit:
 | `rules/run_report.rs` | Centralizes v2 report-run claims and operating-point summary so CLI/report/experiment producers do not keep separate v1 generators. | keep | `make verify`; `report.rs` dropped to 827 lines and CLI tests cover read-only, report-pack, operating-point, and experiment paths. |
 | `RunReportPayload` and operating-point payload structs | Replaces three v1 report DTO families with one generated v2 envelope payload while preserving structured operating-point evidence. | keep | `schemas/generated/lab.report.run.v2.schema.json`; CLI assertions inspect `kind=report.run` and stable claim IDs. |
 | `deleted` schema-ledger state | Lets the ledger retain explicit retired-schema history while mechanically proving deleted files are absent. | keep | `make schemas-check` reports top-level=29 and maintained_by_hand=29. |
+
+Phase 2 dev-workflow route:
+
+- Risk: high. The phase changes public probe CLI JSON, generated schema
+  inventory, schema-ledger semantics, and run-report bounded-load aggregation.
+- Required branches: default implementation lane, `implementation-economy`, and
+  final `quality-gate`.
+- Not triggered: `design-balance` because no new module/class layout is planned;
+  concurrency, embedded NFR, performance hot path, UI, and destructive-refactor
+  branches remain out of scope. Runtime safety monitors, helper boundaries,
+  restore behavior, SSH quoting, and pressure probe mechanics are preserved.
+- Verification depth: focused probe CLI regressions, safety-invariant tests,
+  schema drift/ledger checks, full `make verify`, and phase-exit measurements.
+
+Phase 2 responsibility map:
+
+| Unit | Responsibility sentence | Reason to change | Dependency direction |
+|---|---|---|---|
+| `main.rs` load/pressure paths | Persist and print v2 probe artifacts as the public CLI result while retaining v1 runtime DTOs only as internal execution inputs. | Probe public JSON contract changes. | Depends on core probe artifact constructors and `EvidenceStore`. |
+| `experiment` execution path in `main.rs` | Store bounded load trial evidence as v2 load artifacts so `lab.load_result.v1` is not a hidden public producer. | Experiment evidence output changes. | Depends on the same v2 load artifact constructor as `load cpu`. |
+| `probe/artifacts.rs` | Own v2 probe payload shape and result-id-stable artifact paths. | Public v2 probe envelope changes. | Depends on runtime DTOs, but not on CLI. |
+| `report.rs` / `rules/run_report.rs` | Treat v2 load artifacts as bounded-load evidence for run manifests and run reports. | Report aggregation input changes. | Depends on artifact refs, not on CLI paths. |
+| `schemas/schema-ledger.tsv` and checker | Classify remaining internal v1 probe wire DTOs as generated snapshots after public producers cut over. | Schema source-of-truth status changes. | Checked by `scripts/schema/check-schema-ledger.py` and `make schemas-check`. |
+
+Phase 2 complexity budget:
+
+- Changed files target: 12-16 files, including CLI tests, generated schemas,
+  schema ledger/checker, core probe artifacts, and this plan.
+- New modules/classes target: 0 Rust modules/classes.
+- New helpers/wrappers/adapters target: at most one local CLI persistence helper
+  if repeated v2 artifact writing becomes noisy; prefer direct reuse of
+  `EvidenceStore` and existing artifact constructors.
+- New indirection layers target: 0.
+- Rough line budget: production Rust net -100 to -350, tests +100 to +250,
+  generated schema snapshots +4, top-level handwritten schema files -4.
 
 ### Phase 2: Probe Public Cutover
 
@@ -513,8 +549,8 @@ Quality gate rule:
       deleting `lab.claim_evidence_trace.v1.schema.json`.
 - [x] Phase 1: Delete or retire familiarization/claim-trace/coverage v1
       schemas after parity.
-- [ ] Phase 2: Make load/pressure/composite v2 artifacts primary CLI outputs.
-- [ ] Phase 2: Remove or generated-convert probe v1 schemas.
+- [x] Phase 2: Make load/pressure/composite v2 artifacts primary CLI outputs.
+- [x] Phase 2: Remove or generated-convert probe v1 schemas.
 - [ ] Phase 3: Make constraints generation/checking v2-native.
 - [ ] Phase 3: Retire v1 suitability/constraint schemas where public producers
       are gone.
@@ -559,6 +595,16 @@ Quality gate rule:
 - Phase 1 checkout starts from `origin/main` at `76707e9`, after the Phase 0
   guardrail PR was merged. Local untracked files remain present and must stay
   unstaged unless the user asks otherwise.
+- Phase 2 starts from `origin/main` at `229112a`, after the Phase 1 PR was
+  merged.
+- `lab.load_result.v1`, `lab.resource_pressure_result.v1`, and
+  `lab.composite_boundary_result.v1` cannot honestly be ledger `deleted`
+  contracts because the SSH target/controller boundary and runtime DTOs still
+  deserialize those shapes internally. Their public CLI outputs moved to v2,
+  while the remaining v1 wire DTO schemas are generated snapshots.
+- The `load cpu` v2 sidecar path was still `load/cpu.v2.json`, which would
+  overwrite repeated load results. Phase 2 made load artifact paths result-id
+  stable, matching pressure and composite behavior.
 
 ## Decision Log
 
@@ -602,6 +648,21 @@ Quality gate rule:
   report/experiment parity tests; `report.rs` met its file budget and schema
   deletion target, but total Rust LoC only dropped by 200. Reforecast final
   landing to roughly 16,939-17,739 unless later phases over-delete.
+- 2026-06-11: Keep `report.run` evaluation summary-based for now instead of
+  forcing it into `engine::Rule`. Rationale: run-report claims summarize
+  manifest/run-sequence facts as well as store predicates, unlike operating
+  contract and suitability rules. Revisit convergence only if Phase 3/6 can
+  share predicates without a second bespoke DSL.
+- 2026-06-11: Convert Phase 2 v1 probe result/plan schemas to generated
+  snapshots rather than marking them deleted. Rationale: public controller CLI
+  output now returns v2 artifacts, but v1 DTOs remain internal runtime and SSH
+  wire inputs; ledger `deleted` would hide a real remaining contract.
+- 2026-06-11: Accept the Phase 2 LoC forecast miss. Rationale: v2 public probe
+  payloads, result-id-stable artifact paths, hidden experiment load producer
+  cutover, generated v1 wire snapshots, and ledger support for generated-only
+  wire contracts added more code than schema/golden deletion removed. Reforecast
+  final landing to roughly 17,556-18,156 unless Phase 4 deletes more command
+  implementation than currently expected.
 
 ## Verification Log
 
@@ -695,21 +756,64 @@ Quality gate rule:
   `make file-budgets` passed in informational mode with one remaining future
   violation, `crates/adc-lab/src/main.rs` at 2,470 lines over the Phase 4
   budget.
+- Phase 2 branch setup:
+  `git fetch origin --prune` updated `origin/main` to `229112a`; `git switch
+  -c codex/adc-labv21-probe-cutover origin/main` created the Phase 2 branch.
+- Phase 2 focused verification:
+  `make schemas-check` passed with
+  `top_level=25 no_schema_wire=10 maintained_by_hand=25`.
+- Phase 2 focused verification:
+  `cargo test -p adc-lab-core --test probe_artifacts -- --nocapture` passed; 4
+  tests.
+- Phase 2 focused verification:
+  `cargo test -p adc-lab-core report::tests::load_artifact_updates_manifest_summary -- --nocapture`
+  passed.
+- Phase 2 focused verification:
+  CLI focused tests for
+  `load_cpu_operator_abort_records_safety_monitor_without_abort_path`,
+  `pressure_run_local_writes_typed_artifact_and_audit`,
+  `pressure_network_bounded_transfer_records_generated_bytes`,
+  `pressure_composite_smoke_does_not_support_coupling_without_measured_effect`,
+  and `experiment_real_run_executes_supported_bounded_matrix` passed.
+- Phase 2 safety-invariant verification:
+  `cargo test -p adc-lab --test safety_invariants -- --nocapture` passed; 7
+  tests.
+- Phase 2 integration/contract/lint verification:
+  `cargo test -p adc-lab --test cli -- --nocapture` passed; 32 tests.
+  `cargo test --workspace contract_validation -- --nocapture` passed.
+  `cargo clippy --workspace --all-targets -- -D warnings` passed.
+- Phase 2 final-enforcement check:
+  `python3 scripts/schema/check-schema-ledger.py --enforce-final` failed as
+  expected with 25 maintained-by-hand schemas remaining; this remains a Phase 5
+  gate.
+- Phase 2 measurements:
+  total Rust lines `17,856`; Rust test lines `4,032`; top-level schemas `25`;
+  generated schemas `14`; `main.rs` `2,491`; `report.rs` `837`;
+  `platform_contract.rs` `1,496`; `contracts.rs` `1,211`;
+  `probe/artifacts.rs` `414`; CLI tests `1,977`.
+- Phase 2 file-budget check:
+  `make file-budgets` passed in informational mode with one remaining future
+  violation, `crates/adc-lab/src/main.rs` at 2,491 lines over the Phase 4
+  budget.
+- Phase 2 final gate:
+  `make verify` passed. The gate covered workspace build, format check, clippy,
+  generated schema drift plus ledger coverage, unit tests, integration tests,
+  safety invariants, contract validation, docs smoke, and command smoke.
 
 ## Handoff
 
-- Branch: `codex/adc-labv21-report-run`.
-- Base commit: `76707e9` (`origin/main` after PR #41).
-- Current status: Phase 1 implementation is complete locally with `make verify`
+- Branch: `codex/adc-labv21-probe-cutover`.
+- Base commit: `229112a` (`origin/main` after PR #42).
+- Current status: Phase 2 implementation is complete locally with `make verify`
   passing. Commit/PR publication is next.
 - Untracked local files exist and were not staged:
   `.DS_Store`, `._.DS_Store`,
   `reports/._20260611-v2-evidence-kernel-outcome-review.md`, and
   `reports/20260611-v2-evidence-kernel-outcome-review.md`.
 - Next steps:
-  1. Commit and publish the Phase 1 PR.
-  2. Start Phase 2 after Phase 1 lands.
-  3. Keep the Phase 1 LoC forecast miss visible when updating later phase
+  1. Commit and publish the Phase 2 PR.
+  2. Start Phase 3 after Phase 2 lands.
+  3. Keep the Phase 2 LoC forecast miss visible when updating later phase
      actuals.
 - Read first when resuming:
   - this plan,
@@ -741,3 +845,17 @@ Phase 1 outcome:
   after report and experiment producers moved.
 - `report.rs` is below the 900-line Phase 1 budget; `main.rs` remains a Phase 4
   file-budget target.
+
+Phase 2 outcome:
+
+- `load cpu`, `pressure run`, and `pressure composite` now persist and print v2
+  artifact envelopes as their public CLI JSON result.
+- Experiment bounded-load trial evidence now stores v2 load artifacts instead
+  of `load_result.json`, closing the hidden `lab.load_result.v1` producer.
+- `lab.load_plan.v1`, `lab.load_result.v1`,
+  `lab.resource_pressure_result.v1`, and
+  `lab.composite_boundary_result.v1` top-level handwritten schemas and golden
+  fixtures were removed; generated snapshots now cover the remaining internal
+  v1 wire DTOs.
+- `load` v2 artifacts now include result IDs in their file names so repeated
+  load runs do not overwrite previous v2 evidence.

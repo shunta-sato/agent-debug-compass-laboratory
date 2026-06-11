@@ -1,5 +1,6 @@
 use crate::contracts::{
-    CompositeBoundaryResult, ContractEvidenceStatus, LoadResult, NetworkPressureMode,
+    CompositeBoundaryResult, ContractEvidenceStatus, LoadRestoreOnAbortStatus, LoadResult,
+    NetworkPressureMode, ResourceCouplingEvidenceClass, ResourcePressureEvidenceClass,
     ResourcePressureResult, WorkloadDemandProfile,
 };
 use crate::evidence::{
@@ -7,6 +8,7 @@ use crate::evidence::{
 };
 use crate::ids::{new_id, now_unix_ms};
 use crate::observe::ObservationResult;
+use crate::run::run_id_from_run_dir;
 use crate::LabResult;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -27,10 +29,15 @@ pub struct LoadPayload {
     pub source_schema_version: String,
     pub load_id: String,
     pub status: String,
+    pub abort_reason: Option<String>,
     pub workers: usize,
     pub duration_ms: u64,
     pub max_observed_temp_c: Option<f64>,
     pub operator_abort_observed: bool,
+    pub safety_monitor_samples: u64,
+    pub thermal_surface_available: bool,
+    pub restore_on_abort_status: String,
+    pub worker_iterations: Vec<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -113,10 +120,18 @@ pub fn load_artifact_v2(run_id: impl Into<String>, result: LoadResult) -> Artifa
             source_schema_version: result.schema_version,
             load_id: result.load_id,
             status: result.status,
+            abort_reason: result.abort_reason,
             workers: result.workers,
             duration_ms: result.duration_ms,
             max_observed_temp_c: result.max_observed_temp_c,
             operator_abort_observed: result.safety_monitor.operator_abort_observed,
+            safety_monitor_samples: result.safety_monitor.samples,
+            thermal_surface_available: result.safety_monitor.thermal_surface_available,
+            restore_on_abort_status: load_restore_status_label(
+                &result.safety_monitor.restore_on_abort_status,
+            )
+            .to_string(),
+            worker_iterations: result.worker_iterations,
         },
         now_unix_ms(),
     );
@@ -140,7 +155,7 @@ pub fn pressure_artifact_v2(
         PressurePayload {
             source_schema_version: result.schema_version,
             pressure_kind: result.pressure_kind.as_str().to_string(),
-            evidence_class: format!("{:?}", result.evidence_class).to_ascii_lowercase(),
+            evidence_class: pressure_evidence_class_label(&result.evidence_class).to_string(),
             effect_observed: result.pressure_effect.observed,
             duration_ms: result.duration_ms,
             network_mode: result
@@ -203,8 +218,8 @@ pub fn composite_artifact_v2(
         CompositePayload {
             source_schema_version: result.schema_version,
             scenario: result.scenario.as_str().to_string(),
-            coupling_evidence_class: format!("{:?}", result.coupling_evidence_class)
-                .to_ascii_lowercase(),
+            coupling_evidence_class: coupling_evidence_class_label(&result.coupling_evidence_class)
+                .to_string(),
             phase_count: result.phases.len(),
             duration_ms: result.duration_ms,
         },
@@ -269,7 +284,7 @@ pub fn write_observation_artifact_v2(
     run_dir: &Path,
     result: ObservationResult,
 ) -> LabResult<String> {
-    let artifact = observation_artifact_v2(run_id_from_dir(run_dir), result);
+    let artifact = observation_artifact_v2(run_id_from_run_dir(run_dir), result);
     store.write(
         run_dir,
         Path::new("observations/observe.v2.json"),
@@ -282,8 +297,9 @@ pub fn write_load_artifact_v2(
     run_dir: &Path,
     result: LoadResult,
 ) -> LabResult<String> {
-    let artifact = load_artifact_v2(run_id_from_dir(run_dir), result);
-    store.write(run_dir, Path::new("load/cpu.v2.json"), &artifact)
+    let relative = format!("load/cpu.{}.v2.json", safe_file_segment(&result.result_id));
+    let artifact = load_artifact_v2(run_id_from_run_dir(run_dir), result);
+    store.write(run_dir, Path::new(&relative), &artifact)
 }
 
 pub fn write_pressure_artifact_v2(
@@ -296,7 +312,7 @@ pub fn write_pressure_artifact_v2(
         result.pressure_kind.as_str(),
         safe_file_segment(&result.result_id)
     );
-    let artifact = pressure_artifact_v2(run_id_from_dir(run_dir), result);
+    let artifact = pressure_artifact_v2(run_id_from_run_dir(run_dir), result);
     store.write(run_dir, Path::new(&relative), &artifact)
 }
 
@@ -310,7 +326,7 @@ pub fn write_composite_artifact_v2(
         result.scenario.as_str(),
         safe_file_segment(&result.result_id)
     );
-    let artifact = composite_artifact_v2(run_id_from_dir(run_dir), result);
+    let artifact = composite_artifact_v2(run_id_from_run_dir(run_dir), result);
     store.write(run_dir, Path::new(&relative), &artifact)
 }
 
@@ -351,12 +367,32 @@ fn network_mode_label(mode: &NetworkPressureMode) -> &'static str {
     }
 }
 
-fn run_id_from_dir(run_dir: &Path) -> String {
-    run_dir
-        .file_name()
-        .and_then(|value| value.to_str())
-        .map(|value| value.to_string())
-        .unwrap_or_else(|| "LAB-RUN-v2".to_string())
+fn load_restore_status_label(status: &LoadRestoreOnAbortStatus) -> &'static str {
+    match status {
+        LoadRestoreOnAbortStatus::NotRequired => "not_required",
+        LoadRestoreOnAbortStatus::NotConfigured => "not_configured",
+        LoadRestoreOnAbortStatus::Attempted => "attempted",
+        LoadRestoreOnAbortStatus::Succeeded => "succeeded",
+        LoadRestoreOnAbortStatus::Failed => "failed",
+    }
+}
+
+fn pressure_evidence_class_label(class: &ResourcePressureEvidenceClass) -> &'static str {
+    match class {
+        ResourcePressureEvidenceClass::Smoke => "smoke",
+        ResourcePressureEvidenceClass::PressureInduced => "pressure_induced",
+        ResourcePressureEvidenceClass::PairedPressure => "paired_pressure",
+        ResourcePressureEvidenceClass::BoundaryProbe => "boundary_probe",
+        ResourcePressureEvidenceClass::NotApplicable => "not_applicable",
+    }
+}
+
+fn coupling_evidence_class_label(class: &ResourceCouplingEvidenceClass) -> &'static str {
+    match class {
+        ResourceCouplingEvidenceClass::IngredientsOnly => "ingredients_only",
+        ResourceCouplingEvidenceClass::CompositeMeasured => "composite_measured",
+        ResourceCouplingEvidenceClass::CouplingNotMeasured => "coupling_not_measured",
+    }
 }
 
 fn safe_file_segment(value: &str) -> String {

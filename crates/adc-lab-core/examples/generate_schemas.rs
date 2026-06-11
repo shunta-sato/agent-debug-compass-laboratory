@@ -1,7 +1,7 @@
 use adc_lab_core::{
-    Artifact, ClaimDefinition, CompositePayload, LoadPayload, ObservationPayload,
-    OperatingContractPayload, PressurePayload, RunReportPayload, SuitabilityPayload,
-    WorkloadPayload,
+    Artifact, ClaimDefinition, CompositeBoundaryResult, CompositePayload, LoadPayload, LoadPlan,
+    LoadResult, ObservationPayload, OperatingContractPayload, PressurePayload,
+    ResourcePressureResult, RunReportPayload, SuitabilityPayload, WorkloadPayload,
 };
 use schemars::schema_for;
 use std::fs;
@@ -56,16 +56,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         serde_json::to_vec_pretty(&load_schema)?,
     )?;
 
+    let load_plan_schema = schema_for!(LoadPlan);
+    fs::write(
+        out_dir.join("lab.load_plan.v1.schema.json"),
+        serde_json::to_vec_pretty(&load_plan_schema)?,
+    )?;
+
+    let load_result_schema = schema_for!(LoadResult);
+    fs::write(
+        out_dir.join("lab.load_result.v1.schema.json"),
+        serde_json::to_vec_pretty(&load_result_schema)?,
+    )?;
+
     let pressure_schema = schema_for!(Artifact<PressurePayload>);
     fs::write(
         out_dir.join("lab.pressure.v2.schema.json"),
         serde_json::to_vec_pretty(&pressure_schema)?,
     )?;
 
+    let pressure_result_schema = schema_for!(ResourcePressureResult);
+    fs::write(
+        out_dir.join("lab.resource_pressure_result.v1.schema.json"),
+        serde_json::to_vec_pretty(&pressure_result_schema)?,
+    )?;
+
     let composite_schema = schema_for!(Artifact<CompositePayload>);
     fs::write(
         out_dir.join("lab.composite.v2.schema.json"),
         serde_json::to_vec_pretty(&composite_schema)?,
+    )?;
+
+    let composite_result_schema = schema_for!(CompositeBoundaryResult);
+    fs::write(
+        out_dir.join("lab.composite_boundary_result.v1.schema.json"),
+        serde_json::to_vec_pretty(&composite_result_schema)?,
     )?;
 
     let workload_schema = schema_for!(Artifact<WorkloadPayload>);

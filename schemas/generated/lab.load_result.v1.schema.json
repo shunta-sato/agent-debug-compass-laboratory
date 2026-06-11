@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LoadResult",
+  "type": "object",
+  "required": [
+    "duration_ms",
+    "load_id",
+    "result_id",
+    "safety_monitor",
+    "schema_version",
+    "status",
+    "target_id",
+    "time_unix_ms",
+    "worker_iterations",
+    "workers"
+  ],
+  "properties": {
+    "abort_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "duration_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "load_id": {
+      "type": "string"
+    },
+    "max_observed_temp_c": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "double"
+    },
+    "result_id": {
+      "type": "string"
+    },
+    "safety_monitor": {
+      "$ref": "#/definitions/LoadSafetyMonitorResult"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "worker_iterations": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0.0
+      }
+    },
+    "workers": {
+      "type": "integer",
+      "format": "uint",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "LoadRestoreOnAbortStatus": {
+      "type": "string",
+      "enum": [
+        "not_required",
+        "not_configured",
+        "attempted",
+        "succeeded",
+        "failed"
+      ]
+    },
+    "LoadSafetyMonitorResult": {
+      "type": "object",
+      "required": [
+        "operator_abort_observed",
+        "restore_on_abort_status",
+        "sample_interval_ms",
+        "samples",
+        "thermal_surface_available"
+      ],
+      "properties": {
+        "operator_abort_observed": {
+          "type": "boolean"
+        },
+        "restore_on_abort_status": {
+          "$ref": "#/definitions/LoadRestoreOnAbortStatus"
+        },
+        "sample_interval_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "samples": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "thermal_surface_available": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

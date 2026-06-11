@@ -67,6 +67,30 @@ fn pressure_and_composite_v2_sidecars_keep_each_result_id() {
 }
 
 #[test]
+fn load_v2_sidecars_keep_each_result_id() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+    let mut first = load();
+    let mut second = load();
+    first.result_id = "LOAD-RESULT-001".to_string();
+    second.result_id = "LOAD-RESULT-002".to_string();
+
+    write_load_artifact_v2(&mut store, temp.path(), first).unwrap();
+    write_load_artifact_v2(&mut store, temp.path(), second).unwrap();
+
+    let reopened = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+    assert_eq!(reopened.iter(Kind::Load).count(), 2);
+    assert!(temp
+        .path()
+        .join("load/cpu.LOAD-RESULT-001.v2.json")
+        .exists());
+    assert!(temp
+        .path()
+        .join("load/cpu.LOAD-RESULT-002.v2.json")
+        .exists());
+}
+
+#[test]
 fn dummy_pressure_kind_extension_exercise_stays_within_three_hand_edited_files() {
     let touched_files = [
         "crates/adc-lab-core/src/probe/artifacts.rs",

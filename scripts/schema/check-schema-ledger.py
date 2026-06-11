@@ -59,6 +59,10 @@ def top_level_schema_contracts(schema_dir: Path) -> dict[str, str]:
     return contracts
 
 
+def schema_file_exists(root: Path, schema_file: str) -> bool:
+    return (root / "schemas" / schema_file).exists()
+
+
 def discovered_v1_contracts(root: Path) -> set[str]:
     contracts: set[str] = set()
     for dirname in SCAN_DIRS:
@@ -118,11 +122,19 @@ def main() -> int:
         if row is None:
             errors.append(f"missing ledger row for no-schema wire contract: {contract_id}")
             continue
-        if row["schema_file"] != "-":
-            errors.append(f"{contract_id}: no-schema wire contract must use schema_file '-'")
-        if row["current_state"] != "no_schema_wire_contract":
+        if row["current_state"] == "no_schema_wire_contract":
+            if row["schema_file"] != "-":
+                errors.append(f"{contract_id}: no-schema wire contract must use schema_file '-'")
+        elif row["current_state"] == "generated_snapshot":
+            if row["schema_file"] == "-":
+                errors.append(f"{contract_id}: generated snapshot row must name a schema file")
+            elif not schema_file_exists(root, row["schema_file"]):
+                errors.append(
+                    f"{contract_id}: generated snapshot file does not exist: {row['schema_file']}"
+                )
+        else:
             errors.append(
-                f"{contract_id}: expected current_state no_schema_wire_contract, got {row['current_state']}"
+                f"{contract_id}: expected current_state no_schema_wire_contract or generated_snapshot, got {row['current_state']}"
             )
 
     for contract_id, row in ledger.items():
@@ -139,7 +151,7 @@ def main() -> int:
         if row["current_state"] != "no_schema_wire_contract":
             if row["schema_file"] == "-":
                 errors.append(f"{contract_id}: schema-backed row must name a schema file")
-            elif not (root / "schemas" / row["schema_file"]).exists():
+            elif not schema_file_exists(root, row["schema_file"]):
                 errors.append(f"{contract_id}: schema_file does not exist: {row['schema_file']}")
         elif row["schema_file"] != "-":
             errors.append(f"{contract_id}: no-schema row must use schema_file '-'")

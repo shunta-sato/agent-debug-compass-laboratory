@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 pub const POLICY_VERSION: &str = "default-lab-policy-v1";
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct BuildInfo {
     pub name: String,
@@ -14,14 +14,14 @@ pub struct BuildInfo {
     pub build_profile: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ReleaseBinaryManifest {
     pub name: String,
     pub sha256: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ReleaseManifest {
     pub schema_version: String,
@@ -31,7 +31,7 @@ pub struct ReleaseManifest {
     pub binaries: Vec<ReleaseBinaryManifest>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ActorKind {
     Agent,
@@ -39,7 +39,7 @@ pub enum ActorKind {
     System,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Actor {
     pub kind: ActorKind,
@@ -55,7 +55,7 @@ impl Actor {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RiskTier {
     Tier0ReadOnlyObservation,
@@ -65,7 +65,7 @@ pub enum RiskTier {
     Tier4NormallyProhibited,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ToolCategory {
     Observation,
@@ -78,7 +78,7 @@ pub enum ToolCategory {
     ObservationControl,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PrivilegeLevel {
     None,
@@ -87,14 +87,14 @@ pub enum PrivilegeLevel {
     Root,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PrivilegeProviderKind {
     SudoHelperOptionA,
     SystemdUnixSocketOptionB,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PrivilegeProviderAvailability {
     Active,
@@ -104,14 +104,14 @@ pub enum PrivilegeProviderAvailability {
     Disabled,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PrivilegeProviderTransport {
     SudoExec,
     UnixSocket,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PrivilegeProviderDescriptor {
     pub provider_id: String,
@@ -128,7 +128,7 @@ pub struct PrivilegeProviderDescriptor {
     pub safety_notes: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PrivilegeProviderStatus {
     pub schema_version: String,
@@ -138,7 +138,7 @@ pub struct PrivilegeProviderStatus {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum QualificationStatus {
     Builtin,
@@ -149,7 +149,7 @@ pub enum QualificationStatus {
     Refused,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ToolSource {
     Builtin,
@@ -158,7 +158,7 @@ pub enum ToolSource {
     Missing,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SoftwareStack {
     pub os: String,
@@ -167,7 +167,7 @@ pub struct SoftwareStack {
     pub board: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct HardwareInventory {
     pub cpu_count: usize,
@@ -176,7 +176,7 @@ pub struct HardwareInventory {
     pub cpufreq_policies: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ControlSurfaceSummary {
     pub surface_id: String,
@@ -184,7 +184,7 @@ pub struct ControlSurfaceSummary {
     pub requires_privilege: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct TargetInventory {
     pub schema_version: String,
@@ -197,7 +197,7 @@ pub struct TargetInventory {
     pub control_surfaces: Vec<ControlSurfaceSummary>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ToolInfo {
     pub tool_id: String,
@@ -207,7 +207,7 @@ pub struct ToolInfo {
     pub qualification: QualificationStatus,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ToolchainInventory {
     pub schema_version: String,
@@ -216,7 +216,7 @@ pub struct ToolchainInventory {
     pub tools: Vec<ToolInfo>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ControlSurfaceInventory {
     pub schema_version: String,
@@ -224,7 +224,7 @@ pub struct ControlSurfaceInventory {
     pub surfaces: Vec<ControlSurfaceSummary>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ContractEvidenceStatus {
     Measured,
@@ -235,7 +235,7 @@ pub enum ContractEvidenceStatus {
     Insufficient,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ResourcePressureKind {
     MemoryPressure,
@@ -247,7 +247,7 @@ pub enum ResourcePressureKind {
     ObserverPressure,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ResourceMetric {
     pub metric_id: String,
@@ -256,14 +256,14 @@ pub struct ResourceMetric {
     pub note: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ContractFactor {
     pub factor_id: String,
     pub value: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ResourceSideEffect {
     pub resource: String,
@@ -272,7 +272,7 @@ pub struct ResourceSideEffect {
     pub metrics: Vec<ResourceMetric>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PressureSafety {
     pub duration_seconds_max: u64,
@@ -284,7 +284,7 @@ pub struct PressureSafety {
     pub cleanup_verified: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ResourcePressureEvidenceClass {
     Smoke,
@@ -294,7 +294,7 @@ pub enum ResourcePressureEvidenceClass {
     NotApplicable,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PressureIntensity {
     pub requested: String,
@@ -302,14 +302,14 @@ pub struct PressureIntensity {
     pub pressure_effect_observed: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PressureEffect {
     pub observed: bool,
     pub basis: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum NetworkPressureMode {
     CounterOnly,
@@ -317,7 +317,7 @@ pub enum NetworkPressureMode {
     BoundedTransfer,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct NetworkPressureEvidence {
     pub network_mode: NetworkPressureMode,
@@ -326,7 +326,7 @@ pub struct NetworkPressureEvidence {
     pub selection_claim_allowed: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PressureCondition {
     pub pressure_kind: String,
@@ -335,7 +335,7 @@ pub struct PressureCondition {
     pub duration: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ContractEvidenceGap {
     pub reason: String,
@@ -345,7 +345,7 @@ pub struct ContractEvidenceGap {
     pub owner_surface: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ResourcePressureResult {
     pub schema_version: String,
@@ -372,13 +372,13 @@ pub struct ResourcePressureResult {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum CompositeBoundaryScenario {
     MemoryStorageJitter,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct CompositeBoundaryPhase {
     pub phase_id: String,
@@ -388,7 +388,7 @@ pub struct CompositeBoundaryPhase {
     pub metrics: Vec<ResourceMetric>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct CompositeBoundaryResult {
     pub schema_version: String,
@@ -410,7 +410,7 @@ pub struct CompositeBoundaryResult {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ResourceCouplingEvidenceClass {
     IngredientsOnly,
@@ -418,7 +418,7 @@ pub enum ResourceCouplingEvidenceClass {
     CouplingNotMeasured,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PrivilegeDoctorStatus {
     Ready,
@@ -427,7 +427,7 @@ pub enum PrivilegeDoctorStatus {
     UnsupportedTarget,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PrivilegeDoctorCheckStatus {
     Pass,
@@ -436,7 +436,7 @@ pub enum PrivilegeDoctorCheckStatus {
     NotApplicable,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PrivilegeDoctorCheck {
     pub check_id: String,
@@ -445,7 +445,7 @@ pub struct PrivilegeDoctorCheck {
     pub evidence: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PrivilegeDoctorReport {
     pub schema_version: String,
@@ -462,14 +462,14 @@ pub struct PrivilegeDoctorReport {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PrivilegeSetupPlanKind {
     Install,
     Uninstall,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct PrivilegeSetupPlan {
     pub schema_version: String,
@@ -484,27 +484,27 @@ pub struct PrivilegeSetupPlan {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct OperationBounds {
     pub duration_seconds_max: u64,
     pub thermal_celsius_abort: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct CpufreqDesiredState {
     pub governor: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ControlOperation {
     pub operation_id: String,
     pub desired_state: CpufreqDesiredState,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ControlPlan {
     pub schema_version: String,
@@ -520,14 +520,14 @@ pub struct ControlPlan {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ApprovalBounds {
     pub duration_seconds_max: u64,
     pub thermal_celsius_abort: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ApprovalRecord {
     pub schema_version: String,
@@ -545,7 +545,7 @@ pub struct ApprovalRecord {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct CpufreqPolicyState {
     pub policy: String,
@@ -554,19 +554,19 @@ pub struct CpufreqPolicyState {
     pub scaling_max_freq: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct CapturedState {
     pub cpufreq_policies: Vec<CpufreqPolicyState>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct AppliedState {
     pub governor: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RestoreStatus {
     Pending,
@@ -575,21 +575,21 @@ pub enum RestoreStatus {
     DryRun,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RestoreAttemptStatus {
     Succeeded,
     Failed,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct RestoreAttempt {
     pub status: RestoreAttemptStatus,
     pub message: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct RestoreLease {
     pub schema_version: String,
@@ -604,7 +604,7 @@ pub struct RestoreLease {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ControlResultStatus {
     Refused,
@@ -614,7 +614,7 @@ pub enum ControlResultStatus {
     Failed,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum RefusalCode {
     UnsupportedOperation,
@@ -626,14 +626,14 @@ pub enum RefusalCode {
     MissingSurface,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Refusal {
     pub reason_code: RefusalCode,
     pub message: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ControlResult {
     pub schema_version: String,
@@ -650,7 +650,7 @@ pub struct ControlResult {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct LoadSafetyMonitorPlan {
     pub sample_interval_ms: u64,
@@ -659,13 +659,13 @@ pub struct LoadSafetyMonitorPlan {
     pub restore_on_abort: LoadRestoreOnAbortPolicy,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LoadRestoreOnAbortPolicy {
     NotRequired,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LoadRestoreOnAbortStatus {
     NotRequired,
@@ -675,7 +675,7 @@ pub enum LoadRestoreOnAbortStatus {
     Failed,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct LoadSafetyMonitorResult {
     pub sample_interval_ms: u64,
@@ -685,7 +685,7 @@ pub struct LoadSafetyMonitorResult {
     pub restore_on_abort_status: LoadRestoreOnAbortStatus,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct LoadPlan {
     pub schema_version: String,
@@ -700,7 +700,7 @@ pub struct LoadPlan {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct LoadResult {
     pub schema_version: String,
@@ -717,7 +717,7 @@ pub struct LoadResult {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkloadClass {
     IdleObserve,
@@ -725,7 +725,7 @@ pub enum WorkloadClass {
     ApplicationWorkload,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkloadClaimBoundary {
     ExploratoryOnly,
@@ -733,7 +733,7 @@ pub enum WorkloadClaimBoundary {
     NotSelectionEvidence,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadRequirements {
     pub thermal_celsius_max: Option<f64>,
@@ -742,7 +742,7 @@ pub struct WorkloadRequirements {
     pub latency_p95_ms_max: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadProfile {
     pub schema_version: String,
@@ -755,14 +755,14 @@ pub struct WorkloadProfile {
     pub claim_boundary: WorkloadClaimBoundary,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkloadExecutionMode {
     Local,
     TargetLocal,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkloadRunStatus {
     Completed,
@@ -771,28 +771,28 @@ pub enum WorkloadRunStatus {
     Refused,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkloadDemandScope {
     ProcessScoped,
     SystemWideOnly,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadEnvironmentVariable {
     pub name: String,
     pub value: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadEnvironmentPolicy {
     pub inherit: bool,
     pub allowed: Vec<WorkloadEnvironmentVariable>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadExecution {
     pub executable_path: String,
@@ -805,7 +805,7 @@ pub struct WorkloadExecution {
     pub environment_policy: WorkloadEnvironmentPolicy,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadBounds {
     pub duration_seconds_max: u64,
@@ -817,7 +817,7 @@ pub struct WorkloadBounds {
     pub operator_abort_file: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadObservationConfig {
     pub sample_interval_ms: u64,
@@ -825,7 +825,7 @@ pub struct WorkloadObservationConfig {
     pub system_context: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadRunPlan {
     pub schema_version: String,
@@ -838,7 +838,7 @@ pub struct WorkloadRunPlan {
     pub claim_boundary: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadDataQuality {
     pub degraded: bool,
@@ -846,7 +846,7 @@ pub struct WorkloadDataQuality {
     pub notes: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadRunResult {
     pub schema_version: String,
@@ -871,7 +871,7 @@ pub struct WorkloadRunResult {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadDemand {
     pub process_cpu_utime_ticks: Option<u64>,
@@ -890,7 +890,7 @@ pub struct WorkloadDemand {
     pub child_process_accounting_status: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadTargetConditionedResponse {
     pub portable_between_targets: bool,
@@ -900,7 +900,7 @@ pub struct WorkloadTargetConditionedResponse {
     pub abort_reason: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadSystemContext {
     pub system_cpu_percent_avg: Option<f64>,
@@ -908,7 +908,7 @@ pub struct WorkloadSystemContext {
     pub background_activity_confounder: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct WorkloadDemandProfile {
     pub schema_version: String,
@@ -955,33 +955,33 @@ pub enum SuitabilityConfidence {
     High,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SuitabilityPolicyRules {
     pub unknown_required_dimension_blocks_selection: bool,
     pub unknown_never_becomes_meet: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ThermalSuitabilityPolicy {
     pub max_temp_c: f64,
     pub marginal_margin_c_below: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct CpuSuitabilityPolicy {
     pub max_process_cpu_percent_avg: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct MemorySuitabilityPolicy {
     pub min_memory_margin_mb: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct SuitabilityPolicy {
     pub schema_version: String,
@@ -1011,7 +1011,7 @@ pub struct SuitabilityDimensionDecision {
     pub next_evidence_needed: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct SuitabilityDecision {
     pub schema_version: String,
@@ -1028,7 +1028,7 @@ pub struct SuitabilityDecision {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct DesignConstraintPack {
     pub schema_version: String,
@@ -1048,7 +1048,7 @@ pub struct DesignConstraintPack {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum FactorKind {
     ControlledFactor,
@@ -1056,7 +1056,7 @@ pub enum FactorKind {
     UncontrolledConfounder,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ExperimentFactor {
     pub name: String,
@@ -1064,7 +1064,7 @@ pub struct ExperimentFactor {
     pub levels: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ExperimentMatrix {
     pub schema_version: String,
@@ -1077,7 +1077,7 @@ pub struct ExperimentMatrix {
     pub order: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ExperimentTrial {
     pub trial_id: String,
@@ -1089,7 +1089,7 @@ pub struct ExperimentTrial {
     pub ended_at_unix_ms: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ExperimentRun {
     pub schema_version: String,
@@ -1101,7 +1101,7 @@ pub struct ExperimentRun {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct AuditEvent {
     pub schema_version: String,
@@ -1119,7 +1119,7 @@ pub struct AuditEvent {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct RunArtifactRef {
     pub name: String,
@@ -1128,7 +1128,7 @@ pub struct RunArtifactRef {
     pub schema_version: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct RunDataQuality {
     pub missing: Vec<String>,
@@ -1136,7 +1136,7 @@ pub struct RunDataQuality {
     pub notes: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct RunManifest {
     pub schema_version: String,
@@ -1162,7 +1162,7 @@ pub struct RunManifest {
     pub data_quality: RunDataQuality,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ToolQualification {
     pub schema_version: String,
@@ -1189,7 +1189,7 @@ pub struct ToolQualification {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ToolQualificationSummary {
     pub schema_version: String,
@@ -1202,7 +1202,7 @@ pub struct ToolQualificationSummary {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ToolQualificationSummaryEntry {
     pub tool_id: String,

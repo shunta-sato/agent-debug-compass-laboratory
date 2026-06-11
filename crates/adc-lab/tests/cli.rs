@@ -50,6 +50,19 @@ fn single_load_artifact_path(run_dir: &std::path::Path, suffix: &str) -> PathBuf
         .unwrap()
 }
 
+fn single_v2_load_artifact_path(run_dir: &std::path::Path) -> PathBuf {
+    fs::read_dir(run_dir.join("load"))
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(".v2.json"))
+        })
+        .unwrap()
+}
+
 fn write_workload_plan(run_dir: &std::path::Path, adc_lab_bin: &std::path::Path) -> PathBuf {
     let plan_path = run_dir.join("workload.yaml");
     let working_directory = workspace_root();
@@ -717,16 +730,26 @@ fn load_cpu_operator_abort_records_safety_monitor_without_abort_path() {
         ])
         .assert()
         .success()
+        .stdout(contains("\"schema\": \"lab.artifact.v2\""))
+        .stdout(contains("\"kind\": \"load\""))
         .stdout(contains("\"status\": \"aborted\""))
         .stdout(contains("\"abort_reason\": \"operator_abort\""));
 
     let abort_path_text = abort_file.to_str().unwrap();
     let plan_path = single_load_artifact_path(temp.path(), ".plan.json");
-    let result_path = single_load_artifact_path(temp.path(), ".result.json");
+    let result_path = single_v2_load_artifact_path(temp.path());
     let plan_text = fs::read_to_string(&plan_path).unwrap();
     let result_text = fs::read_to_string(&result_path).unwrap();
     assert!(!plan_text.contains(abort_path_text));
     assert!(!result_text.contains(abort_path_text));
+    assert!(fs::read_dir(temp.path().join("loads"))
+        .unwrap()
+        .flatten()
+        .all(|entry| !entry
+            .path()
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.ends_with(".result.json"))));
 
     let plan: serde_json::Value = serde_json::from_str(&plan_text).unwrap();
     assert_eq!(
@@ -739,14 +762,16 @@ fn load_cpu_operator_abort_records_safety_monitor_without_abort_path() {
     );
 
     let result: serde_json::Value = serde_json::from_str(&result_text).unwrap();
-    assert_eq!(result["status"], "aborted");
-    assert_eq!(result["abort_reason"], "operator_abort");
+    assert_eq!(result["schema"], "lab.artifact.v2");
+    assert_eq!(result["kind"], "load");
+    assert_eq!(result["payload"]["status"], "aborted");
+    assert_eq!(result["payload"]["abort_reason"], "operator_abort");
     assert_eq!(
-        result["safety_monitor"]["operator_abort_observed"],
+        result["payload"]["operator_abort_observed"],
         serde_json::json!(true)
     );
     assert_eq!(
-        result["safety_monitor"]["restore_on_abort_status"],
+        result["payload"]["restore_on_abort_status"],
         serde_json::json!("not_required")
     );
 
@@ -776,9 +801,8 @@ fn pressure_run_local_writes_typed_artifact_and_audit() {
         ])
         .assert()
         .success()
-        .stdout(contains(
-            "\"schema_version\": \"lab.resource_pressure_result.v1\"",
-        ))
+        .stdout(contains("\"schema\": \"lab.artifact.v2\""))
+        .stdout(contains("\"kind\": \"pressure\""))
         .stdout(contains("\"pressure_kind\": \"latency_jitter\""));
 
     let pressure_files = fs::read_dir(temp.path().join("pressure"))
@@ -789,10 +813,18 @@ fn pressure_run_local_writes_typed_artifact_and_audit() {
                 .path()
                 .file_name()
                 .and_then(|name| name.to_str())
-                .is_some_and(|name| name.ends_with(".result.json"))
+                .is_some_and(|name| name.ends_with(".v2.json"))
         })
         .count();
     assert_eq!(pressure_files, 1);
+    assert!(fs::read_dir(temp.path().join("pressure"))
+        .unwrap()
+        .flatten()
+        .all(|entry| !entry
+            .path()
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.ends_with(".result.json"))));
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"pressure.run\""));
 }
@@ -838,7 +870,7 @@ fn pressure_network_bounded_transfer_records_generated_bytes() {
         .assert()
         .success()
         .stdout(contains("\"network_mode\": \"bounded_transfer\""))
-        .stdout(contains("\"traffic_generated_bytes\": 4096"));
+        .stdout(contains("\"network_traffic_generated_bytes\": 4096"));
 
     assert_eq!(receiver.join().unwrap(), 4096);
 
@@ -849,18 +881,17 @@ fn pressure_network_bounded_transfer_records_generated_bytes() {
         .find(|path| {
             path.file_name()
                 .and_then(|name| name.to_str())
-                .is_some_and(|name| name.contains("network_io") && name.ends_with(".result.json"))
+                .is_some_and(|name| name.contains("network_io") && name.ends_with(".v2.json"))
         })
         .unwrap();
     let result: serde_json::Value =
         serde_json::from_slice(&fs::read(pressure_path).unwrap()).unwrap();
-    assert_eq!(result["status"], "measured_partial");
-    assert_eq!(result["evidence_class"], "boundary_probe");
-    assert_eq!(
-        result["network_evidence"]["network_mode"],
-        "bounded_transfer"
-    );
-    assert_eq!(result["network_evidence"]["traffic_generated_bytes"], 4096);
+    assert_eq!(result["schema"], "lab.artifact.v2");
+    assert_eq!(result["kind"], "pressure");
+    assert_eq!(result["status"]["state"], "measured_partial");
+    assert_eq!(result["payload"]["evidence_class"], "boundary_probe");
+    assert_eq!(result["payload"]["network_mode"], "bounded_transfer");
+    assert_eq!(result["payload"]["network_traffic_generated_bytes"], 4096);
 }
 
 #[test]
@@ -1014,7 +1045,8 @@ fn pressure_composite_smoke_does_not_support_coupling_without_measured_effect() 
         ])
         .assert()
         .success()
-        .stdout(contains("lab.composite_boundary_result.v1"))
+        .stdout(contains("\"schema\": \"lab.artifact.v2\""))
+        .stdout(contains("\"kind\": \"composite\""))
         .stdout(contains("memory_storage_jitter"));
 
     Command::cargo_bin("adc-lab")
@@ -1204,11 +1236,16 @@ fn experiment_real_run_executes_supported_bounded_matrix() {
                 .unwrap()
                 .starts_with("artifact://lab/runs/"))
     ));
-    assert!(trials.iter().any(|trial| trial["artifact_refs"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|artifact| artifact.as_str().unwrap().ends_with("/load_result.json"))));
+    assert!(trials.iter().any(
+        |trial| trial["artifact_refs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|artifact| {
+                let artifact = artifact.as_str().unwrap();
+                artifact.contains("/load/experiments/") && artifact.ends_with(".v2.json")
+            })
+    ));
 
     let report: serde_json::Value =
         serde_json::from_slice(&fs::read(temp.path().join("reports/run_report.v2.json")).unwrap())
