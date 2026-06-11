@@ -348,6 +348,33 @@ handwritten schemas until v2 parity is proven.
 The store should make multi-run reporting an indexing concern rather than a
 separate custom traversal path.
 
+Phase 1 responsibility map:
+
+- `evidence/envelope.rs`: v2 artifact envelope, status vocabulary, claim
+  instance DTOs, strict serde/schema shape.
+- `evidence/catalog.rs`: stable claim IDs and default wording/next-evidence
+  text. Claim instances may add context-specific next evidence but do not fork
+  catalog wording.
+- `evidence/store.rs`: run-directory indexing, v2 artifact load/write,
+  `artifact://` reference construction, symlink refusal, malformed JSON
+  diagnostics, and write audit events.
+- `runfs/mod.rs`: bounded run-directory-relative path construction.
+- `examples/generate_schemas.rs`: generated schema snapshots from Rust DTOs.
+
+Phase 1 intentionally adds one kernel abstraction instead of wiring reports or
+probes through it immediately. Public CLI/report behavior remains v1 until
+Phase 4 cutover.
+
+Phase 1 complexity budget and audit:
+
+- New public abstraction budget: `Artifact<P>`, `EvidenceStore`, and
+  `artifact_path`.
+- New support DTO budget: claim catalog entries, artifact metadata, strict
+  envelope status/data-quality DTOs, and schema generator example.
+- Post-implementation decision: keep these abstractions because they each own
+  one repeated concern from the plan; do not add report/probe adapters until
+  Phases 2-3 prove the call sites.
+
 ### Rules Engine
 
 Use Rust declaration tables with a small predicate vocabulary. Do not start
@@ -506,8 +533,8 @@ make verify
       boundary probe plan ownership, Makefile/COMMANDS coupling, and WBS
       granularity.
 - [x] Phase 0: Extract and freeze safety invariant tests.
-- [ ] Phase 1: Implement evidence kernel and schema generation.
-- [ ] Phase 1: Add `make schemas` to `Makefile` and register it in
+- [x] Phase 1: Implement evidence kernel and schema generation.
+- [x] Phase 1: Add `make schemas` to `Makefile` and register it in
       `COMMANDS.md`.
 - [ ] Phase 2: Implement `rules/engine.rs`.
 - [ ] Phase 2: Implement claim catalog and connect blocked-claim lookup.
@@ -539,6 +566,14 @@ make verify
   are crate-local:
   `crates/adc-lab-core/tests/safety_invariants.rs` and
   `crates/adc-lab/tests/safety_invariants.rs`.
+- Phase 1 schema generation uses `schemars` 0.8 because it fits the existing
+  serde DTO stack and does not force external schema DSL maintenance.
+- `ArtifactHeader` is intentionally not `deny_unknown_fields`: it is an
+  internal partial reader used to index a full strict artifact without parsing
+  the payload.
+- The generated `schemars::schema_for!` root stores envelope
+  `additionalProperties: false` at the root object, while nested properties
+  are under `properties`.
 
 ## Verification Log
 
@@ -572,6 +607,21 @@ make verify
   smoke, and command smoke.
 - Phase 0 PR: draft PR #30 opened at
   `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/30`.
+- Phase 1 schema generation: `make schemas` passed and regenerated
+  `schemas/generated/lab.artifact.v2.schema.json` plus
+  `schemas/generated/lab.claim_catalog_entry.v2.schema.json`.
+- Phase 1 focused verification:
+  `cargo test -p adc-lab-core --test evidence_kernel -- --nocapture` passed
+  with 7 tests.
+- Phase 1 contract gate:
+  `cargo test --workspace contract_validation -- --nocapture` passed and kept
+  the Phase 0 safety invariant integration tests green.
+- Phase 1 final gate: `make verify` passed after adding the evidence kernel,
+  schema generation, and command registry entry. The gate ran workspace build,
+  `cargo fmt --all --check`, clippy with `-D warnings`, library tests,
+  integration tests, contract validation, docs smoke, and command smoke.
+- Phase 1 PR: draft PR #31 opened at
+  `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/31`.
 
 ## Decision Log
 
@@ -602,14 +652,21 @@ make verify
 - 2026-06-11: Implement Phase 0 safety invariants as crate-local integration
   tests rather than repository-root tests. Rationale: the workspace root is not
   a Cargo package, so root `tests/` would not be executed by `make verify`.
+- 2026-06-11: Implement Phase 1 as a side-by-side v2 evidence kernel with no
+  CLI/report cutover. Rationale: this proves the envelope, store, schema, and
+  command surfaces while keeping existing public output and safety tests green.
+- 2026-06-11: Use `LabError::Validation` for evidence-store trust-boundary
+  refusals such as symlinks, malformed JSON artifacts, and path escapes.
+  Rationale: these are repository/run-directory contract violations, not claim
+  decisions.
 
 ## Handoff
 
-- Branch: `codex/adc-labv2`.
+- Branch: `codex/adc-labv2-phase1-evidence-kernel`.
 - Baseline commit: `543edf0`.
-- Current status: Phase 0 implemented, verified, pushed, and published as draft
-  PR #30.
-- Uncommitted changes: none expected after the Phase 0 PR URL plan update is
+- Current status: Phase 1 implemented, verified, pushed, and published as
+  stacked draft PR #31. Phase 0 remains draft PR #30.
+- Uncommitted changes: none expected after the Phase 1 PR URL plan update is
   committed and pushed.
 - Commands run so far:
   - `sed -n ...` on the request attachment, `PLANS.md`, execution-plan
@@ -624,18 +681,23 @@ make verify
   - `cargo test -p adc-lab-core --test safety_invariants -- --nocapture`.
   - `cargo test -p adc-lab --test safety_invariants -- --nocapture`.
   - `cargo test --workspace contract_validation -- --nocapture`.
+  - `make schemas`.
+  - `cargo test -p adc-lab-core --test evidence_kernel -- --nocapture`.
   - `make verify`.
 - Next steps:
-  1. Start Phase 1 from `codex/adc-labv2-phase0-safety-invariants`.
-  2. Keep the Phase 1 PR based on the Phase 0 branch while PR #30 is open.
-  3. Add `schemars` and `make schemas` only after this Phase 0 safety baseline.
+  1. Start Phase 2 from `codex/adc-labv2-phase1-evidence-kernel`.
+  2. Keep the Phase 2 PR based on the Phase 1 branch while PR #31 is open.
+  3. Implement rules engine/catalog integration behind core APIs while keeping
+     public CLI output v1.
 - Read these files first when resuming:
   - `plans/20260611-v2-evidence-kernel.md`
   - `crates/adc-lab-core/src/control.rs`
   - `crates/adc-lab-core/src/platform_contract.rs`
   - `crates/adc-lab-core/src/report.rs`
+  - `crates/adc-lab-core/src/evidence/`
   - `crates/adc-lab/tests/cli.rs`
 
 ## Outcomes & Retrospective
 
-Pending implementation.
+Phase 0 and Phase 1 are complete and PR'd. Whole-cutover outcomes remain
+pending until Phases 2-5 are implemented and PR'd.

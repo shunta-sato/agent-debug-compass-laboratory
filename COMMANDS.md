@@ -14,6 +14,7 @@
 - lint: make lint
 - static analysis: make analysis
 - contract validation: make contract
+- schema generation: make schemas
 
 ## Tests
 - unit tests: make test-unit
