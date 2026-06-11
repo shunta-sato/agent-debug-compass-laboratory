@@ -1,11 +1,16 @@
 use crate::contracts::{
-    DesignConstraintPack, OperatingRuleCategory, SuitabilityConfidence, SuitabilityDecision,
-    SuitabilityDecisionValue, SuitabilityDimensionDecision, SuitabilityDimensionKind,
-    SuitabilityPolicy, TargetOperatingContract, WorkloadDemandProfile,
+    DesignConstraintPack, SuitabilityConfidence, SuitabilityDecision, SuitabilityDecisionValue,
+    SuitabilityDimensionDecision, SuitabilityDimensionKind, SuitabilityPolicy,
+    WorkloadDemandProfile,
 };
-use crate::evidence::{blocked_claims_for, claim};
+use crate::evidence::{
+    claim, claim_definition, Artifact, DataQuality, DataQualityLevel, Decision, Kind, Status,
+};
 use crate::fsutil::read_json;
 use crate::ids::{new_id, now_unix_ms};
+use crate::rules::engine::{claim_for_evaluation, RuleEvaluation};
+use crate::rules::suitability::SuitabilityPayload;
+use crate::OperatingContractPayload;
 use crate::{LabError, LabResult};
 use serde::Serialize;
 use serde_json::Value;
@@ -37,15 +42,21 @@ pub struct ConstraintCheckMatch {
     pub blocked_claim: String,
 }
 
-pub fn decide_suitability(
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SuitabilityArtifactContext {
+    pub target_contract_ref: String,
+    pub workload_ref: String,
+    pub policy_ref: String,
+    pub run_id: String,
+}
+
+pub fn decide_suitability_artifact_v2(
     target_run_dir: &Path,
-    target_contract: &TargetOperatingContract,
+    target_contract: &Artifact<OperatingContractPayload>,
     workload: &WorkloadDemandProfile,
     policy: &SuitabilityPolicy,
-    target_contract_ref: String,
-    workload_ref: String,
-    policy_ref: String,
-) -> LabResult<SuitabilityDecision> {
+    context: SuitabilityArtifactContext,
+) -> LabResult<Artifact<SuitabilityPayload>> {
     validate_policy(policy)?;
     let target_evidence = collect_target_run_numeric_evidence(target_run_dir);
     let mut dimensions = Vec::new();
@@ -61,7 +72,10 @@ pub fn decide_suitability(
                 policy,
                 workload,
                 &target_evidence,
-                vec![workload_ref.clone(), target_contract_ref.clone()],
+                vec![
+                    context.workload_ref.clone(),
+                    context.target_contract_ref.clone(),
+                ],
             ));
         }
     }
@@ -93,52 +107,94 @@ pub fn decide_suitability(
             SuitabilityDecisionValue::Fail | SuitabilityDecisionValue::Unknown
         )
     });
-    let mut blocked_claims = blocked_claims_for(&[
-        claim::PRODUCTION_READY,
-        claim::TARGET_SELECTION_PI4_SUFFICIENT,
-        claim::BATTERY_SAFE,
-        claim::REAL_TIME_PRESSURE_SAFE,
-    ]);
+    let mut blocked_claims = vec![
+        claim::PRODUCTION_READY.to_string(),
+        claim::TARGET_SELECTION_PI4_SUFFICIENT.to_string(),
+        claim::BATTERY_SAFE.to_string(),
+        claim::REAL_TIME_PRESSURE_SAFE.to_string(),
+    ];
     if !selection_ready {
-        blocked_claims.extend(blocked_claims_for(&[claim::SELECTION_READY]));
+        blocked_claims.push(claim::SELECTION_READY.to_string());
     }
-    for rule in &target_contract.rules {
-        if rule.category == OperatingRuleCategory::BlockedClaim {
-            blocked_claims.push(rule.statement.clone());
-        }
-    }
-    blocked_claims.extend(target_contract.unknowns.iter().map(|unknown| {
-        format!("target-specific claim blocked by operating contract unknown: {unknown}")
-    }));
+    blocked_claims.extend(target_contract.payload.blocked_claims.clone());
     blocked_claims.sort();
     blocked_claims.dedup();
     let mut data_quality = workload.data_quality.clone();
     if !target_evidence.missing.is_empty() {
         data_quality.degraded = true;
-        data_quality.missing.extend(target_evidence.missing);
+        data_quality.missing.extend(target_evidence.missing.clone());
+        data_quality.notes.extend(
+            target_evidence
+                .missing
+                .iter()
+                .map(|missing| format!("missing target run numeric evidence: {missing}")),
+        );
     }
     data_quality.notes.push(
-        "suitability decision read target run numeric evidence and target operating contract rules"
+        "suitability decision read target run numeric evidence and v2 operating contract claim IDs"
             .to_string(),
     );
-    let mut evidence_refs = vec![target_contract_ref, workload_ref, policy_ref];
+    let mut evidence_refs = vec![
+        context.target_contract_ref,
+        context.workload_ref,
+        context.policy_ref,
+    ];
+    evidence_refs.extend(target_contract.evidence_refs.clone());
+    evidence_refs.extend(
+        target_contract
+            .payload
+            .evaluations
+            .iter()
+            .flat_map(|evaluation| evaluation.evidence_refs.clone()),
+    );
     evidence_refs.extend(target_evidence.evidence_refs);
     evidence_refs.sort();
     evidence_refs.dedup();
-    Ok(SuitabilityDecision {
-        schema_version: "lab.suitability_decision.v1".to_string(),
-        decision_id: new_id("SUITABILITY"),
-        target_id: workload.target_id.clone(),
-        workload_id: workload.workload_id.clone(),
-        policy_id: policy.policy_id.clone(),
-        overall_decision,
-        selection_ready,
-        dimensions,
-        blocked_claims,
-        data_quality,
-        evidence_refs,
-        time_unix_ms: now_unix_ms(),
-    })
+    let evaluations =
+        suitability_policy_evaluations(&blocked_claims, selection_ready, &evidence_refs);
+    let mut next_evidence = suitability_next_evidence(&evaluations);
+    next_evidence.extend(target_contract.payload.next_evidence.clone());
+    next_evidence.sort();
+    next_evidence.dedup();
+    let mut artifact = Artifact::new(
+        Kind::ReportSuitability,
+        new_id("SUITABILITY"),
+        context.run_id,
+        workload.target_id.clone(),
+        if selection_ready {
+            Status::MeasuredPartial
+        } else {
+            Status::Insufficient
+        },
+        SuitabilityPayload {
+            rule_set_id: "rules.suitability.v2.policy_projection".to_string(),
+            selection_ready,
+            workload_id: Some(workload.workload_id.clone()),
+            policy_id: Some(policy.policy_id.clone()),
+            overall_decision: Some(overall_decision),
+            dimensions,
+            evaluations,
+            blocked_claims,
+            next_evidence,
+        },
+        now_unix_ms(),
+    );
+    artifact.claims = artifact
+        .payload
+        .evaluations
+        .iter()
+        .map(claim_for_evaluation)
+        .collect();
+    artifact.evidence_refs = evidence_refs;
+    artifact.data_quality = DataQuality {
+        level: if data_quality.degraded {
+            DataQualityLevel::Degraded
+        } else {
+            DataQualityLevel::Partial
+        },
+        notes: data_quality.notes,
+    };
+    Ok(artifact)
 }
 
 pub fn generate_design_constraint_pack(decision: &SuitabilityDecision) -> DesignConstraintPack {
@@ -309,6 +365,66 @@ fn validate_policy(policy: &SuitabilityPolicy) -> LabResult<()> {
         ));
     }
     Ok(())
+}
+
+fn suitability_policy_evaluations(
+    blocked_claims: &[String],
+    selection_ready: bool,
+    evidence_refs: &[String],
+) -> Vec<RuleEvaluation> {
+    let mut evaluations = blocked_claims
+        .iter()
+        .map(|claim_id| RuleEvaluation {
+            rule_id: format!("suitability.policy.blocked.{}", rule_id_suffix(claim_id)),
+            claim_id: claim_id.clone(),
+            matched: false,
+            decision: Decision::Blocked,
+            evidence_refs: evidence_refs.to_vec(),
+            missing: Vec::new(),
+            next_evidence: next_evidence_for_claim_id(claim_id),
+        })
+        .collect::<Vec<_>>();
+    if selection_ready {
+        evaluations.push(RuleEvaluation {
+            rule_id: "suitability.policy.selection_ready".to_string(),
+            claim_id: claim::SELECTION_READY.to_string(),
+            matched: true,
+            decision: Decision::Provisional,
+            evidence_refs: evidence_refs.to_vec(),
+            missing: Vec::new(),
+            next_evidence: Vec::new(),
+        });
+    }
+    evaluations
+}
+
+fn next_evidence_for_claim_id(claim_id: &str) -> Vec<String> {
+    claim_definition(claim_id)
+        .map(|definition| {
+            definition
+                .default_next_evidence
+                .iter()
+                .map(|item| (*item).to_string())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_else(|| vec![format!("collect evidence to unblock: {claim_id}")])
+}
+
+fn suitability_next_evidence(evaluations: &[RuleEvaluation]) -> Vec<String> {
+    let mut items = evaluations
+        .iter()
+        .flat_map(|evaluation| evaluation.next_evidence.clone())
+        .collect::<Vec<_>>();
+    items.sort();
+    items.dedup();
+    items
+}
+
+fn rule_id_suffix(claim_id: &str) -> String {
+    claim_id
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
+        .collect()
 }
 
 fn decide_dimension(
@@ -783,28 +899,45 @@ mod tests {
             evidence_refs: Vec::new(),
             time_unix_ms: 1,
         };
-        let contract = TargetOperatingContract {
-            schema_version: "lab.target_operating_contract.v1".to_string(),
-            target_id: "target55".to_string(),
-            target_class: "raspberry_pi_4".to_string(),
-            contract_status: crate::contracts::TargetOperatingContractStatus::Insufficient,
-            rules: Vec::new(),
-            boundaries: Vec::new(),
-            unknowns: Vec::new(),
-            next_evidence_needed: Vec::new(),
-            time_unix_ms: 1,
-        };
-        let decision = decide_suitability(
+        let contract = Artifact::new(
+            Kind::ReportOperatingContract,
+            "OPERATING-CONTRACT-001",
+            "run",
+            "target55",
+            Status::Insufficient,
+            OperatingContractPayload {
+                rule_set_id: "test.operating_contract".to_string(),
+                evaluations: Vec::new(),
+                blocked_claims: vec![claim::THERMAL_SUSTAINED_SOAK.to_string()],
+                next_evidence: Vec::new(),
+            },
+            1,
+        );
+        let decision = decide_suitability_artifact_v2(
             temp.path(),
             &contract,
             &workload,
             &policy,
-            "contract".to_string(),
-            "workload".to_string(),
-            "policy".to_string(),
+            SuitabilityArtifactContext {
+                target_contract_ref: "contract".to_string(),
+                workload_ref: "workload".to_string(),
+                policy_ref: "policy".to_string(),
+                run_id: "run".to_string(),
+            },
         )
         .unwrap();
-        assert_eq!(decision.overall_decision, SuitabilityDecisionValue::Unknown);
-        assert!(!decision.selection_ready);
+        assert_eq!(
+            decision.payload.overall_decision,
+            Some(SuitabilityDecisionValue::Unknown)
+        );
+        assert!(!decision.payload.selection_ready);
+        assert!(decision
+            .payload
+            .blocked_claims
+            .contains(&claim::SELECTION_READY.to_string()));
+        assert!(decision
+            .payload
+            .blocked_claims
+            .contains(&claim::THERMAL_SUSTAINED_SOAK.to_string()));
     }
 }

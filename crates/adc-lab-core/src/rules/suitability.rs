@@ -1,6 +1,5 @@
 use crate::evidence::{
-    claim, claim_id_for_blocked_claim, Artifact, DataQuality, DataQualityLevel, Decision,
-    EvidenceStore, Kind, Status,
+    claim, Artifact, DataQuality, DataQualityLevel, Decision, EvidenceStore, Kind, Status,
 };
 use crate::ids::{new_id, now_unix_ms};
 use crate::rules::engine::{claim_for_evaluation, evaluate_rules, Pred, Rule, RuleEvaluation};
@@ -173,82 +172,6 @@ pub fn generate_design_constraint_pack_from_suitability_artifact(
     crate::generate_design_constraint_pack(&decision)
 }
 
-pub fn suitability_artifact_from_legacy_decision_v2(
-    decision: &LegacySuitabilityDecision,
-    run_id: impl Into<String>,
-) -> Artifact<SuitabilityPayload> {
-    let mut evaluations = decision
-        .blocked_claims
-        .iter()
-        .map(|blocked_claim| {
-            let claim_id = claim_id_for_blocked_claim(blocked_claim)
-                .map(str::to_string)
-                .unwrap_or_else(|| legacy_blocked_claim_id(blocked_claim));
-            RuleEvaluation {
-                rule_id: format!("legacy.suitability.blocked.{claim_id}"),
-                claim_id,
-                matched: false,
-                decision: Decision::Blocked,
-                evidence_refs: decision.evidence_refs.clone(),
-                missing: Vec::new(),
-                next_evidence: vec![format!("collect evidence to unblock: {blocked_claim}")],
-            }
-        })
-        .collect::<Vec<_>>();
-    if decision.selection_ready {
-        evaluations.push(RuleEvaluation {
-            rule_id: "legacy.suitability.selection_ready".to_string(),
-            claim_id: claim::SELECTION_READY.to_string(),
-            matched: true,
-            decision: Decision::Provisional,
-            evidence_refs: decision.evidence_refs.clone(),
-            missing: Vec::new(),
-            next_evidence: Vec::new(),
-        });
-    }
-    let blocked_claims = blocked_claims(&evaluations);
-    let next_evidence = next_evidence(&evaluations);
-    let mut artifact = Artifact::new(
-        Kind::ReportSuitability,
-        decision.decision_id.clone(),
-        run_id,
-        decision.target_id.clone(),
-        if decision.selection_ready {
-            Status::MeasuredPartial
-        } else {
-            Status::Insufficient
-        },
-        SuitabilityPayload {
-            rule_set_id: "rules.suitability.v2.legacy_projection".to_string(),
-            selection_ready: decision.selection_ready,
-            workload_id: Some(decision.workload_id.clone()),
-            policy_id: Some(decision.policy_id.clone()),
-            overall_decision: Some(decision.overall_decision.clone()),
-            dimensions: decision.dimensions.clone(),
-            evaluations,
-            blocked_claims,
-            next_evidence,
-        },
-        now_unix_ms(),
-    );
-    artifact.claims = artifact
-        .payload
-        .evaluations
-        .iter()
-        .map(claim_for_evaluation)
-        .collect();
-    artifact.evidence_refs = decision.evidence_refs.clone();
-    artifact.data_quality = DataQuality {
-        level: if decision.data_quality.degraded {
-            DataQualityLevel::Degraded
-        } else {
-            DataQualityLevel::Partial
-        },
-        notes: decision.data_quality.notes.clone(),
-    };
-    artifact
-}
-
 fn blocked_claim_texts(claim_ids: &[String]) -> Vec<String> {
     let mut texts = claim_ids
         .iter()
@@ -275,24 +198,6 @@ fn suitability_evidence_refs(artifact: &Artifact<SuitabilityPayload>) -> Vec<Str
     refs.sort();
     refs.dedup();
     refs
-}
-
-fn legacy_blocked_claim_id(blocked_claim: &str) -> String {
-    let slug = blocked_claim
-        .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() {
-                ch.to_ascii_lowercase()
-            } else {
-                '.'
-            }
-        })
-        .collect::<String>()
-        .split('.')
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join(".");
-    format!("legacy.suitability.blocked_claim.{slug}")
 }
 
 fn blocked_claims(evaluations: &[RuleEvaluation]) -> Vec<String> {

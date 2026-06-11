@@ -1,13 +1,8 @@
 use crate::evidence::{
-    claim, claim_definition, Artifact, DataQuality, DataQualityLevel, Decision, EvidenceStore,
-    Kind, Status,
+    claim, Artifact, DataQuality, DataQualityLevel, Decision, EvidenceStore, Kind, Status,
 };
 use crate::ids::new_id;
 use crate::rules::engine::{claim_for_evaluation, evaluate_rules, Pred, Rule, RuleEvaluation};
-use crate::{
-    ContractConfidence, OperatingContractRule, OperatingRuleCategory, OperatingRuleSource,
-    TargetOperatingContract, TargetOperatingContractStatus,
-};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -162,29 +157,6 @@ pub fn operating_contract_from_rules_v2(
     artifact
 }
 
-pub fn legacy_contract_from_v2_artifact(
-    artifact: &Artifact<OperatingContractPayload>,
-    target_class: impl Into<String>,
-) -> TargetOperatingContract {
-    TargetOperatingContract {
-        schema_version: "lab.target_operating_contract.v1.projected_from_v2".to_string(),
-        target_id: artifact.target_id.clone(),
-        target_class: target_class.into(),
-        contract_status: legacy_contract_status(&artifact.status),
-        rules: artifact
-            .payload
-            .evaluations
-            .iter()
-            .filter(|evaluation| evaluation.decision == Decision::Blocked)
-            .map(legacy_blocked_rule)
-            .collect(),
-        boundaries: Vec::new(),
-        unknowns: Vec::new(),
-        next_evidence_needed: artifact.payload.next_evidence.clone(),
-        time_unix_ms: artifact.time_unix_ms,
-    }
-}
-
 fn status_for_evaluations(evaluations: &[RuleEvaluation]) -> Status {
     if evaluations
         .iter()
@@ -193,34 +165,6 @@ fn status_for_evaluations(evaluations: &[RuleEvaluation]) -> Status {
         Status::MeasuredPartial
     } else {
         Status::Insufficient
-    }
-}
-
-fn legacy_contract_status(status: &Status) -> TargetOperatingContractStatus {
-    match status {
-        Status::Measured | Status::MeasuredPartial => {
-            TargetOperatingContractStatus::MeasuredPartial
-        }
-        Status::Insufficient
-        | Status::NotApplicable { .. }
-        | Status::Refused { .. }
-        | Status::UnsafeBlocked { .. } => TargetOperatingContractStatus::Insufficient,
-    }
-}
-
-fn legacy_blocked_rule(evaluation: &RuleEvaluation) -> OperatingContractRule {
-    OperatingContractRule {
-        rule_id: evaluation.rule_id.clone(),
-        category: OperatingRuleCategory::BlockedClaim,
-        statement: claim_definition(&evaluation.claim_id)
-            .map(|definition| definition.blocked_claim.to_string())
-            .unwrap_or_else(|| evaluation.claim_id.clone()),
-        rule_source: OperatingRuleSource::EvidenceNeededRule,
-        derivation: "projected from v2 operating contract evaluation".to_string(),
-        evidence_refs: evaluation.evidence_refs.clone(),
-        confidence: ContractConfidence::Low,
-        allowed_design: Vec::new(),
-        blocked_design: evaluation.next_evidence.clone(),
     }
 }
 

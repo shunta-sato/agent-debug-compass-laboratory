@@ -148,10 +148,3 @@ pub fn blocked_claims_for(claim_ids: &[&str]) -> Vec<String> {
     claims.dedup();
     claims
 }
-
-pub fn claim_id_for_blocked_claim(blocked_claim: &str) -> Option<&'static str> {
-    CLAIMS
-        .iter()
-        .find(|definition| definition.blocked_claim == blocked_claim)
-        .map(|definition| definition.claim_id)
-}

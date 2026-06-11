@@ -1,30 +1,29 @@
 use super::super::*;
 
 pub(crate) fn command_decide_suitability(args: SuitabilityCommand) -> Result<()> {
-    let target_contract = read_target_contract(&args.target_contract)?;
+    let target_contract = read_operating_contract_artifact(&args.target_contract)?;
     let workload: WorkloadDemandProfile = read_json(&args.workload_demand)?;
     let policy: SuitabilityPolicy = read_yaml(&args.policy)?;
-    let decision = decide_suitability(
+    let artifact = decide_suitability_artifact_v2(
         &args.target_run,
         &target_contract,
         &workload,
         &policy,
-        path_ref(&args.target_contract),
-        path_ref(&args.workload_demand),
-        path_ref(&args.policy),
+        SuitabilityArtifactContext {
+            target_contract_ref: path_ref(&args.target_contract),
+            workload_ref: path_ref(&args.workload_demand),
+            policy_ref: path_ref(&args.policy),
+            run_id: run_id_from_run_dir(&args.target_run),
+        },
     )?;
-    let artifact = suitability_artifact_from_legacy_decision_v2(
-        &decision,
-        run_id_from_run_dir(&args.target_run),
-    );
     write_json_pretty(&args.out, &artifact)?;
     append_audit_event(
         &existing_run_context(args.target_run.clone()),
         AuditInput {
-            target_id: decision.target_id.clone(),
+            target_id: artifact.target_id.clone(),
             actor: Actor::codex(),
             operation: "decide.suitability".to_string(),
-            operation_id: Some(decision.decision_id.clone()),
+            operation_id: Some(artifact.id.clone()),
             risk_tier: RiskTier::Tier0ReadOnlyObservation,
             approval_ref: None,
             restore_lease_ref: None,
@@ -42,15 +41,14 @@ pub(crate) fn command_decide_suitability(args: SuitabilityCommand) -> Result<()>
     Ok(())
 }
 
-fn read_target_contract(path: &std::path::Path) -> Result<TargetOperatingContract> {
-    let value: serde_json::Value = read_json(path)?;
-    if value.get("schema").and_then(|schema| schema.as_str()) == Some("lab.artifact.v2") {
-        let artifact: Artifact<OperatingContractPayload> = serde_json::from_value(value)?;
-        Ok(legacy_contract_from_v2_artifact(
-            &artifact,
-            "projected-v2-contract",
-        ))
-    } else {
-        Ok(serde_json::from_value(value)?)
+fn read_operating_contract_artifact(
+    path: &std::path::Path,
+) -> Result<Artifact<OperatingContractPayload>> {
+    let artifact: Artifact<OperatingContractPayload> = read_json(path)?;
+    if artifact.schema != ARTIFACT_SCHEMA_V2 || artifact.kind != Kind::ReportOperatingContract {
+        return Err(anyhow::anyhow!(
+            "--target-contract must be a lab.artifact.v2 report.operating_contract artifact"
+        ));
     }
+    Ok(artifact)
 }
