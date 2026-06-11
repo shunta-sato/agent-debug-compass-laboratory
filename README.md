@@ -111,7 +111,9 @@ Production readiness is blocked.
 
 That is the difference between a benchmark and an operating contract.
 
-See [Target Operating Contract architecture](docs/architecture/target-operating-contract.md) for the detailed evidence model.
+See [Documentation Index](docs/README.md) for the normative/reference map and
+[Target Operating Contract architecture](docs/architecture/target-operating-contract.md)
+for the detailed evidence model.
 
 ---
 
@@ -268,9 +270,12 @@ lab/runs/LAB-RUN-.../
   inventory/target_inventory.json
   toolchain/toolchain_inventory.json
   observations/observe.json
-  loads/*.result.json
-  reports/claim_evidence_trace.json
+  load/*.v2.json
+  reports/run_report.v2.json
 ```
+
+`reports/run_report.v2.json` is a `lab.artifact.v2` envelope with
+`kind = report.run`.
 
 For the full command reference, see [CLI reference](docs/reference/cli.md).
 
@@ -313,11 +318,11 @@ adc-lab decide suitability \
   --target-contract lab/runs/LAB-RUN-target-contract-.../reports/target_operating_contract.v2.json \
   --workload-demand lab/runs/LAB-RUN-workload-.../reports/workload_demand_profile.json \
   --policy examples/suitability/pi4-default-policy.yaml \
-  --out lab/runs/LAB-RUN-workload-.../reports/suitability_decision.json
+  --out lab/runs/LAB-RUN-workload-.../reports/suitability.v2.json
 
 adc-lab constraints generate \
-  --decision lab/runs/LAB-RUN-workload-.../reports/suitability_decision.json \
-  --out lab/runs/LAB-RUN-workload-.../reports/design_constraint_pack.json \
+  --decision lab/runs/LAB-RUN-workload-.../reports/suitability.v2.json \
+  --out lab/runs/LAB-RUN-workload-.../reports/constraints.v2.json \
   --agent-instructions-out lab/runs/LAB-RUN-workload-.../reports/agent_constraints.md
 ```
 
@@ -618,7 +623,7 @@ crates/
   adc-lab-target/          # Non-root target-side runner
   adc-lab-priv-helper/     # Fixed-path privileged helper
 
-schemas/                  # Agent-facing and lab-facing JSON contracts
+schemas/                  # Generated JSON contract snapshots and ledger
 examples/
   workloads/              # Workload profiles
   experiments/            # Experiment matrix examples
@@ -670,15 +675,15 @@ Add storage I/O under memory pressure.
 Add latency/jitter under pressure.
 Add bounded network transfer.
 Add composite coupling probes.
-Generate Pi4 Platform Operating Contract v1.
+Generate Pi4 operating-contract v2 artifacts.
 ```
 
 Pi4 vs Pi5:
 
 ```text
 Run the same workload and pressure profiles on Pi4 and Pi5.
-Generate target capability profiles.
-Generate target comparison reports.
+Generate policy-bound suitability artifacts.
+Generate target comparison reports only when evidence supports them.
 Generate suitability decisions only when evidence supports them.
 ```
 

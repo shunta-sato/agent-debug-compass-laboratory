@@ -117,8 +117,8 @@ audit.jsonl
 inventory/target_inventory.json
 toolchain/toolchain_inventory.json
 observations/observe.json
-loads/*.result.json
-reports/*
+load/*.v2.json
+reports/run_report.v2.json
 ```
 
 ## 8. Optional: generate an operating contract

@@ -18,9 +18,9 @@
   classifies existing observation/experiment artifacts as `observational_only`,
   `controlled_subset`, `controlled_full`, `not_controllable`, or
   `blocked_unsafe`; it does not add target-local runtime.
-- PR8 capability cost model: controller-side report generation only. It
-  classifies existing capability/cost evidence and blocked architecture claims;
-  it does not probe target accelerators or add target-local runtime.
+- Operating-contract reporting: controller-side report generation only. It
+  classifies existing v2 evidence and blocked operating claims; it does not
+  probe target accelerators or add target-local runtime.
 - PR9 agent-created adapter qualification: controller-side evidence validation
   only. It copies supplied dry-run/comparison/schema/review artifacts into the
   run and does not execute adapter commands or add target-local runtime.
@@ -28,9 +28,10 @@
   records Option A as active and Option B as planned-disabled; it does not
   install a systemd unit, create a Unix socket, start a daemon, or contact a
   privileged provider.
-- PR11 target capability profile: controller-side report generation only. It
-  normalizes existing run artifacts against a workload profile; it does not run
-  target commands, helper apply, load, observe, or destructive experiments.
+- Suitability reporting: controller-side report generation only. It normalizes
+  an existing operating contract and workload profile through a policy; it does
+  not run target commands, helper apply, load, observe, or destructive
+  experiments.
 - PR11 CI/CD release binary foundation: GitHub Actions build/package/release
   only. It produces binary identity and checksum/provenance evidence; it does
   not execute target commands or measure target physical footprint.
@@ -104,8 +105,8 @@
 - PR7 operating-point coverage verification is hardware-free in core/CLI tests.
   It proves claim-boundary classification only; it does not add physical
   measurement evidence.
-- PR8 capability cost verification is hardware-free in core/CLI tests. It
-  proves architecture claim-boundary classification only; it does not measure
+- Operating-contract verification is hardware-free in unit/CLI/schema tests for
+  rule evaluation, artifact loading, and status taxonomy. It does not measure
   accelerator, storage, network, battery, wakeup, flash, latency/jitter, or
   sustained thermal cost.
 - PR9 adapter qualification verification is hardware-free in core/CLI tests. It
@@ -114,10 +115,9 @@
 - PR10 privilege provider status verification is hardware-free in core/CLI
   tests. It proves provider posture reporting only; it does not install or run
   a target-local root provider.
-- PR11 target capability profile verification is hardware-free in core/CLI
-  tests. It proves workload/profile artifact generation and conservative claim
-  blocking only; it does not prove Pi4/Pi5 suitability or production physical
-  footprint.
+- Suitability verification is hardware-free in core/CLI tests. It proves
+  operating-contract/workload/policy wiring and conservative claim blocking
+  only; it does not prove Pi4/Pi5 suitability or production physical footprint.
 - PR11 CI/CD release verification is hardware-free. It proves build, package,
   checksum, and provenance wiring only; it does not prove target resource/NFR
   behavior.

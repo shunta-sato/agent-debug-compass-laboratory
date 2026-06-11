@@ -8,10 +8,10 @@ control operations, or compare probe output.
 
 Built-in read-only observation/probe/report/health tools can be marked
 `builtin` and accepted as evidence when they are available and require no
-privilege. Starting in PR5, the built-in `adc-lab-builtin-cpu-load` tool can be
-marked `builtin` and accepted only for explicit Tier 1 bounded CPU load
-`lab.load_plan.v1` / `lab.load_result.v1` evidence that includes duration,
-worker, thermal, operator-abort, and safety-monitor fields.
+privilege. The built-in `adc-lab-builtin-cpu-load` tool can be marked
+`builtin` and accepted only for explicit Tier 1 bounded CPU load evidence in
+v2 `kind = load` artifacts that include duration, worker, thermal,
+operator-abort, and safety-monitor fields.
 
 External, control-capable, privileged, missing, or non-allowlisted load tools
 are not evidence sources until qualification evidence exists. Starting in PR9,

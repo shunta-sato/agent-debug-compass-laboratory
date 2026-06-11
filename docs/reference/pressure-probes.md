@@ -1,8 +1,9 @@
 # Pressure Probes Reference
 
-`adc-lab pressure run` creates bounded `lab.resource_pressure_result.v1`
-artifacts. `adc-lab pressure composite` creates bounded
-`lab.composite_boundary_result.v1` artifacts.
+`adc-lab pressure run` creates bounded v2 `kind = pressure` artifacts under
+`pressure/<kind>.<result_id>.v2.json`. `adc-lab pressure composite` creates
+bounded v2 `kind = composite` artifacts under
+`composite/<scenario>.<result_id>.v2.json`.
 
 Pressure probes are:
 
@@ -112,8 +113,8 @@ when the bounded transfer completes and records `network_mode=bounded_transfer`
 with `traffic_generated_bytes`.
 
 For composite coupling, the v2 operating-contract rules can support coupling
-claims only when the required pressure and composite evidence kinds are present.
-Separate pressure results remain evidence ingredients.
+claims only when the required pressure effect and composite measured evidence
+are present. Separate pressure results remain evidence ingredients.
 
 ## Claim boundaries
 

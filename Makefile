@@ -63,10 +63,13 @@ file-budgets:
 
 docs-smoke:
 	test -f README.md
+	test -f docs/README.md
 	test -f docs/architecture/privilege-model-option-a.md
 	test -f docs/architecture/safety-model.md
 	test -f docs/evidence-model.md
 	test -f docs/rules.md
+	test -f docs/reference/cli.md
+	test -f docs/reference/pressure-probes.md
 	test -f docs/getting-started/install-release-binaries.md
 	test -f reports/resource/nfr-gate-report.md
 

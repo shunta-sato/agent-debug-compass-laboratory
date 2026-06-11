@@ -44,8 +44,8 @@ SHA256SUMS
 
 `release-manifest.json` records the release version, git sha, target triple,
 and per-binary SHA-256 digests. Later lab runs may copy or reference that
-release identity in their run manifest or target capability profile, but a
-release manifest is not itself target behavior, resource, or NFR evidence.
+release identity in their run manifest or suitability artifacts, but a release
+manifest is not itself target behavior, resource, or NFR evidence.
 
 Run manifests copy the relevant binary identity into the evidence pack:
 
@@ -56,5 +56,5 @@ Run manifests copy the relevant binary identity into the evidence pack:
 
 Missing release checksums or target runner version artifacts are not warnings
 outside the contract; they are recorded in `data_quality.missing` or
-`data_quality.inconsistent` so later target capability profiles can block
+`data_quality.inconsistent` so later suitability artifacts can block
 formal comparison.
