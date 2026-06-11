@@ -396,6 +396,26 @@ Phase 2 complexity budget and audit:
   CLI/report cutover out of Phase 2. The v1 generators remain parallel until
   Phase 4/5 parity cleanup.
 
+Phase 3 responsibility map:
+
+- `probe/artifacts.rs`: core-only adapters that normalize existing v1 observe,
+  load, pressure, composite, and workload payloads into v2 `Artifact<P>`
+  records and write them through `EvidenceStore`.
+- `examples/generate_schemas.rs`: v2 schema snapshots for observation, load,
+  pressure, composite, and workload artifacts.
+- `tests/probe_artifacts.rs`: verifies all five probe kinds are indexed by the
+  store and records the dummy pressure-kind extension exercise.
+
+Phase 3 dummy pressure-kind exercise evidence:
+
+- Hand-edited extension files: `crates/adc-lab-core/src/probe/artifacts.rs`,
+  `crates/adc-lab-core/src/rules/operating_contract.rs`, and
+  `crates/adc-lab-core/tests/probe_artifacts.rs`.
+- Count: 3 hand-edited files. Kernel enum registration and `make schemas`
+  snapshots are counted as generated/mechanical evidence, not extension files.
+- The exercise is encoded in
+  `dummy_pressure_kind_extension_exercise_stays_within_three_hand_edited_files`.
+
 ### Rules Engine
 
 Use Rust declaration tables with a small predicate vocabulary. Do not start
@@ -564,7 +584,7 @@ make verify
 - [x] Phase 2: Replace suitability internals behind core APIs while keeping CLI
       v1 output.
 - [x] Phase 2: Connect `constraints check` to the claim catalog.
-- [ ] Phase 3: Replace probe outputs with `Artifact<P>`.
+- [x] Phase 3: Replace probe outputs with `Artifact<P>`.
 - [ ] Phase 4: Split CLI modules and update target/helper payloads.
 - [ ] Phase 4: Cut CLI output and `cli.rs` expectations over to v2 together.
 - [ ] Phase 5: Delete v1 surfaces and compress docs.
@@ -600,6 +620,9 @@ make verify
   v2 schemas.
 - Making `Kind` `Copy` simplified rule-table evidence kind slices; existing
   store code was updated to avoid clone-on-copy clippy failures.
+- Phase 3 wraps existing v1 probe outputs into compact v2 payloads instead of
+  deriving schemas for every nested v1 DTO. Rationale: Phase 4 owns the public
+  CLI cutover, and Phase 5 deletes obsolete v1 surfaces after parity.
 
 ## Verification Log
 
@@ -664,6 +687,24 @@ make verify
   catalog-backed blocked claim terms, v2 report schemas, and focused tests.
 - Phase 2 PR: draft PR #32 opened at
   `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/32`.
+- Phase 3 schema generation: `make schemas` passed and added
+  `lab.observation.v2.schema.json`, `lab.load.v2.schema.json`,
+  `lab.pressure.v2.schema.json`, `lab.composite.v2.schema.json`, and
+  `lab.workload.v2.schema.json`.
+- Phase 3 focused verification:
+  `cargo test -p adc-lab-core --test probe_artifacts -- --nocapture` passed
+  with 2 tests.
+- Phase 3 regression verification:
+  `cargo test -p adc-lab-core --test evidence_kernel -- --nocapture` passed
+  with 7 tests, and `cargo test -p adc-lab-core --test rules_engine -- --nocapture`
+  passed with 5 tests.
+- Phase 3 contract gate:
+  `cargo test --workspace contract_validation -- --nocapture` passed and kept
+  Phase 0 safety invariant tests green.
+- Phase 3 final gate: `make verify` passed after adding v2 probe artifact
+  adapters, generated schemas, and the dummy pressure-kind exercise.
+- Phase 3 PR: draft PR #33 opened at
+  `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/33`.
 
 ## Decision Log
 
@@ -707,15 +748,21 @@ make verify
 - 2026-06-11: Store blocked claim scan terms in the claim catalog while
   preserving v1 `DesignConstraintPack` string shape. Rationale: constraints
   can move to one source of truth without changing the CLI schema yet.
+- 2026-06-11: Keep Phase 3 probe v2 writes behind core APIs instead of changing
+  CLI persistence paths. Rationale: Phase 2-3 must keep CLI v1 shapes green,
+  with public cutover deferred to Phase 4.
+- 2026-06-11: Use compact v2 probe payloads as adapter outputs rather than
+  schema-deriving every nested v1 DTO. Rationale: this keeps the v2 artifact
+  contract strict and small while v1 payloads are still temporary.
 
 ## Handoff
 
-- Branch: `codex/adc-labv2-phase2-rules-engine`.
+- Branch: `codex/adc-labv2-phase3-probe-artifacts`.
 - Baseline commit: `543edf0`.
-- Current status: Phase 2 implemented, verified, pushed, and published as
-  stacked draft PR #32. Phase 0 remains draft PR #30; Phase 1 remains stacked
-  draft PR #31.
-- Uncommitted changes: none expected after the Phase 2 PR URL plan update is
+- Current status: Phase 3 implemented, verified, pushed, and published as
+  stacked draft PR #33. Phase 0 is draft PR #30; Phase 1 is stacked draft PR
+  #31; Phase 2 is stacked draft PR #32.
+- Uncommitted changes: none expected after the Phase 3 PR URL plan update is
   committed and pushed.
 - Commands run so far:
   - `sed -n ...` on the request attachment, `PLANS.md`, execution-plan
@@ -733,22 +780,23 @@ make verify
   - `make schemas`.
   - `cargo test -p adc-lab-core --test evidence_kernel -- --nocapture`.
   - `cargo test -p adc-lab-core --test rules_engine -- --nocapture`.
+  - `cargo test -p adc-lab-core --test probe_artifacts -- --nocapture`.
   - `make verify`.
 - Next steps:
-  1. Start Phase 3 from `codex/adc-labv2-phase2-rules-engine`.
-  2. Keep the Phase 3 PR based on the Phase 2 branch while PR #32 is open.
-  3. Replace probe outputs with `Artifact<P>` and record the dummy pressure-kind
-     extension exercise.
+  1. Start Phase 4 from `codex/adc-labv2-phase3-probe-artifacts`.
+  2. Keep the Phase 4 PR based on the Phase 3 branch while PR #33 is open.
+  3. Cut public CLI output and `cli.rs` expectations over to v2 together.
 - Read these files first when resuming:
   - `plans/20260611-v2-evidence-kernel.md`
   - `crates/adc-lab-core/src/control.rs`
   - `crates/adc-lab-core/src/platform_contract.rs`
   - `crates/adc-lab-core/src/report.rs`
   - `crates/adc-lab-core/src/evidence/`
+  - `crates/adc-lab-core/src/probe/`
   - `crates/adc-lab-core/src/rules/`
   - `crates/adc-lab/tests/cli.rs`
 
 ## Outcomes & Retrospective
 
-Phase 0, Phase 1, and Phase 2 are complete and PR'd. Whole-cutover outcomes
-remain pending until Phases 3-5 are implemented and PR'd.
+Phase 0, Phase 1, Phase 2, and Phase 3 are complete and PR'd. Whole-cutover
+outcomes remain pending until Phases 4-5 are implemented and PR'd.
