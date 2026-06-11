@@ -310,7 +310,7 @@ After a target operating contract run and a workload run exist:
 ```sh
 adc-lab decide suitability \
   --target-run lab/runs/LAB-RUN-target-contract-... \
-  --target-contract lab/runs/LAB-RUN-target-contract-.../reports/target_operating_contract.json \
+  --target-contract lab/runs/LAB-RUN-target-contract-.../reports/target_operating_contract.v2.json \
   --workload-demand lab/runs/LAB-RUN-workload-.../reports/workload_demand_profile.json \
   --policy examples/suitability/pi4-default-policy.yaml \
   --out lab/runs/LAB-RUN-workload-.../reports/suitability_decision.json

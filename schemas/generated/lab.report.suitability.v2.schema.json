@@ -418,10 +418,110 @@
         }
       ]
     },
+    "SuitabilityConfidence": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "SuitabilityDecisionValue": {
+      "type": "string",
+      "enum": [
+        "meet",
+        "marginal",
+        "fail",
+        "unknown"
+      ]
+    },
+    "SuitabilityDimensionDecision": {
+      "type": "object",
+      "required": [
+        "confidence",
+        "decision",
+        "dimension",
+        "evidence_refs",
+        "next_evidence_needed",
+        "portable_between_targets",
+        "requirement",
+        "target_conditioned"
+      ],
+      "properties": {
+        "confidence": {
+          "$ref": "#/definitions/SuitabilityConfidence"
+        },
+        "decision": {
+          "$ref": "#/definitions/SuitabilityDecisionValue"
+        },
+        "dimension": {
+          "$ref": "#/definitions/SuitabilityDimensionKind"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "margin": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "next_evidence_needed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "observed_demand": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "portable_between_targets": {
+          "type": "boolean"
+        },
+        "requirement": {
+          "type": "string"
+        },
+        "target_conditioned": {
+          "type": "boolean"
+        },
+        "target_envelope": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unknown_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "SuitabilityDimensionKind": {
+      "type": "string",
+      "enum": [
+        "cpu",
+        "thermal",
+        "memory",
+        "storage_io",
+        "network_io",
+        "latency_jitter",
+        "observer"
+      ]
+    },
     "SuitabilityPayload": {
       "type": "object",
       "required": [
         "blocked_claims",
+        "dimensions",
         "evaluations",
         "next_evidence",
         "rule_set_id",
@@ -432,6 +532,12 @@
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SuitabilityDimensionDecision"
           }
         },
         "evaluations": {
@@ -446,11 +552,33 @@
             "type": "string"
           }
         },
+        "overall_decision": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SuitabilityDecisionValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "policy_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "rule_set_id": {
           "type": "string"
         },
         "selection_ready": {
           "type": "boolean"
+        },
+        "workload_id": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "additionalProperties": false

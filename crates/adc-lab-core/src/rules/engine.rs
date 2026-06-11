@@ -1,10 +1,15 @@
-use crate::evidence::{claim_definition, ArtifactMeta, Claim, Decision, EvidenceStore, Kind};
+use crate::evidence::{
+    claim_definition, ArtifactMeta, Claim, Decision, EvidenceStore, Kind, Status,
+};
+use crate::probe::{CompositePayload, PressurePayload};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub enum Pred {
     Present(Kind),
+    PressureEffect(&'static str),
+    CompositeMeasured(&'static str),
     All(Vec<Pred>),
     Any(Vec<Pred>),
     Not(Box<Pred>),
@@ -97,11 +102,37 @@ fn evaluate_rule(store: &EvidenceStore, rule: &Rule) -> RuleEvaluation {
 fn eval_pred(store: &EvidenceStore, pred: &Pred) -> bool {
     match pred {
         Pred::Present(kind) => store.iter(*kind).next().is_some(),
+        Pred::PressureEffect(pressure_kind) => pressure_effect_observed(store, pressure_kind),
+        Pred::CompositeMeasured(scenario) => composite_measured(store, scenario),
         Pred::All(preds) => preds.iter().all(|pred| eval_pred(store, pred)),
         Pred::Any(preds) => preds.iter().any(|pred| eval_pred(store, pred)),
         Pred::Not(pred) => !eval_pred(store, pred),
         Pred::Custom(_, func) => func(store),
     }
+}
+
+fn pressure_effect_observed(store: &EvidenceStore, pressure_kind: &str) -> bool {
+    store.iter(Kind::Pressure).any(|meta| {
+        store.load::<PressurePayload>(meta).is_ok_and(|artifact| {
+            is_measured_status(&artifact.status)
+                && artifact.payload.pressure_kind == pressure_kind
+                && artifact.payload.effect_observed
+        })
+    })
+}
+
+fn composite_measured(store: &EvidenceStore, scenario: &str) -> bool {
+    store.iter(Kind::Composite).any(|meta| {
+        store.load::<CompositePayload>(meta).is_ok_and(|artifact| {
+            is_measured_status(&artifact.status)
+                && artifact.payload.scenario == scenario
+                && artifact.payload.coupling_evidence_class == "composite_measured"
+        })
+    })
+}
+
+fn is_measured_status(status: &Status) -> bool {
+    matches!(status, Status::Measured | Status::MeasuredPartial)
 }
 
 fn refs_for_kinds(store: &EvidenceStore, kinds: &[Kind]) -> Vec<String> {

@@ -614,6 +614,19 @@ make verify
 - [x] Phase 5: Update `Makefile` `docs-smoke` paths in the same commit as
       normative doc deletion.
 - [x] Run final whole-cutover `make verify`.
+- [x] Review follow-up: Restore v2 suitability E2E flow and conservative
+      coupling semantics.
+  - [x] Add CLI regression coverage for `report operating-contract` ->
+        `decide suitability` -> `constraints generate` using only
+        tool-produced v2 artifacts.
+  - [x] Add rules regression coverage so insufficient composite evidence does
+        not support memory/storage coupling.
+  - [x] Add probe regression coverage so repeated v2 pressure/composite
+        sidecars are not overwritten.
+  - [x] Add generated schema drift detection to the default `make verify`
+        gate.
+  - [x] Update audit behavior, docs, RCA artifact, outcomes, and final
+        verification evidence.
 
 ## Surprises & Discoveries
 
@@ -654,6 +667,62 @@ make verify
   `run_composite_boundary`, `PressureProbeOptions`) used by the CLI. Phase 5
   deleted the public v1 report/schema/demo surfaces and left the pressure
   runtime for a later file-boundary split.
+- Review follow-up discovery: after PR #37 merged the phase stack into `main`,
+  `decide suitability` still read `TargetOperatingContract` directly, so the
+  v2 `target_operating_contract.v2.json` artifact emitted by
+  `report operating-contract` failed before policy evaluation.
+- Review follow-up discovery: `constraints generate` still read
+  `SuitabilityDecision` directly, so the v2 `Artifact<SuitabilityPayload>`
+  emitted by `decide suitability` could not feed the public README loop.
+- Review follow-up discovery:
+  `operating.memory_storage_coupling_requires_composite` used only artifact
+  presence, allowing insufficient composite evidence to support a coupling
+  claim.
+
+Review follow-up route summary:
+
+- Risk level: high. Public CLI artifacts, claim decisions, schema verification,
+  and audit behavior change, but target/helper/control safety semantics are not
+  touched.
+- Definition of Done:
+  - `decide suitability` accepts the v2 operating contract emitted by
+    `report operating-contract`.
+  - `constraints generate` accepts the v2 suitability artifact emitted by
+    `decide suitability`.
+  - memory/storage coupling is not `Supported` unless measured pressure effect
+    and measured composite scenario evidence are both present.
+  - repeated pressure/composite probes preserve v2 sidecars instead of
+    overwriting prior results.
+  - `make verify` detects generated schema drift.
+- Test List:
+  - CLI E2E suitability loop with v2 artifacts only.
+  - CLI constraints generation from v2 suitability artifact.
+  - rules engine insufficient composite regression.
+  - probe v2 sidecar uniqueness regression.
+  - schema drift check through `make verify`.
+- Responsibility map:
+  - `rules/engine.rs`: owns generic predicate evaluation over indexed
+    artifacts and typed payload loading.
+  - `rules/operating_contract.rs`: owns operating contract rule catalog and
+    conservative report status aggregation.
+  - `rules/suitability.rs`: owns v2 suitability artifact projection and
+    v2-to-v1 constraint-pack view.
+  - `probe/artifacts.rs`: owns v1 probe result to v2 sidecar naming and payload
+    normalization.
+  - `adc-lab` command layer: owns public CLI compatibility, audit events, and
+    file IO.
+- Complexity budget:
+  - New modules/classes: 0.
+  - New helper functions: up to 8, all local to existing modules.
+  - New dependencies: 0.
+  - Production line budget: about 180 lines.
+  - Test/docs/plan line budget: about 260 lines.
+- Branch evidence:
+  - Bug RCA artifact: `reports/bug-reports/20260611-v2-review-followup.md`.
+  - Architecture option analysis: not triggered; no competing architecture
+    options are being selected.
+  - Concurrency/embedded NFR/UI: not triggered; no runtime loop, control
+    surface, background execution, or UI changes.
 
 ## Verification Log
 
@@ -767,6 +836,8 @@ make verify
 - Phase 5 focused CLI verification:
   `cargo test -p adc-lab --test cli pressure_composite_promotes_coupling_evidence_class -- --nocapture`
   passed after adding the v2 rule-required pressure artifact to the test setup.
+  Review follow-up later replaced this expectation with
+  `pressure_composite_smoke_does_not_support_coupling_without_measured_effect`.
 - Phase 5 full CLI verification:
   `cargo test -p adc-lab --test cli -- --nocapture` passed with 31 tests.
 - Phase 5 contract gate:
@@ -778,6 +849,36 @@ make verify
   docs.
 - Phase 5 PR: draft PR #36 opened at
   `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/36`.
+- Review follow-up baseline: `git rev-parse --short origin/main` reported
+  `03529e3`, the PR #37 rollup merge commit.
+- Review follow-up red tests:
+  `cargo test -p adc-lab-core --test rules_engine operating_contract_coupling_requires_measured_effect_not_just_presence -- --nocapture`
+  failed because presence-only coupling matched insufficient composite
+  evidence.
+- Review follow-up red tests:
+  `cargo test -p adc-lab-core --test probe_artifacts pressure_and_composite_v2_sidecars_keep_each_result_id -- --nocapture`
+  failed because same-kind/scenario v2 sidecars overwrote prior results.
+- Review follow-up red tests:
+  `cargo test -p adc-lab --test cli suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end -- --nocapture`
+  failed because `decide suitability` tried to deserialize a v2 operating
+  contract as v1.
+- Review follow-up focused verification:
+  `cargo test -p adc-lab-core --test rules_engine -- --nocapture` passed with
+  6 tests.
+- Review follow-up focused verification:
+  `cargo test -p adc-lab-core --test probe_artifacts -- --nocapture` passed
+  with 3 tests.
+- Review follow-up focused verification:
+  `cargo test -p adc-lab-core --test evidence_kernel -- --nocapture` passed
+  with 7 tests.
+- Review follow-up focused verification:
+  `cargo test -p adc-lab --test cli -- --nocapture` passed with 32 tests.
+- Review follow-up schema verification: `make schemas` passed and regenerated
+  `schemas/generated/lab.report.suitability.v2.schema.json`; `make
+  schemas-check` passed using a temporary schema output directory.
+- Review follow-up final gate: `make verify` passed. The gate now includes
+  build, format, clippy, generated schema drift detection, library tests,
+  integration tests, contract validation, docs smoke, and command smoke.
 
 ## Decision Log
 
@@ -838,16 +939,24 @@ make verify
   without changing probe behavior. Rationale: `platform_contract.rs` still owns
   active bounded pressure execution, while the CLI no longer emits the deleted
   v1 report artifacts.
+- 2026-06-11: Review follow-up keeps the legacy suitability policy evaluator as
+  the numeric policy engine but adds v2 artifact readers/projections at the CLI
+  boundary. Rationale: this restores the public v2 E2E loop without rebuilding
+  target-run numeric suitability semantics in the same PR.
+- 2026-06-11: Promote measured-effect checks into the core predicate
+  vocabulary. Rationale: v2 parity requires claim decisions to inspect artifact
+  status and effect evidence, not mere file existence.
+- 2026-06-11: Write `evidence.write` as normal `lab.audit_event.v1` entries.
+  Rationale: one audit stream should keep a single schema for existing
+  consumers, and v2 evidence writes still need audit coverage.
 
 ## Handoff
 
-- Branch: `codex/adc-labv2-phase5-cleanup`.
-- Baseline commit: `543edf0`.
-- Current status: Phase 5 implemented and verified locally. Phase 0 is draft
-  PR #30; Phase 1 is stacked draft PR #31; Phase 2 is stacked draft PR #32;
-  Phase 3 is stacked draft PR #33; Phase 4 is stacked draft PR #34; Phase 5 is
-  stacked draft PR #36.
-- Uncommitted changes: this plan update, pending handoff commit.
+- Branch: `codex/adc-labv2-review-fixes`.
+- Baseline commit: `03529e3`.
+- Current status: Phase 0-5 were rolled into `main` via PR #37. Review
+  follow-up is implemented and locally verified from `origin/main`.
+- Uncommitted changes: review follow-up implementation pending commit/PR.
 - Commands run so far:
   - `sed -n ...` on the request attachment, `PLANS.md`, execution-plan
     references, existing plans, `COMMANDS.md`, Cargo manifests, Makefile, and
@@ -867,9 +976,18 @@ make verify
   - `cargo test -p adc-lab-core --test probe_artifacts -- --nocapture`.
   - `cargo test -p adc-lab --test cli -- --nocapture`.
   - `make verify`.
+- Review follow-up commands:
+  - `git fetch --prune origin`.
+  - `git switch -c codex/adc-labv2-review-fixes origin/main`.
+  - focused red/green tests listed in the verification log.
+  - `make schemas`.
+  - `make schemas-check`.
+  - `cargo fmt --all`.
+  - `make verify`.
 - Next steps:
-  1. Review/merge stacked PRs in order from #30 through #36.
-  2. Regenerate fresh v2 demo evidence if target-specific evidence is needed.
+  1. Commit and push `codex/adc-labv2-review-fixes`.
+  2. Open a PR targeting `main`.
+  3. Watch CI for the new `schemas-check` stage inside `make verify`.
 - Read these files first when resuming:
   - `plans/20260611-v2-evidence-kernel.md`
   - `crates/adc-lab-core/src/control.rs`
@@ -884,4 +1002,17 @@ make verify
 ## Outcomes & Retrospective
 
 Phase 0 through Phase 5 are implemented, locally verified, pushed, and
-published as stacked draft PRs.
+published as stacked PRs, then rolled into `main` via PR #37.
+
+Review follow-up outcome:
+
+- The public v2 suitability loop now accepts the artifacts emitted by the CLI:
+  v2 operating contract -> v2 suitability artifact -> design constraint pack.
+- The coupling claim is conservative again: pressure/composite artifact
+  presence is insufficient without observed pressure effect and measured
+  composite evidence.
+- Repeated pressure/composite probes retain distinct v2 sidecars by result ID.
+- `make verify` now detects generated schema drift through `schemas-check`.
+- EvidenceStore writes `evidence.write` as normal `lab.audit_event.v1`, and
+  `decide.suitability` / `constraints.generate` add audit events for
+  claim-producing outputs.
