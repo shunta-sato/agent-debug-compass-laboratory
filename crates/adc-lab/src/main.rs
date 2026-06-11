@@ -2581,7 +2581,7 @@ fn write_json_artifact<T: Serialize>(run: &RunContext, path: &Path, value: &T) -
 }
 
 fn evidence_store_for_run(run: &RunContext) -> Result<EvidenceStore> {
-    Ok(EvidenceStore::open(&[run.run_dir.clone()])?)
+    Ok(EvidenceStore::open(std::slice::from_ref(&run.run_dir))?)
 }
 
 fn legacy_v1_sidecar_path(path: &Path) -> PathBuf {
