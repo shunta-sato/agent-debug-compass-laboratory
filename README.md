@@ -357,9 +357,8 @@ It does not expose arbitrary remote shell.
 
 ## Pressure probes
 
-`adc-lab pressure run` creates bounded `lab.resource_pressure_result.v1`
-artifacts. `adc-lab pressure composite` creates bounded
-`lab.composite_boundary_result.v1` artifacts.
+`adc-lab pressure run` and `adc-lab pressure composite` create bounded probe
+evidence and v2 `lab.artifact.v2` sidecars for rule evaluation.
 
 Supported pressure kinds:
 
@@ -405,18 +404,12 @@ adc-lab report operating-contract \
 This writes:
 
 ```text
-lab.platform_mechanism_inventory.v1
-lab.boundary_probe_plan.v1
-lab.resource_coupling_report.v1
-lab.target_operating_contract.v1
+lab.artifact.v2 kind=report.operating_contract
 ```
 
-With `--include-run`, it also writes:
-
-```text
-lab.run_set_manifest.v1
-lab.multi_run_operating_contract.v1
-```
+With `--include-run`, the v2 evidence store opens all provided run
+directories and evaluates one combined rule body. It does not emit v1 run-set
+or multi-run compatibility artifacts.
 
 The contract describes measured mechanisms, boundary evidence,
 resource-coupling evidence class, allowed patterns, burst-only patterns,
@@ -514,13 +507,11 @@ The point is to keep the Agent honest.
 | Pressure probe | `adc-lab pressure run ...` to create bounded pressure evidence. |
 | Operating point experiment | `adc-lab control plan`, approve, apply, load, restore, and health-check. |
 | Operating contract generation | `adc-lab report operating-contract ...` after one or more pressure or control runs. |
-| Workload capability profile | `adc-lab report capability-profile ...` to bind a workload definition to a run. |
 | Local workload suitability | `adc-lab workload run`, `adc-lab decide suitability`, and `adc-lab constraints generate`. |
 | Constraint lint | `adc-lab constraints check ...` to fail on blocked claim text in candidate agent-facing content. |
 
-Capability profiles remain exploratory. Local workload suitability decisions can
-produce meet / marginal / fail / unknown for one target/workload/policy evidence
-body, but they still cannot say:
+Local workload suitability decisions can produce meet / marginal / fail /
+unknown for one target/workload/policy evidence body, but they still cannot say:
 
 ```text
 Pi5 is required.

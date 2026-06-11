@@ -262,41 +262,26 @@ adc-lab report operating-contract \
   --include-run lab/runs/LAB-RUN-network-transfer \
   --target-id target-id \
   --target-class raspberry_pi_4
-
-adc-lab report capability-profile \
-  --run lab/runs/LAB-RUN-... \
-  --target-id local-target \
-  --workload examples/workloads/bounded_cpu_load_2_workers_60s.json
 ```
 
 `adc-lab report operating-point` classifies run evidence as `observational_only`, `controlled_subset`, `controlled_full`, `not_controllable`, or `blocked_unsafe`. Passive frequency variation remains observational evidence; it is not a fixed-frequency sweep.
 
-The same report command also writes `lab.capability_cost_model.v1` as an architecture evidence packet. It records observed CPU/memory/thermal/cpufreq and bounded-load evidence, but keeps GPU/NPU/DSP/storage/network and production physical-footprint claims blocked until qualified, target-specific cost evidence exists.
-
-`adc-lab report operating-contract` writes:
-
-* `lab.platform_mechanism_inventory.v1`
-* `lab.boundary_probe_plan.v1`
-* `lab.resource_coupling_report.v1`
-* `lab.target_operating_contract.v1`
-* `lab.run_set_manifest.v1` when `--include-run` is supplied
-* `lab.multi_run_operating_contract.v1` when `--include-run` is supplied
+`adc-lab report operating-contract` writes `lab.artifact.v2` with
+`kind = report.operating_contract`.
 
 The target operating contract tells agents which patterns are allowed by evidence, burst-only, degraded-mode triggers, forbidden without more evidence, or blocked as claims.
 
-With `--include-run`, the report aggregates evidence refs across runs into one target evidence body. This can move a pack from pressure smoke toward a platform operating contract candidate, but it does not prove same-condition coupling by itself. Resource coupling is measured only when composite or phased evidence exists.
+With `--include-run`, the v2 evidence store opens all provided run
+directories and evaluates the rule table against the combined v2 artifacts. It
+does not emit v1 run-set or multi-run compatibility artifacts.
 
-`adc-lab report capability-profile` writes `lab.target_capability_profile.v1` for a specific `lab.workload_profile.v1`. It reads existing run artifacts only and keeps `selection_ready=false` while capability profiles are exploratory.
-
-A capability profile can say a target produced short-smoke artifacts for a workload. It cannot say:
+An operating contract can support scoped lab claims. It cannot say:
 
 ```text
 Pi4 is sufficient.
 Pi5 is required.
 This target is production-ready.
 ```
-
-See also `docs/architecture/workload-and-capability-profiles.md`.
 
 ## SSH targets
 

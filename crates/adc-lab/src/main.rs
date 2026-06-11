@@ -438,7 +438,6 @@ enum ReportCommand {
     Pack(ReportPackCommand),
     OperatingPoint(ReportPackCommand),
     OperatingContract(OperatingContractCommand),
-    CapabilityProfile(TargetCapabilityProfileCommand),
 }
 
 #[derive(Debug, Args)]
@@ -449,18 +448,6 @@ struct ReportPackCommand {
     target_id: String,
     #[arg(long, default_value = "unknown-target")]
     target: String,
-    #[arg(long)]
-    json: bool,
-}
-
-#[derive(Debug, Args)]
-struct TargetCapabilityProfileCommand {
-    #[arg(long)]
-    run: PathBuf,
-    #[arg(long, default_value = "unknown-target")]
-    target_id: String,
-    #[arg(long)]
-    workload: PathBuf,
     #[arg(long)]
     json: bool,
 }
@@ -621,7 +608,6 @@ fn main() -> Result<()> {
             ReportCommand::OperatingContract(args) => {
                 commands::report::command_report_operating_contract(args)
             }
-            ReportCommand::CapabilityProfile(args) => command_report_capability_profile(args),
         },
         Commands::HealthCheck(args) => command_health_check(args),
         Commands::Privilege { command } => match command {
@@ -1562,12 +1548,9 @@ fn command_report_pack(args: ReportPackCommand) -> Result<()> {
 
 fn command_report_operating_point(args: ReportPackCommand) -> Result<()> {
     let run = existing_run_context(args.run);
-    let coverage = operating_point_coverage(&run.run_dir, args.target_id.clone())?;
-    let cost = capability_cost_model(&run.run_dir, args.target_id)?;
+    let coverage = operating_point_coverage(&run.run_dir, args.target_id)?;
     let coverage_path = run.run_dir.join("reports/operating_point_coverage.json");
-    let cost_path = run.run_dir.join("reports/capability_cost_model.json");
     let coverage_ref = write_json_artifact(&run, &coverage_path, &coverage)?;
-    let cost_ref = write_json_artifact(&run, &cost_path, &cost)?;
     append_audit_event(
         &run,
         AuditInput {
@@ -1584,64 +1567,9 @@ fn command_report_operating_point(args: ReportPackCommand) -> Result<()> {
                 .to_string(),
         },
     )?;
-    append_audit_event(
-        &run,
-        AuditInput {
-            target_id: cost.target_id.clone(),
-            actor: Actor::codex(),
-            operation: "report.capability_cost".to_string(),
-            operation_id: None,
-            risk_tier: RiskTier::Tier0ReadOnlyObservation,
-            approval_ref: None,
-            restore_lease_ref: None,
-            result: serde_json::to_string(&cost.model_status)
-                .unwrap_or_else(|_| "unknown".to_string())
-                .trim_matches('"')
-                .to_string(),
-        },
-    )?;
     print_json(&serde_json::json!({
         "operating_point_coverage_ref": coverage_ref,
-        "capability_cost_model_ref": cost_ref,
-        "coverage": coverage,
-        "cost_model": cost
-    }))
-}
-
-fn command_report_capability_profile(args: TargetCapabilityProfileCommand) -> Result<()> {
-    let run = existing_run_context(args.run);
-    let workload: WorkloadProfile = read_json(&args.workload).with_context(|| {
-        format!(
-            "failed to read workload profile {}",
-            args.workload.display()
-        )
-    })?;
-    let profile = target_capability_profile(&run.run_dir, args.target_id, workload)?;
-    let safe_workload_id = safe_artifact_id(&profile.workload_id, "workload");
-    let path = run
-        .run_dir
-        .join("reports")
-        .join(format!("target_capability_profile.{safe_workload_id}.json"));
-    let artifact_ref = write_json_artifact(&run, &path, &profile)?;
-    append_audit_event(
-        &run,
-        AuditInput {
-            target_id: profile.target_id.clone(),
-            actor: Actor::codex(),
-            operation: "report.target_capability_profile".to_string(),
-            operation_id: Some(profile.workload_id.clone()),
-            risk_tier: RiskTier::Tier0ReadOnlyObservation,
-            approval_ref: None,
-            restore_lease_ref: None,
-            result: serde_json::to_string(&profile.capability_status)
-                .unwrap_or_else(|_| "unknown".to_string())
-                .trim_matches('"')
-                .to_string(),
-        },
-    )?;
-    print_json(&serde_json::json!({
-        "target_capability_profile_ref": artifact_ref,
-        "profile": profile
+        "coverage": coverage
     }))
 }
 
@@ -2582,14 +2510,6 @@ fn write_json_artifact<T: Serialize>(run: &RunContext, path: &Path, value: &T) -
 
 fn evidence_store_for_run(run: &RunContext) -> Result<EvidenceStore> {
     Ok(EvidenceStore::open(std::slice::from_ref(&run.run_dir))?)
-}
-
-fn legacy_v1_sidecar_path(path: &Path) -> PathBuf {
-    let stem = path
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .unwrap_or("artifact");
-    path.with_file_name(format!("{stem}.v1.json"))
 }
 
 fn write_text_artifact(run: &RunContext, path: &Path, value: &str) -> Result<String> {

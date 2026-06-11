@@ -32,8 +32,7 @@
 | `experiment.trial` | explain one matrix trial outcome and per-trial evidence | trial start to trial artifact refs |
 | `experiment.run` | explain matrix planning/execution summary | CLI start to experiment artifacts |
 | `report.operating_point` | explain observed vs controlled operating-point coverage | CLI start to coverage artifact |
-| `report.capability_cost` | explain architecture evidence sufficiency and blocked cost claims | CLI start to capability-cost artifact |
-| `report.target_capability_profile` | explain workload-to-target evidence profile generation | CLI start to target capability profile artifact |
+| `report.target_operating_contract` | explain rule-set evaluation and blocked claims | CLI start to v2 operating-contract artifact |
 | `tool.qualify` | explain whether an agent-created tool can be evidence | CLI start to evidence artifact copy and qualification report |
 | `privilege.provider_status` | explain which privilege provider is active or disabled | CLI start to provider status artifact |
 | `release.package` | explain binary release identity and package integrity | release workflow build to tarball, checksum, attestation, and Release asset |
@@ -144,36 +143,19 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
 - Artifact path:
   `artifact://lab/runs/<run_id>/reports/operating_point_coverage.json`.
 
-- Signal: capability cost model report.
-- Decision supported: whether observed capabilities are sufficient for lab-only
-  architecture claims and which offload/production claims remain blocked.
-- Action owner: lab operator or agent reviewing architecture options.
-- Expected action when degraded: inspect `limitations`, `blocked_claims`, and
-  `next_evidence_needed`; collect qualified target-specific cost evidence before
-  recommending GPU/NPU/DSP/storage/network-heavy designs.
-- Counter-metric: `blocked_claims` prevent hardware presence or bounded load
-  completion from becoming production or offload claims.
-- Failure mode / misleading interpretation: capability presence is not an
-  architecture recommendation.
+- Signal: v2 operating contract report.
+- Decision supported: whether rule-table predicates support, defer, or block
+  named operating claims for the evidence store contents.
+- Action owner: lab operator or agent reviewing operating claims.
+- Expected action when degraded: inspect rule evaluations, catalog claim IDs,
+  and `next_evidence`; collect the listed v2 evidence before repeating the
+  report.
+- Counter-metric: catalog-backed blocked claims prevent probe existence from
+  becoming production or target-selection claims.
+- Failure mode / misleading interpretation: a v2 operating contract is not a
+  benchmark score or target ranking.
 - Artifact path:
-  `artifact://lab/runs/<run_id>/reports/capability_cost_model.json`.
-
-- Signal: target capability profile report.
-- Decision supported: whether a target has exploratory/short-smoke evidence for
-  a specific workload profile, and which target-selection claims remain
-  blocked.
-- Action owner: lab operator or agent preparing later target comparison.
-- Expected action when degraded: inspect `observed_results`,
-  `next_evidence_needed`, and `blocked_claims`; collect missing same-suite
-  evidence before creating target comparison or suitability decisions.
-- Counter-metric: `selection_ready=false` and blocked target-selection claims
-  prevent short-smoke artifacts from becoming "Pi4 sufficient" or "Pi5
-  required" decisions.
-- Failure mode / misleading interpretation: a measured short-smoke capability
-  profile is not a Pi4/Pi5 comparison, sustained thermal proof, or production
-  suitability decision.
-- Artifact path:
-  `artifact://lab/runs/<run_id>/reports/target_capability_profile.<workload_id>.json`.
+  `artifact://lab/runs/<run_id>/reports/target_operating_contract.v2.json`.
 
 - Signal: read-only run manifest.
 - Decision supported: whether target familiarization has inventory, toolchain,
@@ -182,7 +164,8 @@ No metrics or tracing backend is added in MVP to avoid implying production obser
 - Action owner: lab operator or agent reviewing the run.
 - Expected action when degraded: inspect `operations_summary`,
   `data_quality.missing`, and `data_quality.inconsistent`; rerun missing or
-  inconsistent operations before creating target capability profiles.
+  inconsistent operations before creating suitability or operating-contract
+  claims.
 - Counter-metric: familiarization pack `pack_status`, claim trace blocked
   entries, and target capability profile `selection_ready=false`.
 - Failure mode / misleading interpretation: an exploratory short-smoke pack is
