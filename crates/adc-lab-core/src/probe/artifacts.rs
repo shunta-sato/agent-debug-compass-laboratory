@@ -1,6 +1,6 @@
 use crate::contracts::{
-    CompositeBoundaryResult, ContractEvidenceStatus, LoadResult, ResourcePressureResult,
-    WorkloadDemandProfile,
+    CompositeBoundaryResult, ContractEvidenceStatus, LoadResult, NetworkPressureMode,
+    ResourcePressureResult, WorkloadDemandProfile,
 };
 use crate::evidence::{
     Artifact, Bounds, DataQuality, DataQualityLevel, EvidenceStore, Factors, Kind, Metric, Status,
@@ -41,6 +41,9 @@ pub struct PressurePayload {
     pub evidence_class: String,
     pub effect_observed: bool,
     pub duration_ms: u64,
+    pub network_mode: Option<String>,
+    pub network_endpoint_available: Option<bool>,
+    pub network_traffic_generated_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -140,6 +143,18 @@ pub fn pressure_artifact_v2(
             evidence_class: format!("{:?}", result.evidence_class).to_ascii_lowercase(),
             effect_observed: result.pressure_effect.observed,
             duration_ms: result.duration_ms,
+            network_mode: result
+                .network_evidence
+                .as_ref()
+                .map(|evidence| network_mode_label(&evidence.network_mode).to_string()),
+            network_endpoint_available: result
+                .network_evidence
+                .as_ref()
+                .map(|evidence| evidence.endpoint_available),
+            network_traffic_generated_bytes: result
+                .network_evidence
+                .as_ref()
+                .map(|evidence| evidence.traffic_generated_bytes),
         },
         now_unix_ms(),
     );
@@ -325,6 +340,14 @@ fn status_from_contract(status: &ContractEvidenceStatus) -> Status {
         ContractEvidenceStatus::NotControllable | ContractEvidenceStatus::Insufficient => {
             Status::Insufficient
         }
+    }
+}
+
+fn network_mode_label(mode: &NetworkPressureMode) -> &'static str {
+    match mode {
+        NetworkPressureMode::CounterOnly => "counter_only",
+        NetworkPressureMode::EndpointAttempt => "endpoint_attempt",
+        NetworkPressureMode::BoundedTransfer => "bounded_transfer",
     }
 }
 

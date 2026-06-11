@@ -627,6 +627,21 @@ make verify
         gate.
   - [x] Update audit behavior, docs, RCA artifact, outcomes, and final
         verification evidence.
+- [x] Final cleanup follow-up: delete remaining dead v1 public report surfaces,
+      expand v2 operating-contract semantic coverage, and remeasure final
+      LoC/schema counts.
+  - [x] Delete public v1 platform-mechanism inventory, boundary-probe plan,
+        resource-coupling report, target-operating-contract generator,
+        run-set manifest, and multi-run operating-contract generator surfaces.
+  - [x] Delete the corresponding dead DTOs while preserving active pressure
+        runtime DTOs and the `TargetOperatingContract` projection used by the
+        suitability policy engine.
+  - [x] Add v2 predicates for long load duration, endpoint-backed bounded
+        network transfer, and observation sample count.
+  - [x] Expand v2 operating-contract rules for thermal soak, storage writes,
+        network bounded transfer, pressure jitter, and observer cadence.
+  - [x] Regenerate schemas and record final Rust LoC plus handwritten/generated
+        schema counts.
 
 ## Surprises & Discoveries
 
@@ -678,6 +693,15 @@ make verify
   `operating.memory_storage_coupling_requires_composite` used only artifact
   presence, allowing insufficient composite evidence to support a coupling
   claim.
+- Final cleanup discovery: `TargetOperatingContract` and its rule DTOs are not
+  dead yet because `decide suitability` still projects the v2 operating
+  contract into the legacy numeric suitability policy evaluator. The run-dir
+  v1 target-contract generator is dead and was deleted; the projection DTOs
+  remain.
+- Final cleanup discovery: deleting the remaining v1 report generators removes
+  about two thousand lines from `platform_contract.rs`, but the whole-repo Rust
+  LoC target of 40-50% reduction remains unmet because active probe, control,
+  suitability, manifest, and report-pack code still exist.
 
 Review follow-up route summary:
 
@@ -723,6 +747,51 @@ Review follow-up route summary:
     options are being selected.
   - Concurrency/embedded NFR/UI: not triggered; no runtime loop, control
     surface, background execution, or UI changes.
+
+Final cleanup follow-up route summary:
+
+- Risk level: high. The change deletes public core exports and changes
+  operating-contract claim semantics, but leaves target/helper/control safety
+  semantics untouched.
+- Definition of Done:
+  - code/tests no longer reference the dead v1 public report generators or DTOs
+    named in review.
+  - v2 operating-contract rule output covers coupling, thermal, storage,
+    network, jitter, observer, and production-readiness claim boundaries.
+  - network bounded-transfer support requires endpoint-backed payload fields,
+    not a pressure artifact's existence alone.
+  - generated schemas are updated and drift check passes.
+  - final Rust LoC and schema counts are recorded in Outcomes.
+- Test List:
+  - rules engine expanded coverage and conservative blocked-claim regression.
+  - rules engine endpoint-backed network bounded-transfer regression.
+  - probe artifact payload/schema regression.
+  - CLI v2 suitability loop smoke.
+  - full `make verify`.
+- Responsibility map:
+  - `rules/engine.rs`: owns typed semantic predicates over v2 artifacts.
+  - `rules/operating_contract.rs`: owns operating-contract claim coverage and
+    conservative decisions.
+  - `probe/artifacts.rs`: owns normalization from active v1 pressure runtime
+    DTOs into compact v2 pressure payloads.
+  - `contracts.rs`: retains active runtime DTOs and deletes dead v1 report
+    DTOs.
+  - `platform_contract.rs`: owns only bounded pressure/composite runtime after
+    this cleanup.
+- Complexity budget:
+  - New modules/classes: 0.
+  - New helper functions: 4 small predicate/payload helpers.
+  - New dependencies: 0.
+  - Production line budget: net deletion, with about 170 new semantic lines and
+    about 2,100 deleted v1 generator/helper lines.
+  - Test/docs/plan line budget: about 240 lines.
+- Post-implementation economy audit:
+  - Kept new predicate helpers because they remove rule-table pressure to use
+    `Custom` closures for common evidence semantics.
+  - Deleted dead v1 report generators and DTOs instead of adding adapters.
+  - Kept `TargetOperatingContract` DTOs only for the existing suitability
+    policy projection; removing them requires a separate suitability-engine
+    replacement.
 
 ## Verification Log
 
@@ -879,6 +948,44 @@ Review follow-up route summary:
 - Review follow-up final gate: `make verify` passed. The gate now includes
   build, format, clippy, generated schema drift detection, library tests,
   integration tests, contract validation, docs smoke, and command smoke.
+- Final cleanup baseline: `git rev-parse --short origin/main` reported
+  `8e7036a`, the merged review-follow-up main commit.
+- Final cleanup focused verification:
+  `cargo check -p adc-lab-core` passed after deleting dead v1 report surfaces.
+- Final cleanup focused verification:
+  `cargo test -p adc-lab-core --test rules_engine -- --nocapture` passed with
+  8 tests.
+- Final cleanup focused verification:
+  `cargo test -p adc-lab-core --test probe_artifacts -- --nocapture` passed
+  with 3 tests.
+- Final cleanup focused verification:
+  `cargo test -p adc-lab-core --test safety_invariants -- --nocapture` passed
+  with 19 tests.
+- Final cleanup focused verification:
+  `cargo test -p adc-lab --test cli suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end -- --nocapture`
+  passed.
+- Final cleanup focused verification: `cargo check --workspace` passed.
+- Final cleanup schema verification: `make schemas` passed and regenerated
+  `schemas/generated/lab.pressure.v2.schema.json`; `make schemas-check`
+  passed using a temporary schema output directory.
+- Final cleanup measurement:
+  `find crates -name '*.rs' -type f -print0 | xargs -0 wc -l | tail -n 1`
+  reported 18,038 total Rust lines.
+- Final cleanup measurement:
+  `find schemas -maxdepth 1 -type f -name '*.schema.json' | wc -l` reported
+  32 handwritten schema files.
+- Final cleanup measurement:
+  `find schemas/generated -maxdepth 1 -type f -name '*.schema.json' | wc -l`
+  reported 9 generated schema files.
+- Final cleanup large-file measurement:
+  `wc -l crates/adc-lab-core/src/contracts.rs crates/adc-lab-core/src/platform_contract.rs crates/adc-lab-core/src/rules/operating_contract.rs crates/adc-lab-core/src/rules/engine.rs crates/adc-lab-core/src/probe/artifacts.rs crates/adc-lab/src/main.rs`
+  reported `contracts.rs` 1,393; `platform_contract.rs` 1,496;
+  `operating_contract.rs` 246; `engine.rs` 200; `artifacts.rs` 378;
+  `main.rs` 2,595.
+- Final cleanup final gate: `make verify` passed. The gate ran workspace
+  build, format check, clippy with `-D warnings`, generated schema drift check,
+  library tests, integration tests, contract validation, docs smoke, and
+  command smoke.
 
 ## Decision Log
 
@@ -949,14 +1056,24 @@ Review follow-up route summary:
 - 2026-06-11: Write `evidence.write` as normal `lab.audit_event.v1` entries.
   Rationale: one audit stream should keep a single schema for existing
   consumers, and v2 evidence writes still need audit coverage.
+- 2026-06-11: Delete the remaining dead v1 public report generators and DTOs
+  from `platform_contract.rs`/`contracts.rs`, but keep `TargetOperatingContract`
+  projection DTOs. Rationale: the public CLI now emits v2 artifacts, while the
+  legacy suitability policy evaluator still needs a typed projection until the
+  suitability engine is replaced.
+- 2026-06-11: Expand operating-contract coverage through typed predicates
+  rather than `Custom` closures. Rationale: thermal, network, observer, and
+  jitter semantics are common enough to be first-class rule vocabulary, and
+  artifact presence alone must not support claim boundaries.
 
 ## Handoff
 
-- Branch: `codex/adc-labv2-review-fixes`.
-- Baseline commit: `03529e3`.
-- Current status: Phase 0-5 were rolled into `main` via PR #37. Review
-  follow-up is implemented and locally verified from `origin/main`.
-- Uncommitted changes: review follow-up implementation pending commit/PR.
+- Branch: `codex/adc-labv2-final-cleanup`.
+- Baseline commit: `8e7036a`.
+- Current status: Phase 0-5 and the review follow-up were merged into `main`.
+  Final cleanup follow-up is implemented locally from `origin/main` with
+  `make verify` passing.
+- Uncommitted changes: final cleanup implementation pending commit/PR.
 - Commands run so far:
   - `sed -n ...` on the request attachment, `PLANS.md`, execution-plan
     references, existing plans, `COMMANDS.md`, Cargo manifests, Makefile, and
@@ -984,10 +1101,23 @@ Review follow-up route summary:
   - `make schemas-check`.
   - `cargo fmt --all`.
   - `make verify`.
+- Final cleanup commands:
+  - `git switch -c codex/adc-labv2-final-cleanup origin/main`.
+  - `cargo check -p adc-lab-core`.
+  - `cargo test -p adc-lab-core --test rules_engine -- --nocapture`.
+  - `cargo test -p adc-lab-core --test probe_artifacts -- --nocapture`.
+  - `cargo test -p adc-lab-core --test safety_invariants -- --nocapture`.
+  - `cargo test -p adc-lab --test cli suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end -- --nocapture`.
+  - `cargo check --workspace`.
+  - `cargo fmt --all`.
+  - `make schemas`.
+  - `make schemas-check`.
+  - `make verify`.
+  - final LoC/schema measurement commands listed in the verification log.
 - Next steps:
-  1. Commit and push `codex/adc-labv2-review-fixes`.
+  1. Commit and push `codex/adc-labv2-final-cleanup`.
   2. Open a PR targeting `main`.
-  3. Watch CI for the new `schemas-check` stage inside `make verify`.
+  3. Watch CI for `make verify`.
 - Read these files first when resuming:
   - `plans/20260611-v2-evidence-kernel.md`
   - `crates/adc-lab-core/src/control.rs`
@@ -1016,3 +1146,24 @@ Review follow-up outcome:
 - EvidenceStore writes `evidence.write` as normal `lab.audit_event.v1`, and
   `decide.suitability` / `constraints.generate` add audit events for
   claim-producing outputs.
+
+Final cleanup follow-up outcome:
+
+- The remaining dead v1 public report surfaces named in review are removed
+  from code/tests: platform-mechanism inventory, boundary-probe plan,
+  resource-coupling report, v1 target-operating-contract run-dir generator,
+  run-set manifest, and multi-run operating-contract.
+- `platform_contract.rs` is now reduced to active bounded pressure/composite
+  runtime plus tests: 1,496 lines, down from the plan baseline of about 3,538.
+- v2 operating-contract coverage now evaluates seven rule rows: coupling,
+  sustained thermal soak, bounded storage writes, bounded network transfer,
+  pressure-specific jitter, observer cadence, and production readiness.
+- `PressurePayload` now carries optional endpoint-backed network transfer
+  fields so `NetworkBoundedTransfer` can inspect payload semantics.
+- Final measured Rust implementation total is 18,038 lines versus the original
+  19,311-line denominator, a 1,273-line reduction. The planned 40-50% overall
+  code-reduction target remains unmet.
+- Final schema counts are 32 handwritten v1 schema files and 9 generated v2
+  schema files. The original "0 handwritten schemas" quantitative target
+  remains unmet because active v1 control, run manifest, workload, suitability,
+  and report-pack surfaces still publish v1 schemas.
