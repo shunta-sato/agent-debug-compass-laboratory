@@ -28,6 +28,45 @@ fn probe_artifact_writers_index_all_core_probe_kinds() {
 }
 
 #[test]
+fn pressure_and_composite_v2_sidecars_keep_each_result_id() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+    let mut first_pressure = pressure();
+    let mut second_pressure = pressure();
+    first_pressure.result_id = "PRESSURE-001".to_string();
+    second_pressure.result_id = "PRESSURE-002".to_string();
+    let mut first_composite = composite();
+    let mut second_composite = composite();
+    first_composite.result_id = "COMPOSITE-001".to_string();
+    second_composite.result_id = "COMPOSITE-002".to_string();
+
+    write_pressure_artifact_v2(&mut store, temp.path(), first_pressure).unwrap();
+    write_pressure_artifact_v2(&mut store, temp.path(), second_pressure).unwrap();
+    write_composite_artifact_v2(&mut store, temp.path(), first_composite).unwrap();
+    write_composite_artifact_v2(&mut store, temp.path(), second_composite).unwrap();
+
+    let reopened = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+    assert_eq!(reopened.iter(Kind::Pressure).count(), 2);
+    assert_eq!(reopened.iter(Kind::Composite).count(), 2);
+    assert!(temp
+        .path()
+        .join("pressure/memory_pressure.PRESSURE-001.v2.json")
+        .exists());
+    assert!(temp
+        .path()
+        .join("pressure/memory_pressure.PRESSURE-002.v2.json")
+        .exists());
+    assert!(temp
+        .path()
+        .join("composite/memory_storage_jitter.COMPOSITE-001.v2.json")
+        .exists());
+    assert!(temp
+        .path()
+        .join("composite/memory_storage_jitter.COMPOSITE-002.v2.json")
+        .exists());
+}
+
+#[test]
 fn dummy_pressure_kind_extension_exercise_stays_within_three_hand_edited_files() {
     let touched_files = [
         "crates/adc-lab-core/src/probe/artifacts.rs",

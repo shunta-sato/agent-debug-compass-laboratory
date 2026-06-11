@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -1141,7 +1142,7 @@ pub struct WorkloadDemandProfile {
     pub time_unix_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum SuitabilityDimensionKind {
     Cpu,
@@ -1153,7 +1154,7 @@ pub enum SuitabilityDimensionKind {
     Observer,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SuitabilityDecisionValue {
     Meet,
@@ -1162,7 +1163,7 @@ pub enum SuitabilityDecisionValue {
     Unknown,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SuitabilityConfidence {
     Low,
@@ -1209,7 +1210,7 @@ pub struct SuitabilityPolicy {
     pub memory: Option<MemorySuitabilityPolicy>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SuitabilityDimensionDecision {
     pub dimension: SuitabilityDimensionKind,

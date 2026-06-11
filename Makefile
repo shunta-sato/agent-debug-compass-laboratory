@@ -1,4 +1,4 @@
-.PHONY: help build-debug build-release format format-fix lint analysis test-unit test-integration contract schemas docs-smoke command-smoke verify clean
+.PHONY: help build-debug build-release format format-fix lint analysis test-unit test-integration contract schemas schemas-check docs-smoke command-smoke verify clean
 
 help:
 	@printf '%s\n' \
@@ -13,8 +13,9 @@ help:
 	  '  make test-integration  cargo test --workspace --tests' \
 	  '  make contract          cargo test --workspace contract_validation -- --nocapture' \
 	  '  make schemas           cargo run -p adc-lab-core --example generate_schemas -- schemas/generated' \
+	  '  make schemas-check     regenerate schemas and fail on generated drift' \
 	  '  make command-smoke     scripts/resource/run-resource-smoke.sh --host-fallback' \
-	  '  make verify            build-debug + format + lint + tests + contract + docs/command smoke'
+	  '  make verify            build-debug + format + lint + schemas-check + tests + contract + docs/command smoke'
 
 build-debug:
 	cargo build --workspace
@@ -45,6 +46,12 @@ contract:
 schemas:
 	cargo run -p adc-lab-core --example generate_schemas -- schemas/generated
 
+schemas-check:
+	tmp_dir=$$(mktemp -d); \
+	trap 'rm -rf "$$tmp_dir"' EXIT; \
+	cargo run -p adc-lab-core --example generate_schemas -- "$$tmp_dir"; \
+	diff -ru schemas/generated "$$tmp_dir"
+
 docs-smoke:
 	test -f README.md
 	test -f docs/architecture/privilege-model-option-a.md
@@ -57,7 +64,7 @@ docs-smoke:
 command-smoke:
 	scripts/resource/run-resource-smoke.sh --host-fallback
 
-verify: build-debug format lint test-unit test-integration contract docs-smoke command-smoke
+verify: build-debug format lint schemas-check test-unit test-integration contract docs-smoke command-smoke
 
 clean:
 	cargo clean

@@ -1092,11 +1092,41 @@ fn persist_workload_artifacts(
 }
 
 fn command_constraints_generate(args: ConstraintsGenerateCommand) -> Result<()> {
-    let decision: SuitabilityDecision = read_json(&args.decision)?;
-    let pack = generate_design_constraint_pack(&decision);
+    let decision_value: serde_json::Value = read_json(&args.decision)?;
+    let (pack, audit_context) = if decision_value
+        .get("schema")
+        .and_then(|schema| schema.as_str())
+        == Some("lab.artifact.v2")
+    {
+        let artifact: Artifact<SuitabilityPayload> = serde_json::from_value(decision_value)?;
+        let audit_context = run_context_for_report_artifact(&args.decision, &artifact.run_id)
+            .map(|run| (run, artifact.target_id.clone(), artifact.id.clone()));
+        (
+            generate_design_constraint_pack_from_suitability_artifact(&artifact),
+            audit_context,
+        )
+    } else {
+        let decision: SuitabilityDecision = serde_json::from_value(decision_value)?;
+        (generate_design_constraint_pack(&decision), None)
+    };
     let markdown = render_agent_constraints_markdown(&pack, &path_ref(&args.decision));
     write_json_pretty(&args.out, &pack)?;
     write_text_file(&args.agent_instructions_out, &markdown)?;
+    if let Some((run, target_id, decision_id)) = audit_context {
+        append_audit_event(
+            &run,
+            AuditInput {
+                target_id,
+                actor: Actor::codex(),
+                operation: "constraints.generate".to_string(),
+                operation_id: Some(decision_id),
+                risk_tier: RiskTier::Tier0ReadOnlyObservation,
+                approval_ref: None,
+                restore_lease_ref: None,
+                result: "generated".to_string(),
+            },
+        )?;
+    }
     if args.json {
         print_json(&pack)?;
     } else {
@@ -1104,6 +1134,17 @@ fn command_constraints_generate(args: ConstraintsGenerateCommand) -> Result<()> 
         println!("{}", args.agent_instructions_out.display());
     }
     Ok(())
+}
+
+fn run_context_for_report_artifact(path: &Path, run_id: &str) -> Option<RunContext> {
+    let reports_dir = path.parent()?;
+    if reports_dir.file_name().and_then(|name| name.to_str()) != Some("reports") {
+        return None;
+    }
+    Some(RunContext {
+        run_id: run_id.to_string(),
+        run_dir: reports_dir.parent()?.to_path_buf(),
+    })
 }
 
 fn command_constraints_check(args: ConstraintsCheckCommand) -> Result<()> {

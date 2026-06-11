@@ -276,7 +276,11 @@ pub fn write_pressure_artifact_v2(
     run_dir: &Path,
     result: ResourcePressureResult,
 ) -> LabResult<String> {
-    let relative = format!("pressure/{}.v2.json", result.pressure_kind.as_str());
+    let relative = format!(
+        "pressure/{}.{}.v2.json",
+        result.pressure_kind.as_str(),
+        safe_file_segment(&result.result_id)
+    );
     let artifact = pressure_artifact_v2(run_id_from_dir(run_dir), result);
     store.write(run_dir, Path::new(&relative), &artifact)
 }
@@ -286,7 +290,11 @@ pub fn write_composite_artifact_v2(
     run_dir: &Path,
     result: CompositeBoundaryResult,
 ) -> LabResult<String> {
-    let relative = format!("composite/{}.v2.json", result.scenario.as_str());
+    let relative = format!(
+        "composite/{}.{}.v2.json",
+        result.scenario.as_str(),
+        safe_file_segment(&result.result_id)
+    );
     let artifact = composite_artifact_v2(run_id_from_dir(run_dir), result);
     store.write(run_dir, Path::new(&relative), &artifact)
 }
@@ -326,4 +334,22 @@ fn run_id_from_dir(run_dir: &Path) -> String {
         .and_then(|value| value.to_str())
         .map(|value| value.to_string())
         .unwrap_or_else(|| "LAB-RUN-v2".to_string())
+}
+
+fn safe_file_segment(value: &str) -> String {
+    let segment = value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    if segment.is_empty() {
+        "unknown".to_string()
+    } else {
+        segment
+    }
 }

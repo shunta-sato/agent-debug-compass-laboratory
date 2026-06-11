@@ -315,6 +315,113 @@ fn decide_suitability_writes_v2_without_legacy_sidecar() {
 }
 
 #[test]
+fn suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::create_dir_all(temp.path().join("observations")).unwrap();
+    fs::write(
+        temp.path().join("observations/observe.json"),
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "max_observed_temp_c": 61.0,
+            "memory_available_kb": 7340032
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let demand_path = temp.path().join("workload_demand_profile.json");
+    let policy_path = temp.path().join("policy.yaml");
+    let decision_path = temp.path().join("reports/suitability_decision.json");
+    let constraints_path = temp.path().join("reports/design_constraint_pack.json");
+    let agent_md_path = temp.path().join("reports/agent_constraints.md");
+    fs::copy(
+        workspace_root().join("tests/golden/lab.workload_demand_profile.v1.valid.json"),
+        &demand_path,
+    )
+    .unwrap();
+    fs::copy(
+        workspace_root().join("tests/golden/lab.suitability_policy.v1.valid.json"),
+        &policy_path,
+    )
+    .unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "operating-contract",
+            "--run",
+            temp.path().to_str().unwrap(),
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--json",
+        ])
+        .assert()
+        .success();
+    let contract_path = temp
+        .path()
+        .join("reports/target_operating_contract.v2.json");
+    assert!(contract_path.exists());
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "decide",
+            "suitability",
+            "--target-run",
+            temp.path().to_str().unwrap(),
+            "--target-contract",
+            contract_path.to_str().unwrap(),
+            "--workload-demand",
+            demand_path.to_str().unwrap(),
+            "--policy",
+            policy_path.to_str().unwrap(),
+            "--out",
+            decision_path.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"kind\": \"report.suitability\""));
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "constraints",
+            "generate",
+            "--decision",
+            decision_path.to_str().unwrap(),
+            "--out",
+            constraints_path.to_str().unwrap(),
+            "--agent-instructions-out",
+            agent_md_path.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains(
+            "\"schema_version\": \"lab.design_constraint_pack.v1\"",
+        ));
+
+    let decision: serde_json::Value =
+        serde_json::from_slice(&fs::read(&decision_path).unwrap()).unwrap();
+    assert_eq!(decision["schema"], "lab.artifact.v2");
+    assert_eq!(decision["kind"], "report.suitability");
+    let constraints: serde_json::Value =
+        serde_json::from_slice(&fs::read(&constraints_path).unwrap()).unwrap();
+    assert_eq!(
+        constraints["schema_version"],
+        "lab.design_constraint_pack.v1"
+    );
+    let markdown = fs::read_to_string(agent_md_path).unwrap();
+    assert!(markdown.contains("## Blocked claims"));
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"report.target_operating_contract\""));
+    assert!(audit.contains("\"operation\":\"decide.suitability\""));
+    assert!(audit.contains("\"operation\":\"constraints.generate\""));
+}
+
+#[test]
 fn constraints_check_fails_on_blocked_claim_fixture() {
     let temp = tempfile::tempdir().unwrap();
     let pack_path = temp.path().join("design_constraint_pack.json");
@@ -883,7 +990,7 @@ fn report_operating_contract_accepts_include_run_in_v2_store() {
 }
 
 #[test]
-fn pressure_composite_promotes_coupling_evidence_class() {
+fn pressure_composite_smoke_does_not_support_coupling_without_measured_effect() {
     let temp = tempfile::tempdir().unwrap();
 
     Command::cargo_bin("adc-lab")
@@ -971,7 +1078,8 @@ fn pressure_composite_promotes_coupling_evidence_class() {
         .iter()
         .any(|evaluation| evaluation["rule_id"]
             == "operating.memory_storage_coupling_requires_composite"
-            && evaluation["matched"] == true));
+            && evaluation["matched"] == false
+            && evaluation["decision"] == "blocked"));
 
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"pressure.composite\""));
