@@ -662,6 +662,8 @@ make verify
   Phase 0 safety invariant tests green.
 - Phase 2 final gate: `make verify` passed after adding the rules engine,
   catalog-backed blocked claim terms, v2 report schemas, and focused tests.
+- Phase 2 PR: draft PR #32 opened at
+  `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/32`.
 
 ## Decision Log
 
@@ -710,12 +712,11 @@ make verify
 
 - Branch: `codex/adc-labv2-phase2-rules-engine`.
 - Baseline commit: `543edf0`.
-- Current status: Phase 2 implemented and verified locally. Phase 0 is draft PR
-  #30; Phase 1 is stacked draft PR #31. Phase 2 should be committed, pushed,
-  and opened as a stacked draft PR based on
-  `codex/adc-labv2-phase1-evidence-kernel`.
-- Uncommitted changes: Phase 2 rules engine, catalog connection, generated
-  schemas, tests, and this plan update are pending commit.
+- Current status: Phase 2 implemented, verified, pushed, and published as
+  stacked draft PR #32. Phase 0 remains draft PR #30; Phase 1 remains stacked
+  draft PR #31.
+- Uncommitted changes: none expected after the Phase 2 PR URL plan update is
+  committed and pushed.
 - Commands run so far:
   - `sed -n ...` on the request attachment, `PLANS.md`, execution-plan
     references, existing plans, `COMMANDS.md`, Cargo manifests, Makefile, and
@@ -734,10 +735,10 @@ make verify
   - `cargo test -p adc-lab-core --test rules_engine -- --nocapture`.
   - `make verify`.
 - Next steps:
-  1. Commit and push Phase 2 on `codex/adc-labv2-phase2-rules-engine`.
-  2. Open the Phase 2 draft PR against
-     `codex/adc-labv2-phase1-evidence-kernel`.
-  3. Start Phase 3 from the Phase 2 branch after the Phase 2 PR exists.
+  1. Start Phase 3 from `codex/adc-labv2-phase2-rules-engine`.
+  2. Keep the Phase 3 PR based on the Phase 2 branch while PR #32 is open.
+  3. Replace probe outputs with `Artifact<P>` and record the dummy pressure-kind
+     extension exercise.
 - Read these files first when resuming:
   - `plans/20260611-v2-evidence-kernel.md`
   - `crates/adc-lab-core/src/control.rs`
@@ -749,6 +750,5 @@ make verify
 
 ## Outcomes & Retrospective
 
-Phase 0 and Phase 1 are complete and PR'd. Phase 2 is complete locally.
-Whole-cutover outcomes remain pending until Phases 2-5 are implemented and
-PR'd.
+Phase 0, Phase 1, and Phase 2 are complete and PR'd. Whole-cutover outcomes
+remain pending until Phases 3-5 are implemented and PR'd.
