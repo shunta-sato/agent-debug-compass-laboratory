@@ -1142,12 +1142,15 @@ fn experiment_dry_run_and_report_pack_work() {
         ])
         .assert()
         .success()
-        .stdout(contains("familiarization_pack.json"))
+        .stdout(contains("run_report.v2.json"))
         .get_output()
         .stdout
         .clone();
     let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let refs = value["value"]["artifact_refs"].as_array().unwrap();
+    assert_eq!(value["value"]["kind"], "report.run");
+    let refs = value["value"]["payload"]["artifact_refs"]
+        .as_array()
+        .unwrap();
     assert!(refs.iter().all(|artifact| artifact
         .as_str()
         .unwrap()
@@ -1207,16 +1210,13 @@ fn experiment_real_run_executes_supported_bounded_matrix() {
         .iter()
         .any(|artifact| artifact.as_str().unwrap().ends_with("/load_result.json"))));
 
-    let trace: serde_json::Value = serde_json::from_slice(
-        &fs::read(temp.path().join("reports/claim_evidence_trace.json")).unwrap(),
-    )
-    .unwrap();
-    assert!(trace["claims"].as_array().unwrap().iter().any(|claim| {
+    let report: serde_json::Value =
+        serde_json::from_slice(&fs::read(temp.path().join("reports/run_report.v2.json")).unwrap())
+            .unwrap();
+    assert_eq!(report["kind"], "report.run");
+    assert!(report["claims"].as_array().unwrap().iter().any(|claim| {
         claim["decision"] == "supported"
-            && claim["claim"]
-                .as_str()
-                .unwrap()
-                .contains("Bounded non-privileged experiment matrix executed")
+            && claim["claim_id"] == "run.experiment_bounded_matrix_executed"
     }));
 
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
@@ -1279,16 +1279,13 @@ order: listed
         .contains("controlled factor 'governor' is not supported"));
     assert!(trial["artifact_refs"].as_array().unwrap().is_empty());
 
-    let trace: serde_json::Value = serde_json::from_slice(
-        &fs::read(temp.path().join("reports/claim_evidence_trace.json")).unwrap(),
-    )
-    .unwrap();
-    assert!(trace["claims"].as_array().unwrap().iter().any(|claim| {
+    let report: serde_json::Value =
+        serde_json::from_slice(&fs::read(temp.path().join("reports/run_report.v2.json")).unwrap())
+            .unwrap();
+    assert_eq!(report["kind"], "report.run");
+    assert!(report["claims"].as_array().unwrap().iter().any(|claim| {
         claim["decision"] == "blocked"
-            && claim["claim"]
-                .as_str()
-                .unwrap()
-                .contains("Bounded non-privileged experiment matrix")
+            && claim["claim_id"] == "run.experiment_bounded_matrix_executed"
     }));
 
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
@@ -1329,40 +1326,36 @@ fn report_operating_point_marks_read_only_run_observational_only() {
         ])
         .assert()
         .success()
-        .stdout(contains("operating_point_coverage.json"))
+        .stdout(contains("run_report.v2.json"))
         .stdout(contains("\"coverage_status\": \"observational_only\""))
         .get_output()
         .stdout
         .clone();
 
     let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let coverage = &value["coverage"];
+    let coverage = &value["value"]["payload"]["operating_point"];
     assert_eq!(coverage["coverage_status"], "observational_only");
     assert!(coverage["observed_points"]
         .as_array()
         .unwrap()
         .iter()
         .any(|point| point["factor_id"] == "default_policy_frequency"
-            && point["coverage_status"] == "observational_only"));
+            && point["level"] == "observed_current_policy"));
     assert!(coverage["blocked_points"]
         .as_array()
         .unwrap()
         .iter()
         .any(|point| point["factor_id"] == "fixed_cpu_frequency"
             && point["coverage_status"] == "not_controllable"));
-    assert!(coverage["claim_boundaries"]
+    assert!(value["value"]["claims"]
         .as_array()
         .unwrap()
         .iter()
-        .any(|boundary| boundary["decision"] == "blocked"
-            && boundary["claim"]
-                .as_str()
-                .unwrap()
-                .contains("fixed CPU frequencies")));
+        .any(|claim| claim["decision"] == "blocked"
+            && claim["claim_id"] == "operating_point.fixed_cpu_frequency_verified"));
 
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
-    assert!(audit.contains("\"operation\":\"report.operating_point\""));
-    assert!(audit.contains("\"result\":\"observational_only\""));
+    assert!(audit.contains("\"operation\":\"report.run\""));
 }
 
 #[test]
@@ -1560,40 +1553,32 @@ fn report_operating_point_marks_bounded_matrix_controlled_subset() {
         .clone();
 
     let value: serde_json::Value = serde_json::from_slice(&output).unwrap();
-    let coverage = &value["coverage"];
+    let coverage = &value["value"]["payload"]["operating_point"];
     assert_eq!(coverage["coverage_status"], "controlled_subset");
     assert!(coverage["controlled_points"]
         .as_array()
         .unwrap()
         .iter()
         .any(|point| point["factor_id"] == "cpu_load_workers"
-            && point["coverage_status"] == "controlled_subset"
-            && point["evidence_class"] == "bounded_load"));
-    assert!(coverage["claim_boundaries"]
+            && !point["evidence_refs"].as_array().unwrap().is_empty()));
+    assert!(value["value"]["claims"]
         .as_array()
         .unwrap()
         .iter()
-        .any(|boundary| boundary["decision"] == "supported"
-            && boundary["claim"]
-                .as_str()
-                .unwrap()
-                .contains("bounded workload")));
-    assert!(coverage["claim_boundaries"]
+        .any(|claim| claim["decision"] == "supported"
+            && claim["claim_id"] == "operating_point.bounded_workload_measured"));
+    assert!(value["value"]["claims"]
         .as_array()
         .unwrap()
         .iter()
-        .any(|boundary| boundary["decision"] == "blocked"
-            && boundary["claim"]
-                .as_str()
-                .unwrap()
-                .contains("fixed CPU frequencies")));
+        .any(|claim| claim["decision"] == "blocked"
+            && claim["claim_id"] == "operating_point.fixed_cpu_frequency_verified"));
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
-    assert!(audit.contains("\"operation\":\"report.operating_point\""));
-    assert!(audit.contains("\"result\":\"controlled_subset\""));
+    assert!(audit.contains("\"operation\":\"report.run\""));
 }
 
 #[test]
-fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
+fn familiarize_read_only_writes_manifest_run_report_and_audit() {
     let temp = tempfile::tempdir().unwrap();
     let output = Command::cargo_bin("adc-lab")
         .unwrap()
@@ -1610,10 +1595,10 @@ fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
         ])
         .assert()
         .success()
-        .stdout(contains("\"pack_status\": \"observational_read_only\""))
+        .stdout(contains("\"report_status\": \"observational_read_only\""))
         .stdout(contains("\"run_manifest_ref\""))
-        .stdout(contains("\"familiarization_pack_ref\""))
-        .stdout(contains("tool qualification summary was generated"))
+        .stdout(contains("\"run_report_ref\""))
+        .stdout(contains("run.tool_qualification_summary_generated"))
         .get_output()
         .stdout
         .clone();
@@ -1623,20 +1608,19 @@ fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
         .as_str()
         .unwrap()
         .starts_with("artifact://lab/runs/"));
-    assert!(value["familiarization_pack_ref"]
+    assert!(value["run_report_ref"]
         .as_str()
         .unwrap()
         .starts_with("artifact://lab/runs/"));
+    assert_eq!(value["value"]["kind"], "report.run");
 
     assert!(temp.path().join("run_manifest.json").exists());
-    assert!(temp
-        .path()
-        .join("reports/familiarization_pack.json")
-        .exists());
-    assert!(temp
-        .path()
-        .join("reports/claim_evidence_trace.json")
-        .exists());
+    assert!(temp.path().join("reports/run_report.v2.json").exists());
+    let report_files = fs::read_dir(temp.path().join("reports"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(report_files, vec!["run_report.v2.json"]);
     assert!(temp.path().join("inventory/target_inventory.json").exists());
     assert!(temp
         .path()
@@ -1665,6 +1649,7 @@ fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
         "completed"
     );
     assert_eq!(manifest["operations_summary"]["bounded_load"], "not_run");
+    assert_eq!(manifest["claim_trace_ref"], value["run_report_ref"]);
     assert!(!manifest["adc_lab_version"].as_str().unwrap().is_empty());
     assert!(!manifest["adc_lab_git_sha"].as_str().unwrap().is_empty());
     assert!(!manifest["adc_lab_target_version"]
@@ -1682,23 +1667,16 @@ fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
         .iter()
         .any(|item| item == "controlled operating point experiment was not run"));
 
-    let trace: serde_json::Value = serde_json::from_slice(
-        &fs::read(temp.path().join("reports/claim_evidence_trace.json")).unwrap(),
-    )
-    .unwrap();
-    assert!(trace["claims"].as_array().unwrap().iter().any(|claim| {
+    let report: serde_json::Value =
+        serde_json::from_slice(&fs::read(temp.path().join("reports/run_report.v2.json")).unwrap())
+            .unwrap();
+    assert!(report["claims"].as_array().unwrap().iter().any(|claim| {
         claim["decision"] == "supported"
-            && claim["claim"]
-                .as_str()
-                .unwrap()
-                .contains("tool qualification summary")
+            && claim["claim_id"] == "run.tool_qualification_summary_generated"
     }));
-    assert!(trace["claims"].as_array().unwrap().iter().any(|claim| {
+    assert!(report["claims"].as_array().unwrap().iter().any(|claim| {
         claim["decision"] == "blocked"
-            && claim["claim"]
-                .as_str()
-                .unwrap()
-                .contains("fixed CPU frequency")
+            && claim["claim_id"] == "operating_point.fixed_cpu_frequency_verified"
     }));
 
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
@@ -1708,9 +1686,9 @@ fn familiarize_read_only_writes_manifest_pack_claim_trace_and_audit() {
         "observe",
         "tool.qualify_inventory",
         "tool.version",
-        "report.claim_trace",
+        "evidence.write",
+        "report.run",
         "run_manifest.write",
-        "report.pack",
     ] {
         assert!(audit.contains(&format!("\"operation\":\"{operation}\"")));
     }

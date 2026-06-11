@@ -1,6 +1,7 @@
 use adc_lab_core::{
     Artifact, ClaimDefinition, CompositePayload, LoadPayload, ObservationPayload,
-    OperatingContractPayload, PressurePayload, SuitabilityPayload, WorkloadPayload,
+    OperatingContractPayload, PressurePayload, RunReportPayload, SuitabilityPayload,
+    WorkloadPayload,
 };
 use schemars::schema_for;
 use std::fs;
@@ -29,6 +30,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(
         out_dir.join("lab.report.operating_contract.v2.schema.json"),
         serde_json::to_vec_pretty(&operating_contract_schema)?,
+    )?;
+
+    let run_report_schema = schema_for!(Artifact<RunReportPayload>);
+    fs::write(
+        out_dir.join("lab.report.run.v2.schema.json"),
+        serde_json::to_vec_pretty(&run_report_schema)?,
     )?;
 
     let suitability_schema = schema_for!(Artifact<SuitabilityPayload>);

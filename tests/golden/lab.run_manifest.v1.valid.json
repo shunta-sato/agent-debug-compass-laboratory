@@ -40,13 +40,18 @@
       "schema_version": "lab.target_inventory.v1"
     },
     {
+      "name": "report_run",
+      "ref": "artifact://lab/runs/LAB-RUN-001/reports/run_report.v2.json",
+      "schema_version": "lab.artifact.v2"
+    },
+    {
       "name": "audit_log",
       "ref": "artifact://lab/runs/LAB-RUN-001/audit.jsonl",
       "schema_version": "lab.audit_event.v1"
     }
   ],
   "audit_ref": "artifact://lab/runs/LAB-RUN-001/audit.jsonl",
-  "claim_trace_ref": "artifact://lab/runs/LAB-RUN-001/reports/claim_evidence_trace.json",
+  "claim_trace_ref": "artifact://lab/runs/LAB-RUN-001/reports/run_report.v2.json",
   "data_quality": {
     "missing": [
       "controlled operating point experiment was not run"

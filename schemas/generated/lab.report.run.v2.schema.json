@@ -1,0 +1,621 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Artifact_for_RunReportPayload",
+  "type": "object",
+  "required": [
+    "claims",
+    "data_quality",
+    "evidence_refs",
+    "factors",
+    "id",
+    "kind",
+    "metrics",
+    "payload",
+    "run_id",
+    "schema",
+    "status",
+    "target_id",
+    "time_unix_ms"
+  ],
+  "properties": {
+    "bounds": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Bounds"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Claim"
+      }
+    },
+    "data_quality": {
+      "$ref": "#/definitions/DataQuality"
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "factors": {
+      "$ref": "#/definitions/Factors"
+    },
+    "id": {
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/definitions/Kind"
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Metric"
+      }
+    },
+    "payload": {
+      "$ref": "#/definitions/RunReportPayload"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/definitions/Status"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Bounds": {
+      "type": "object",
+      "required": [
+        "notes"
+      ],
+      "properties": {
+        "duration_seconds_max": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Claim": {
+      "type": "object",
+      "required": [
+        "claim_id",
+        "decision",
+        "evidence_refs",
+        "next_evidence"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string"
+        },
+        "decision": {
+          "$ref": "#/definitions/Decision"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "next_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "DataQuality": {
+      "type": "object",
+      "required": [
+        "level",
+        "notes"
+      ],
+      "properties": {
+        "level": {
+          "$ref": "#/definitions/DataQualityLevel"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "DataQualityLevel": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial",
+        "degraded"
+      ]
+    },
+    "Decision": {
+      "type": "string",
+      "enum": [
+        "supported",
+        "provisional",
+        "blocked"
+      ]
+    },
+    "EvidenceRefusalCode": {
+      "type": "string",
+      "enum": [
+        "invalid_artifact",
+        "policy_violation",
+        "unsupported_operation",
+        "missing_evidence"
+      ]
+    },
+    "Factors": {
+      "type": "object",
+      "required": [
+        "confounders",
+        "controlled",
+        "observed"
+      ],
+      "properties": {
+        "confounders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "controlled": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "observed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Kind": {
+      "type": "string",
+      "enum": [
+        "inventory",
+        "observation",
+        "pressure",
+        "composite",
+        "control_result",
+        "load",
+        "workload",
+        "report.run",
+        "report.operating_contract",
+        "report.suitability"
+      ]
+    },
+    "Metric": {
+      "type": "object",
+      "required": [
+        "name",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RuleEvaluation": {
+      "type": "object",
+      "required": [
+        "claim_id",
+        "decision",
+        "evidence_refs",
+        "matched",
+        "missing",
+        "next_evidence",
+        "rule_id"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string"
+        },
+        "decision": {
+          "$ref": "#/definitions/Decision"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "matched": {
+          "type": "boolean"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "next_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rule_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RunOperatingPointBlocked": {
+      "type": "object",
+      "required": [
+        "coverage_status",
+        "factor_id",
+        "next_evidence",
+        "reason"
+      ],
+      "properties": {
+        "coverage_status": {
+          "type": "string"
+        },
+        "factor_id": {
+          "type": "string"
+        },
+        "next_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reason": {
+          "type": "string"
+        },
+        "requested_level": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "RunOperatingPointControlled": {
+      "type": "object",
+      "required": [
+        "claim_boundary",
+        "evidence_refs",
+        "factor_id",
+        "level"
+      ],
+      "properties": {
+        "claim_boundary": {
+          "type": "string"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "factor_id": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RunOperatingPointObserved": {
+      "type": "object",
+      "required": [
+        "claim_boundary",
+        "evidence_refs",
+        "factor_id",
+        "level"
+      ],
+      "properties": {
+        "claim_boundary": {
+          "type": "string"
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "factor_id": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RunOperatingPointSummary": {
+      "type": "object",
+      "required": [
+        "blocked_points",
+        "controlled_points",
+        "coverage_status",
+        "observed_points"
+      ],
+      "properties": {
+        "blocked_points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RunOperatingPointBlocked"
+          }
+        },
+        "controlled_points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RunOperatingPointControlled"
+          }
+        },
+        "coverage_status": {
+          "type": "string"
+        },
+        "observed_points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RunOperatingPointObserved"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "RunReportPayload": {
+      "type": "object",
+      "required": [
+        "artifact_refs",
+        "audit_event_count",
+        "blocked_claims",
+        "evaluations",
+        "indexed_v2_artifact_refs",
+        "next_evidence",
+        "operating_point",
+        "operation_audit_refs",
+        "operations_summary",
+        "report_status",
+        "restore_status",
+        "rule_set_id"
+      ],
+      "properties": {
+        "artifact_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "audit_event_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "blocked_claims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "evaluations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuleEvaluation"
+          }
+        },
+        "indexed_v2_artifact_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "next_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "operating_point": {
+          "$ref": "#/definitions/RunOperatingPointSummary"
+        },
+        "operation_audit_refs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "operations_summary": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "report_status": {
+          "type": "string"
+        },
+        "restore_status": {
+          "type": "string"
+        },
+        "rule_set_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Status": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "measured"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "measured_partial"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "enum": [
+                "insufficient"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "detail",
+            "state"
+          ],
+          "properties": {
+            "detail": {
+              "type": "object",
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              }
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "not_applicable"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "detail",
+            "state"
+          ],
+          "properties": {
+            "detail": {
+              "type": "object",
+              "required": [
+                "code",
+                "message"
+              ],
+              "properties": {
+                "code": {
+                  "$ref": "#/definitions/EvidenceRefusalCode"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "refused"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "detail",
+            "state"
+          ],
+          "properties": {
+            "detail": {
+              "type": "object",
+              "required": [
+                "reason"
+              ],
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              }
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "unsafe_blocked"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}
