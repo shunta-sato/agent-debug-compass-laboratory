@@ -1,4 +1,4 @@
-.PHONY: help build-debug build-release format format-fix lint analysis test-unit test-integration contract schemas schemas-check docs-smoke command-smoke verify clean
+.PHONY: help build-debug build-release format format-fix lint analysis test-unit test-integration contract schemas schemas-check schema-ledger-check file-budgets docs-smoke command-smoke verify clean
 
 help:
 	@printf '%s\n' \
@@ -14,6 +14,8 @@ help:
 	  '  make contract          cargo test --workspace contract_validation -- --nocapture' \
 	  '  make schemas           cargo run -p adc-lab-core --example generate_schemas -- schemas/generated' \
 	  '  make schemas-check     regenerate schemas and fail on generated drift' \
+	  '  make schema-ledger-check validate schema classification coverage' \
+	  '  make file-budgets      report production Rust file budget status' \
 	  '  make command-smoke     scripts/resource/run-resource-smoke.sh --host-fallback' \
 	  '  make verify            build-debug + format + lint + schemas-check + tests + contract + docs/command smoke'
 
@@ -51,6 +53,13 @@ schemas-check:
 	trap 'rm -rf "$$tmp_dir"' EXIT; \
 	cargo run -p adc-lab-core --example generate_schemas -- "$$tmp_dir"; \
 	diff -ru schemas/generated "$$tmp_dir"
+	python3 scripts/schema/check-schema-ledger.py
+
+schema-ledger-check:
+	python3 scripts/schema/check-schema-ledger.py
+
+file-budgets:
+	python3 scripts/ci/check-file-budgets.py
 
 docs-smoke:
 	test -f README.md

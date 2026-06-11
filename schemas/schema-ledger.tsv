@@ -1,0 +1,39 @@
+contract_id	schema_file	current_state	target_state	phase	owner	notes
+lab.approval_record.v1	lab.approval_record.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	safety-critical approval record; generate only after compatibility checks
+lab.audit_event.v1	lab.audit_event.v1.schema.json	handwritten_schema	generated_checked	phase5-infra	audit	active audit stream, including evidence.write events
+lab.claim_evidence_trace.v1	lab.claim_evidence_trace.v1.schema.json	handwritten_schema	delete	phase1-report-run	reporting	delete only after report and experiment trace producers move to v2
+lab.composite_boundary_result.v1	lab.composite_boundary_result.v1.schema.json	handwritten_schema	delete	phase2-probe-cutover	probe	replace public composite output with v2 Artifact<CompositePayload>
+lab.control_plan.v1	lab.control_plan.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	safety-critical plan contract; keep semantics frozen
+lab.control_result.v1	lab.control_result.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	control status vocabulary is not equivalent to evidence Status
+lab.control_surface.v1	lab.control_surface.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	control discovery contract
+lab.design_constraint_pack.v1	lab.design_constraint_pack.v1.schema.json	handwritten_schema	delete	phase3-suitability-constraints	suitability	replace public JSON with v2 constraints artifact
+lab.experiment_matrix.v1	lab.experiment_matrix.v1.schema.json	handwritten_schema	generated_checked	phase5-experiment	experiment	active experiment planning contract
+lab.experiment_run.v1	lab.experiment_run.v1.schema.json	handwritten_schema	generated_checked	phase5-experiment	experiment	active experiment result contract
+lab.familiarization_pack.v1	lab.familiarization_pack.v1.schema.json	handwritten_schema	delete	phase1-report-run	reporting	replace with v2 report.run
+lab.health_check.v1	lab.health_check.v1.schema.json	handwritten_schema	generated_checked	phase5-infra	core	active health check contract
+lab.load_plan.v1	lab.load_plan.v1.schema.json	handwritten_schema	generated_checked	phase2-probe-cutover	load	active typed safety plan unless public producer disappears
+lab.load_result.v1	lab.load_result.v1.schema.json	handwritten_schema	delete	phase2-probe-cutover	load	replace public load output with v2 Artifact<LoadPayload>
+lab.operating_point_coverage.v1	lab.operating_point_coverage.v1.schema.json	handwritten_schema	delete	phase1-report-run	reporting	replace with v2 report.run
+lab.privilege_doctor.v1	lab.privilege_doctor.v1.schema.json	handwritten_schema	generated_checked	phase5-privilege	privilege	active privilege readiness contract
+lab.privilege_provider_status.v1	lab.privilege_provider_status.v1.schema.json	handwritten_schema	generated_checked	phase5-privilege	privilege	active provider status contract
+lab.privilege_setup_plan.v1	lab.privilege_setup_plan.v1.schema.json	handwritten_schema	generated_checked	phase5-privilege	privilege	instruction-only setup plan contract
+lab.release_manifest.v1	lab.release_manifest.v1.schema.json	handwritten_schema	generated_checked	phase5-infra	release	active release manifest contract
+lab.resource_pressure_result.v1	lab.resource_pressure_result.v1.schema.json	handwritten_schema	delete	phase2-probe-cutover	pressure	replace public pressure output with v2 Artifact<PressurePayload>
+lab.restore_lease.v1	lab.restore_lease.v1.schema.json	handwritten_schema	generated_checked	phase5-control	control	safety-critical restore lease contract
+lab.run_manifest.v1	lab.run_manifest.v1.schema.json	handwritten_schema	generated_checked	phase5-infra	runfs	dedicated identity artifact; keep but generate-check
+lab.suitability_decision.v1	lab.suitability_decision.v1.schema.json	handwritten_schema	delete	phase3-suitability-constraints	suitability	public suitability output is v2 artifact
+lab.suitability_policy.v1	lab.suitability_policy.v1.schema.json	handwritten_schema	generated_checked	phase3-suitability-constraints	suitability	active input policy unless replaced by v2 policy artifact
+lab.target_inventory.v1	lab.target_inventory.v1.schema.json	handwritten_schema	generated_checked	phase5-inventory	inventory	active inventory contract
+lab.tool_qualification.v1	lab.tool_qualification.v1.schema.json	handwritten_schema	generated_checked	phase5-qualification	qualification	active tool qualification contract
+lab.tool_qualification_summary.v1	lab.tool_qualification_summary.v1.schema.json	handwritten_schema	generated_checked	phase5-qualification	qualification	active qualification summary contract
+lab.toolchain_inventory.v1	lab.toolchain_inventory.v1.schema.json	handwritten_schema	generated_checked	phase5-qualification	toolchain	active toolchain inventory contract
+lab.workload_demand_profile.v1	lab.workload_demand_profile.v1.schema.json	handwritten_schema	generated_checked	phase5-workload	workload	active suitability input until v2 workload loop replaces it
+lab.workload_profile.v1	lab.workload_profile.v1.schema.json	handwritten_schema	generated_checked	phase5-workload	workload	active workload profile contract
+lab.workload_run_plan.v1	lab.workload_run_plan.v1.schema.json	handwritten_schema	generated_checked	phase5-workload	workload	active workload plan contract
+lab.workload_run_result.v1	lab.workload_run_result.v1.schema.json	handwritten_schema	generated_checked	phase5-workload	workload	active workload result contract
+lab.observation_result.v1	-	no_schema_wire_contract	generated_checked	phase5-infra	observe	schema_version string exists without top-level schema file
+lab.run_context.v1	-	no_schema_wire_contract	generated_checked	phase5-infra	runfs	run context file has schema_version but no top-level schema file
+lab.build_info.v1	-	no_schema_wire_contract	generated_checked	phase5-infra	build	active build-info output without top-level schema file
+lab.constraint_check_result.v1	-	no_schema_wire_contract	generated_checked	phase3-suitability-constraints	suitability	constraints check result has schema_version but no top-level schema file
+lab.workload_fixture_result.v1	-	no_schema_wire_contract	generated_checked	phase5-workload	workload	fixture command output has schema_version but no top-level schema file
+lab.suitability_decision.v1.projected_from_v2	-	no_schema_wire_contract	exempt	phase3-suitability-constraints	suitability	internal v2-to-v1 projection object, not a persisted public schema
