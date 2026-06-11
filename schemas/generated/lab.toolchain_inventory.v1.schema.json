@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ToolchainInventory",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "software_stack",
+    "target_id",
+    "tools"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "software_stack": {
+      "$ref": "#/definitions/SoftwareStack"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ToolInfo"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "PrivilegeLevel": {
+      "type": "string",
+      "enum": [
+        "none",
+        "user",
+        "sudo_helper",
+        "root"
+      ]
+    },
+    "QualificationStatus": {
+      "type": "string",
+      "enum": [
+        "builtin",
+        "needs_control_test",
+        "external_unqualified",
+        "agent_created_unqualified",
+        "qualified",
+        "refused"
+      ]
+    },
+    "SoftwareStack": {
+      "type": "object",
+      "required": [
+        "arch",
+        "board",
+        "kernel",
+        "os"
+      ],
+      "properties": {
+        "arch": {
+          "type": "string"
+        },
+        "board": {
+          "type": "string"
+        },
+        "kernel": {
+          "type": "string"
+        },
+        "os": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolCategory": {
+      "type": "string",
+      "enum": [
+        "observation",
+        "control",
+        "load",
+        "probe",
+        "report_normalizer",
+        "restore",
+        "health_check",
+        "observation_control"
+      ]
+    },
+    "ToolInfo": {
+      "type": "object",
+      "required": [
+        "available",
+        "category",
+        "privilege",
+        "qualification",
+        "tool_id"
+      ],
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "category": {
+          "$ref": "#/definitions/ToolCategory"
+        },
+        "privilege": {
+          "$ref": "#/definitions/PrivilegeLevel"
+        },
+        "qualification": {
+          "$ref": "#/definitions/QualificationStatus"
+        },
+        "tool_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

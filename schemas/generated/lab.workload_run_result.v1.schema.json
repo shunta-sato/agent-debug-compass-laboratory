@@ -1,0 +1,162 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WorkloadRunResult",
+  "type": "object",
+  "required": [
+    "audit_refs",
+    "data_quality",
+    "duration_ms",
+    "ended_at_unix_ms",
+    "execution_mode",
+    "process_ids",
+    "run_id",
+    "schema_version",
+    "started_at_unix_ms",
+    "status",
+    "stderr_truncated",
+    "stdout_truncated",
+    "target_id",
+    "time_unix_ms",
+    "workload_id"
+  ],
+  "properties": {
+    "audit_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_quality": {
+      "$ref": "#/definitions/WorkloadDataQuality"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "ended_at_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "execution_mode": {
+      "$ref": "#/definitions/WorkloadExecutionMode"
+    },
+    "exit_code": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int32"
+    },
+    "process_ids": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0.0
+      }
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "signal": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "int32"
+    },
+    "started_at_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "status": {
+      "$ref": "#/definitions/WorkloadRunStatus"
+    },
+    "stderr_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "stderr_truncated": {
+      "type": "boolean"
+    },
+    "stdout_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "stdout_truncated": {
+      "type": "boolean"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "workload_id": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "WorkloadDataQuality": {
+      "type": "object",
+      "required": [
+        "degraded",
+        "missing",
+        "notes"
+      ],
+      "properties": {
+        "degraded": {
+          "type": "boolean"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkloadExecutionMode": {
+      "type": "string",
+      "enum": [
+        "local",
+        "target_local"
+      ]
+    },
+    "WorkloadRunStatus": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "failed",
+        "aborted",
+        "refused"
+      ]
+    }
+  }
+}

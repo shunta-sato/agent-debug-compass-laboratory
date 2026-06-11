@@ -1,0 +1,16 @@
+{
+  "schema_version": "lab.observation_result.v1",
+  "target_id": "local",
+  "duration_ms": 100,
+  "signals": ["cpu", "freq", "thermal", "memory"],
+  "samples": [
+    {
+      "sample_index": 0,
+      "cpu_total_ticks": 1000,
+      "cpu_idle_ticks": 800,
+      "memory_available_kb": 524288,
+      "avg_cpu_freq_khz": 1400000,
+      "max_temp_c": 42.5
+    }
+  ]
+}

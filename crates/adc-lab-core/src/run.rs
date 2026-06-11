@@ -1,5 +1,6 @@
 use crate::error::{IoPathExt, LabResult};
 use crate::ids::{new_id, now_unix_ms};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -9,11 +10,11 @@ pub struct RunContext {
     pub run_dir: PathBuf,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-struct RunContextArtifact {
-    schema_version: String,
-    run_id: String,
+pub struct RunContextArtifact {
+    pub schema_version: String,
+    pub run_id: String,
 }
 
 impl RunContext {

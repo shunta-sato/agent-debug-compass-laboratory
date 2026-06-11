@@ -1,12 +1,13 @@
 use crate::fsutil::read_to_string_lossy;
 use crate::{LabError, LabResult};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::str::FromStr;
 use std::thread;
 use std::time::{Duration, Instant};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Signal {
     Cpu,
@@ -29,7 +30,7 @@ impl FromStr for Signal {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ObservationSample {
     pub sample_index: usize,
@@ -40,7 +41,7 @@ pub struct ObservationSample {
     pub max_temp_c: Option<f64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ObservationResult {
     pub schema_version: String,

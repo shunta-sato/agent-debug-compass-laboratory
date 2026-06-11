@@ -1,0 +1,163 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RunManifest",
+  "type": "object",
+  "required": [
+    "adc_lab_git_sha",
+    "adc_lab_target_git_sha",
+    "adc_lab_target_version",
+    "adc_lab_version",
+    "artifacts",
+    "audit_ref",
+    "binary_sha256",
+    "data_quality",
+    "ended_at_unix_ms",
+    "mode",
+    "operation_audit_refs",
+    "operations_summary",
+    "release_asset",
+    "release_asset_sha256",
+    "release_tag",
+    "run_id",
+    "schema_version",
+    "started_at_unix_ms",
+    "target",
+    "target_id"
+  ],
+  "properties": {
+    "adc_lab_git_sha": {
+      "type": "string"
+    },
+    "adc_lab_target_git_sha": {
+      "type": "string"
+    },
+    "adc_lab_target_version": {
+      "type": "string"
+    },
+    "adc_lab_version": {
+      "type": "string"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/RunArtifactRef"
+      }
+    },
+    "audit_ref": {
+      "type": "string"
+    },
+    "binary_sha256": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "claim_trace_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "data_quality": {
+      "$ref": "#/definitions/RunDataQuality"
+    },
+    "ended_at_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "mode": {
+      "type": "string"
+    },
+    "operation_audit_refs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "operations_summary": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "release_asset": {
+      "type": "string"
+    },
+    "release_asset_sha256": {
+      "type": "string"
+    },
+    "release_tag": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "started_at_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "target": {
+      "type": "string"
+    },
+    "target_id": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "RunArtifactRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "ref",
+        "schema_version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "schema_version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RunDataQuality": {
+      "type": "object",
+      "required": [
+        "inconsistent",
+        "missing",
+        "notes"
+      ],
+      "properties": {
+        "inconsistent": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -165,6 +165,18 @@ def main() -> int:
         errors.append(
             "maintained-by-hand schemas remain: " + ", ".join(sorted(maintained_by_hand))
         )
+    if args.enforce_final:
+        unfinished_generated = [
+            contract_id
+            for contract_id, row in ledger.items()
+            if row["target_state"] == "generated_checked"
+            and row["current_state"] != "generated_snapshot"
+        ]
+        if unfinished_generated:
+            errors.append(
+                "generated-check targets are not generated snapshots: "
+                + ", ".join(sorted(unfinished_generated))
+            )
 
     if errors:
         for error in errors:

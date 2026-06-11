@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PrivilegeDoctorReport",
+  "type": "object",
+  "required": [
+    "checks",
+    "helper_installed",
+    "helper_path",
+    "next_action",
+    "schema_version",
+    "status",
+    "sudo_non_interactive_available",
+    "target_id",
+    "time_unix_ms"
+  ],
+  "properties": {
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/PrivilegeDoctorCheck"
+      }
+    },
+    "helper_installed": {
+      "type": "boolean"
+    },
+    "helper_path": {
+      "type": "string"
+    },
+    "helper_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "next_action": {
+      "type": "string"
+    },
+    "root_owned": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/definitions/PrivilegeDoctorStatus"
+    },
+    "sudo_non_interactive_available": {
+      "type": "boolean"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "world_writable": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "PrivilegeDoctorCheck": {
+      "type": "object",
+      "required": [
+        "check_id",
+        "evidence",
+        "status",
+        "summary"
+      ],
+      "properties": {
+        "check_id": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "$ref": "#/definitions/PrivilegeDoctorCheckStatus"
+        },
+        "summary": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PrivilegeDoctorCheckStatus": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "fail",
+        "warning",
+        "not_applicable"
+      ]
+    },
+    "PrivilegeDoctorStatus": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "degraded",
+        "operator_setup_required",
+        "unsupported_target"
+      ]
+    }
+  }
+}

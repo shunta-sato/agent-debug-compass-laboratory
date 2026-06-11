@@ -71,10 +71,9 @@ Reframed quantitative targets:
   - report behavior changes through rule rows, not bespoke generators,
   - generated schema drift is checked by `make verify`.
 - v2.1 LoC expectation is forecast-driven, not fixed. The actuals table below
-  is authoritative when it differs from prose. After Phase 3, expected final
-  landing is roughly 18,024-18,424 Rust lines if Phase 4 and Phase 5 follow the
-  current remaining estimates. This is a guardrail record, not an acceptance
-  target.
+  is authoritative when it differs from prose. After Phase 5, expected final
+  landing is roughly 18,017 Rust lines plus documentation-only Phase 6 changes.
+  This is a guardrail record, not an acceptance target.
 - File budgets after Phase 4:
   - `crates/adc-lab/src/main.rs` <= 800 lines,
   - `crates/adc-lab-core/src/report.rs` <= 900 lines or deleted,
@@ -107,7 +106,7 @@ Phase contribution forecast:
 | Phase 4 CLI module split | -100 to +100 | 0 | Better boundaries may add small module overhead. |
 | Phase 5 generated schemas | +200 to +400 | maintained-by-hand -> 0 | Derives, adapters, and compatibility tests add code. |
 | Phase 6 docs | 0 | 0 | Documentation-only. |
-| Total forecast | Actuals plus remaining phase forecast | maintained-by-hand -> 0 | Current expected landing after Phase 3: 18,024-18,424 Rust lines. |
+| Total forecast | Actuals plus remaining phase forecast | maintained-by-hand -> 0 | Current expected landing after Phase 5: about 18,017 Rust lines; Phase 6 is docs-only. |
 
 Phase contribution actuals:
 
@@ -117,6 +116,7 @@ Phase contribution actuals:
 | Phase 2 probe cutover | +117 total Rust LoC (`17,739` -> `17,856`) | top-level `29` -> `25`, generated `10` -> `14`, maintained-by-hand `29` -> `25` | Remaining phases now forecast final total around `17,556-18,156`; v2 public payload and generated v1 wire snapshots offset deleted schemas. |
 | Phase 3 suitability/constraints | +68 total Rust LoC (`17,856` -> `17,924`) | top-level `25` -> `22`, generated `14` -> `17`, maintained-by-hand `25` -> `22` | Remaining phases now forecast final total around `18,024-18,424`; LoC is effectively neutral while schema maintenance drops. |
 | Phase 4 CLI module split | +84 total Rust LoC (`17,924` -> `18,008`) | no schema change | In forecast. `main.rs` dropped to 605 lines and all production Rust files are under budget. |
+| Phase 5 generated schemas | +9 total Rust LoC (`18,008` -> `18,017`) | top-level `22` -> `0`, generated `17` -> `43`, maintained-by-hand `22` -> `0` | Better than forecast. Most DTOs already had `JsonSchema`; generator helper offset small DTO additions. |
 
 ## Context & Orientation
 
@@ -519,6 +519,51 @@ Acceptance:
 - Every committed schema is either generated or explicitly generated-checked.
 - `make verify` fails on schema drift.
 
+Phase 5 dev workflow route:
+
+- Risk route: high. Rationale: schema contracts and generated drift gates are
+  public compatibility boundaries, including safety-critical control contracts.
+- Required branches: default implementation lane, `design-balance`,
+  `implementation-economy`, ExecPlan update, and final `quality-gate`.
+- Not triggered: embedded NFR, observability, performance, concurrency,
+  destructive-refactor, and error-handling. This phase changes schema source of
+  truth and tests, not target runtime behavior or failure contracts.
+- Verification depth: full `make verify`, plus focused schema ledger/drift,
+  contract validation, CLI, safety invariant, and file-budget checks.
+
+Phase 5 responsibility map:
+
+| Unit | Name | Responsibility sentence | Reason to change | Dependency direction |
+|---|---|---|---|---|
+| DTO module | `contracts.rs` | Own active v1 wire DTO shape for generated schemas. | v1 wire contract fields or status vocabulary change. | Schema generator depends on these DTOs; runtime producers already use them. |
+| DTO module | `run.rs` | Own `run_context.json` DTO shape and run identity helpers. | Run identity file shape changes. | Schema generator depends on `RunContextArtifact`; run helpers remain runtime owners. |
+| DTO module | `observe.rs` | Own observation result DTO shape and signal vocabulary. | Observation result fields or signal vocabulary change. | Schema generator depends on observation DTOs; probe artifacts depend on them. |
+| CLI command module | `commands/workload.rs` | Emit typed workload fixture result instead of anonymous JSON. | Workload fixture output shape changes. | Depends on core DTO; does not own schema generation. |
+| schema generator | `examples/generate_schemas.rs` | Generate every committed schema snapshot from Rust DTOs. | DTO/schema inventory changes. | Depends on core DTOs; `make schemas-check` verifies drift. |
+| schema ledger | `schemas/schema-ledger.tsv` | Classify each v1 contract as deleted or generated snapshot. | Contract source-of-truth status changes. | Checked by `scripts/schema/check-schema-ledger.py`. |
+
+Phase 5 complexity budget:
+
+- Changed files target: 35-45 files including generated snapshots, deleted
+  handwritten schemas, tests, ledger, and this plan.
+- New modules target: 0.
+- New DTO structs target: up to 2 public DTOs for previously anonymous CLI
+  outputs; no new runtime layer.
+- New helper/wrapper target: one schema-generator helper replacing repeated
+  write blocks.
+- Production LoC budget: expected +0 to +80 after generator helper savings;
+  no `platform_contract.rs` growth or file-budget exemption.
+- Test budget: reuse existing golden fixtures and negative tests, adding
+  fixtures only for previously no-schema wire contracts.
+
+Phase 5 post-implementation economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `HealthCheck` DTO | Moves health-check wire shape into core so schema generation and CLI output share one contract. | keep | health fixture validates through generated schema; CLI tests pass. |
+| `WorkloadFixtureResult` DTO | Replaces anonymous JSON with a typed DTO so the previous no-schema fixture result is generated-checked. | keep | fixture validates through generated schema; CLI tests pass. |
+| `write_schema<T>` helper | Removes repeated generator blocks while keeping generation explicit at each call site. | keep | `make schemas-check` passes and generated snapshot count is 43. |
+
 ### Phase 6: Documentation Normalization
 
 Separate normative docs from reference/archive docs.
@@ -619,8 +664,8 @@ Quality gate rule:
       are gone.
 - [x] Phase 4: Split remaining command groups out of `main.rs`.
 - [x] Phase 4: Wire `make file-budgets` into `make verify`.
-- [ ] Phase 5: Convert non-control active schemas to generated snapshots.
-- [ ] Phase 5: Convert control schemas last after compatibility tests.
+- [x] Phase 5: Convert non-control active schemas to generated snapshots.
+- [x] Phase 5: Convert control schemas last after compatibility tests.
 - [ ] Phase 6: Normalize docs and update `docs-smoke`.
 - [ ] Phase 6: Document or rename public output file names whose v2 artifact
       kind no longer matches legacy v1 file names.
@@ -673,6 +718,13 @@ Quality gate rule:
 - `blocked_claims_for` returns catalog blocked phrases, not claim IDs. Phase 3
   kept v2 suitability/constraints payloads on stable claim IDs and uses catalog
   phrases only for Markdown/check scanning.
+- Phase 5 did not need to edit `platform_contract.rs`. The Phase 2 pressure and
+  composite v1 wire DTOs were already generated snapshots, so the file-budget
+  risk at 1,496/1,500 lines required no temporary exemption.
+- `lab.build_info.v1` is an artifact type label used in run manifests, but the
+  current `BuildInfo` DTO does not carry a `schema_version` field. Phase 5
+  generated and fixture-checked the existing DTO shape rather than changing the
+  wire output.
 
 ## Decision Log
 
@@ -752,6 +804,20 @@ Quality gate rule:
   Rationale: the Phase 3 review identified confusing legacy names for v2
   artifacts, but Phase 4 is a behavior-preserving module split and docs
   normalization is already scoped to Phase 6.
+- 2026-06-11: Keep `platform_contract.rs` untouched in Phase 5 and use the
+  existing Phase 2 generated snapshots for pressure/composite v1 wire DTOs.
+  Rationale: the file has only four lines of budget headroom; no remaining
+  Phase 5 schema target required editing it, so no exemption or split was
+  justified.
+- 2026-06-11: Turn `make schemas-check` into the final schema-source gate by
+  passing `--enforce-final`. Rationale: maintained-by-hand schema count is now
+  zero, and future drift or handwritten-schema reintroduction should fail
+  `make verify`.
+- 2026-06-11: Accept the Phase 5 LoC forecast undershoot. Rationale: most
+  active DTOs already had `JsonSchema` derives, and replacing repeated
+  generator write blocks with one helper offset the small DTO/test additions.
+  The final expected Rust LoC after Phase 5 is about 18,017 plus docs-only
+  Phase 6 changes.
 
 ## Verification Log
 
@@ -946,12 +1012,48 @@ Quality gate rule:
   submit. Acceptance criteria are met: `main.rs <= 800`, `make file-budgets`
   is part of `make verify`, and command behavior is covered by the existing CLI
   and safety regression suites.
+- Phase 5 branch setup:
+  `git fetch origin --prune` updated `origin/main` to `de23632`; `git switch
+  -c codex/adc-labv21-generated-schemas origin/main` created the Phase 5
+  branch.
+- Phase 5 focused verification:
+  `make schemas` passed and generated 43 schema snapshots under
+  `schemas/generated`.
+- Phase 5 focused verification:
+  `make schemas-check` passed with
+  `top_level=0 no_schema_wire=31 maintained_by_hand=0`.
+- Phase 5 focused verification:
+  `cargo test -p adc-lab-core --test contract_validation -- --nocapture`
+  passed; 14 tests.
+- Phase 5 focused verification:
+  `cargo check --workspace` passed.
+- Phase 5 focused verification:
+  `make file-budgets` passed with
+  `file budgets: enforced checked=50 violations=0`.
+- Phase 5 focused verification:
+  `cargo test -p adc-lab --test safety_invariants -- --nocapture` passed; 7
+  tests.
+- Phase 5 focused verification:
+  `cargo test -p adc-lab --test cli -- --nocapture` passed; 32 tests.
+- Phase 5 measurements before final gate:
+  total Rust lines `18,017`; top-level schemas `0`; generated schemas `43`;
+  `platform_contract.rs` remains `1,496` lines; `contracts.rs` is `1,196`
+  lines; file budgets have 0 violations.
+- Phase 5 final gate:
+  `make verify` passed. The gate covered workspace build, format check, clippy,
+  generated schema drift plus final ledger enforcement, enforced file budgets,
+  unit tests, integration tests, safety invariants, contract validation, docs
+  smoke, and command smoke.
+- Phase 5 quality gate:
+  submit. Acceptance criteria are met: maintained-by-hand schema count is 0,
+  every active schema is generated or generated-checked, and `make verify`
+  fails on generated schema drift plus final ledger violations.
 
 ## Handoff
 
-- Branch: `codex/adc-labv21-cli-module-split`.
-- Base commit: `8c529fe` (`origin/main` after PR #44 / Phase 3 merge).
-- Current status: Phase 4 implementation is complete locally with `make verify`
+- Branch: `codex/adc-labv21-generated-schemas`.
+- Base commit: `de23632` (`origin/main` after PR #45 / Phase 4 merge).
+- Current status: Phase 5 implementation is complete locally with `make verify`
   passing. Commit and PR publication are next.
 - Untracked local files exist and were not staged:
   `.DS_Store`, `._.DS_Store`,
@@ -961,14 +1063,15 @@ Quality gate rule:
   `reports/20260611-planning-skills-improvement-proposal.md`, and
   `reports/20260611-v2-evidence-kernel-outcome-review.md`.
 - Next steps:
-  1. Commit and publish the Phase 4 PR.
-  2. Start Phase 5 after Phase 4 lands, with file budgets enforced in CI.
+  1. Commit and publish the Phase 5 PR.
+  2. Start Phase 6 docs normalization after Phase 5 lands.
 - Read first when resuming:
   - this plan,
   - `reports/20260611-v2-evidence-kernel-outcome-review.md`,
   - `plans/20260611-v2-evidence-kernel.md`,
   - `crates/adc-lab/src/main.rs`,
-  - `crates/adc-lab/src/commands/`,
+  - `crates/adc-lab-core/examples/generate_schemas.rs`,
+  - `crates/adc-lab-core/tests/contract_validation.rs`,
   - `schemas/schema-ledger.tsv`.
 
 ## Outcomes & Retrospective
@@ -1035,3 +1138,19 @@ Phase 4 outcome:
   Every production Rust file is under the configured budget.
 - Phase 4 landed at +84 Rust lines, inside the -100 to +100 forecast window,
   with no schema-count change.
+
+Phase 5 outcome:
+
+- All active v1 schema contracts are generated snapshots under
+  `schemas/generated`; no top-level handwritten `.schema.json` files remain.
+- `make schemas-check` now runs the schema ledger with `--enforce-final`, so
+  `make verify` fails if maintained-by-hand schema rows return or a
+  generated-check target remains ungenerated.
+- Previously no-schema wire contracts for observation result, run context,
+  build info, and workload fixture result now have generated snapshots and
+  golden fixtures.
+- Control schemas were converted last and remain covered by fixture validation,
+  negative schema tests, CLI tests, and safety invariant tests.
+- Phase 5 landed at +9 Rust lines while reducing maintained-by-hand schemas
+  from 22 to 0. `platform_contract.rs` stayed at 1,496 lines, so no file-budget
+  exemption was needed.

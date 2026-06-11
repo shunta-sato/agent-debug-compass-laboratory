@@ -1,0 +1,200 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WorkloadRunPlan",
+  "type": "object",
+  "required": [
+    "bounds",
+    "claim_boundary",
+    "execution",
+    "observation",
+    "schema_version",
+    "target",
+    "workload_id",
+    "workload_name"
+  ],
+  "properties": {
+    "bounds": {
+      "$ref": "#/definitions/WorkloadBounds"
+    },
+    "claim_boundary": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "execution": {
+      "$ref": "#/definitions/WorkloadExecution"
+    },
+    "observation": {
+      "$ref": "#/definitions/WorkloadObservationConfig"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "target": {
+      "type": "string"
+    },
+    "workload_id": {
+      "type": "string"
+    },
+    "workload_name": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "WorkloadBounds": {
+      "type": "object",
+      "required": [
+        "duration_seconds_max",
+        "memory_bytes_max",
+        "stderr_bytes_max",
+        "stdout_bytes_max",
+        "storage_bytes_max"
+      ],
+      "properties": {
+        "duration_seconds_max": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "memory_bytes_max": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "operator_abort_file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stderr_bytes_max": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "stdout_bytes_max": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "storage_bytes_max": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "thermal_abort_c": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkloadEnvironmentPolicy": {
+      "type": "object",
+      "required": [
+        "allowed",
+        "inherit"
+      ],
+      "properties": {
+        "allowed": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkloadEnvironmentVariable"
+          }
+        },
+        "inherit": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkloadEnvironmentVariable": {
+      "type": "object",
+      "required": [
+        "name",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkloadExecution": {
+      "type": "object",
+      "required": [
+        "args",
+        "environment_policy",
+        "executable_path",
+        "reject_setuid",
+        "reject_world_writable",
+        "require_executable_sha256",
+        "working_directory"
+      ],
+      "properties": {
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "environment_policy": {
+          "$ref": "#/definitions/WorkloadEnvironmentPolicy"
+        },
+        "executable_path": {
+          "type": "string"
+        },
+        "expected_executable_sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reject_setuid": {
+          "type": "boolean"
+        },
+        "reject_world_writable": {
+          "type": "boolean"
+        },
+        "require_executable_sha256": {
+          "type": "boolean"
+        },
+        "working_directory": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkloadObservationConfig": {
+      "type": "object",
+      "required": [
+        "process_scoped",
+        "sample_interval_ms",
+        "system_context"
+      ],
+      "properties": {
+        "process_scoped": {
+          "type": "boolean"
+        },
+        "sample_interval_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "system_context": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

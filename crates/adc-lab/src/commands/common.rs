@@ -14,20 +14,10 @@ pub(super) struct ArtifactOutput<T: Serialize> {
     pub value: T,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(deny_unknown_fields)]
-pub(super) struct HealthOutput {
-    pub schema_version: String,
-    pub target_id: String,
-    pub status: String,
-    pub inventory_available: bool,
-    pub toolchain_available: bool,
-}
-
-pub(super) fn build_health_output(target: &TargetSpec) -> HealthOutput {
+pub(super) fn build_health_output(target: &TargetSpec) -> HealthCheck {
     let inventory_available = collect_inventory(target).is_ok();
     let toolchain_available = discover_toolchain(target).is_ok();
-    HealthOutput {
+    HealthCheck {
         schema_version: "lab.health_check.v1".to_string(),
         target_id: target.target_id.clone(),
         status: if inventory_available && toolchain_available {

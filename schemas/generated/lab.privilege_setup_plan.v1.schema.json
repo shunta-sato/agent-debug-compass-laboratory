@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PrivilegeSetupPlan",
+  "type": "object",
+  "required": [
+    "commands",
+    "helper_path",
+    "operator_steps",
+    "plan_id",
+    "plan_kind",
+    "schema_version",
+    "target_id",
+    "time_unix_ms",
+    "verification_commands",
+    "warnings"
+  ],
+  "properties": {
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "helper_path": {
+      "type": "string"
+    },
+    "operator_steps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "plan_id": {
+      "type": "string"
+    },
+    "plan_kind": {
+      "$ref": "#/definitions/PrivilegeSetupPlanKind"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "verification_commands": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "PrivilegeSetupPlanKind": {
+      "type": "string",
+      "enum": [
+        "install",
+        "uninstall"
+      ]
+    }
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TargetInventory",
+  "type": "object",
+  "required": [
+    "collected_by",
+    "control_surfaces",
+    "hardware",
+    "schema_version",
+    "software_stack",
+    "target",
+    "target_id",
+    "time_unix_ms"
+  ],
+  "properties": {
+    "collected_by": {
+      "type": "string"
+    },
+    "control_surfaces": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ControlSurfaceSummary"
+      }
+    },
+    "hardware": {
+      "$ref": "#/definitions/HardwareInventory"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "software_stack": {
+      "$ref": "#/definitions/SoftwareStack"
+    },
+    "target": {
+      "type": "string"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ControlSurfaceSummary": {
+      "type": "object",
+      "required": [
+        "available",
+        "requires_privilege",
+        "surface_id"
+      ],
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "requires_privilege": {
+          "type": "boolean"
+        },
+        "surface_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HardwareInventory": {
+      "type": "object",
+      "required": [
+        "cpu_count",
+        "cpufreq_policies",
+        "thermal_zones"
+      ],
+      "properties": {
+        "cpu_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "cpufreq_policies": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "memory_total_kb": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "thermal_zones": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "SoftwareStack": {
+      "type": "object",
+      "required": [
+        "arch",
+        "board",
+        "kernel",
+        "os"
+      ],
+      "properties": {
+        "arch": {
+          "type": "string"
+        },
+        "board": {
+          "type": "string"
+        },
+        "kernel": {
+          "type": "string"
+        },
+        "os": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

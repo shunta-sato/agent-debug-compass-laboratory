@@ -1,0 +1,102 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ObservationResult",
+  "type": "object",
+  "required": [
+    "duration_ms",
+    "samples",
+    "schema_version",
+    "signals",
+    "target_id"
+  ],
+  "properties": {
+    "duration_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "samples": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ObservationSample"
+      }
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "signals": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Signal"
+      }
+    },
+    "target_id": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ObservationSample": {
+      "type": "object",
+      "required": [
+        "sample_index"
+      ],
+      "properties": {
+        "avg_cpu_freq_khz": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "cpu_idle_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "cpu_total_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "max_temp_c": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "memory_available_kb": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "sample_index": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Signal": {
+      "type": "string",
+      "enum": [
+        "cpu",
+        "freq",
+        "thermal",
+        "memory"
+      ]
+    }
+  }
+}

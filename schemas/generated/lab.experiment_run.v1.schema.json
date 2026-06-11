@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExperimentRun",
+  "type": "object",
+  "required": [
+    "dry_run",
+    "matrix_id",
+    "run_id",
+    "schema_version",
+    "target_id",
+    "time_unix_ms",
+    "trials"
+  ],
+  "properties": {
+    "dry_run": {
+      "type": "boolean"
+    },
+    "matrix_id": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "target_id": {
+      "type": "string"
+    },
+    "time_unix_ms": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "trials": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ExperimentTrial"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ExperimentTrial": {
+      "type": "object",
+      "required": [
+        "artifact_refs",
+        "factors",
+        "status",
+        "trial_id"
+      ],
+      "properties": {
+        "artifact_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ended_at_unix_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "factors": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "failure": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "started_at_unix_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "status": {
+          "type": "string"
+        },
+        "trial_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
