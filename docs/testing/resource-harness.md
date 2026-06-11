@@ -97,17 +97,13 @@ adc-lab report operating-contract \
 - Baselines: `baselines/resource/`
 - Reports: `reports/resource/`, `reports/operating-envelope/`, `reports/target-characterization/`
 - Gate report: `reports/resource/nfr-gate-report.md`
-- Platform contract reports:
-  `reports/platform_mechanism_inventory.json`,
-  `reports/boundary_probe_plan.json`,
-  `reports/resource_coupling_report.json`,
-  `reports/target_operating_contract.json`,
-  `reports/run_set_manifest.json`,
-  `reports/multi_run_operating_contract.json`
+- Platform contract report:
+  `reports/target_operating_contract.v2.json`
 
 ## Limits
 
-- Demo target smoke passed for `target55` after non-root deployment of `adc-lab-target` to `/home/demo/.local/bin/adc-lab-target`; the tracked demo pack lives under `examples/demos/target55/`.
+- Target-specific smoke evidence must be regenerated for the target under test;
+  v1 demo packs are not part of the maintained verification surface.
 - Host fallback proves command wiring and schema behavior only.
 - Command smoke reports `resource_metrics_collected=false` and `resource_claims_supported=false`.
 - PR5 hardware-free tests verify operator-abort contract behavior; they do not

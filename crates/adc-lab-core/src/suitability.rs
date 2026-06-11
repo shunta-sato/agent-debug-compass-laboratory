@@ -3,6 +3,7 @@ use crate::contracts::{
     SuitabilityDecisionValue, SuitabilityDimensionDecision, SuitabilityDimensionKind,
     SuitabilityPolicy, TargetOperatingContract, WorkloadDemandProfile,
 };
+use crate::evidence::{blocked_claims_for, claim};
 use crate::fsutil::read_json;
 use crate::ids::{new_id, now_unix_ms};
 use crate::{LabError, LabResult};
@@ -92,14 +93,14 @@ pub fn decide_suitability(
             SuitabilityDecisionValue::Fail | SuitabilityDecisionValue::Unknown
         )
     });
-    let mut blocked_claims = vec![
-        "production readiness".to_string(),
-        "Pi4 is sufficient".to_string(),
-        "battery safe".to_string(),
-        "real-time safe under all pressure".to_string(),
-    ];
+    let mut blocked_claims = blocked_claims_for(&[
+        claim::PRODUCTION_READY,
+        claim::TARGET_SELECTION_PI4_SUFFICIENT,
+        claim::BATTERY_SAFE,
+        claim::REAL_TIME_PRESSURE_SAFE,
+    ]);
     if !selection_ready {
-        blocked_claims.push("selection readiness".to_string());
+        blocked_claims.extend(blocked_claims_for(&[claim::SELECTION_READY]));
     }
     for rule in &target_contract.rules {
         if rule.category == OperatingRuleCategory::BlockedClaim {

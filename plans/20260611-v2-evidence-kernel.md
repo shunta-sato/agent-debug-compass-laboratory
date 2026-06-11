@@ -348,6 +348,97 @@ handwritten schemas until v2 parity is proven.
 The store should make multi-run reporting an indexing concern rather than a
 separate custom traversal path.
 
+Phase 1 responsibility map:
+
+- `evidence/envelope.rs`: v2 artifact envelope, status vocabulary, claim
+  instance DTOs, strict serde/schema shape.
+- `evidence/catalog.rs`: stable claim IDs and default wording/next-evidence
+  text. Claim instances may add context-specific next evidence but do not fork
+  catalog wording.
+- `evidence/store.rs`: run-directory indexing, v2 artifact load/write,
+  `artifact://` reference construction, symlink refusal, malformed JSON
+  diagnostics, and write audit events.
+- `runfs/mod.rs`: bounded run-directory-relative path construction.
+- `examples/generate_schemas.rs`: generated schema snapshots from Rust DTOs.
+
+Phase 1 intentionally adds one kernel abstraction instead of wiring reports or
+probes through it immediately. Public CLI/report behavior remains v1 until
+Phase 4 cutover.
+
+Phase 1 complexity budget and audit:
+
+- New public abstraction budget: `Artifact<P>`, `EvidenceStore`, and
+  `artifact_path`.
+- New support DTO budget: claim catalog entries, artifact metadata, strict
+  envelope status/data-quality DTOs, and schema generator example.
+- Post-implementation decision: keep these abstractions because they each own
+  one repeated concern from the plan; do not add report/probe adapters until
+  Phases 2-3 prove the call sites.
+
+Phase 2 responsibility map:
+
+- `rules/engine.rs`: predicate evaluation, table-driven rule evaluation,
+  evidence-ref collection, and claim instance projection from catalog defaults.
+- `rules/operating_contract.rs`: v2 operating-contract artifact payload and
+  rule table behind core API only.
+- `rules/suitability.rs`: v2 suitability artifact payload and conservative
+  selection-readiness rule table behind core API only.
+- `evidence/catalog.rs`: claim IDs, blocked scan terms, and default next
+  evidence lookup for both v1 constraints and v2 rules.
+- `suitability.rs`: legacy v1 public DTO generation remains in place, but its
+  initial blocked claim terms now come from the claim catalog.
+
+Phase 2 complexity budget and audit:
+
+- New public abstraction budget: `Pred`, `Rule`, `RuleEvaluation`, plus two
+  v2 report payload structs.
+- Post-implementation decision: keep this as Rust tables, not YAML, and keep
+  CLI/report cutover out of Phase 2. The v1 generators remain parallel until
+  Phase 4/5 parity cleanup.
+
+Phase 3 responsibility map:
+
+- `probe/artifacts.rs`: core-only adapters that normalize existing v1 observe,
+  load, pressure, composite, and workload payloads into v2 `Artifact<P>`
+  records and write them through `EvidenceStore`.
+- `examples/generate_schemas.rs`: v2 schema snapshots for observation, load,
+  pressure, composite, and workload artifacts.
+- `tests/probe_artifacts.rs`: verifies all five probe kinds are indexed by the
+  store and records the dummy pressure-kind extension exercise.
+
+Phase 3 dummy pressure-kind exercise evidence:
+
+- Hand-edited extension files: `crates/adc-lab-core/src/probe/artifacts.rs`,
+  `crates/adc-lab-core/src/rules/operating_contract.rs`, and
+  `crates/adc-lab-core/tests/probe_artifacts.rs`.
+- Count: 3 hand-edited files. Kernel enum registration and `make schemas`
+  snapshots are counted as generated/mechanical evidence, not extension files.
+- The exercise is encoded in
+  `dummy_pressure_kind_extension_exercise_stays_within_three_hand_edited_files`.
+
+Phase 4 responsibility map:
+
+- `adc-lab/src/commands/decide.rs`: `decide suitability` now writes a v2
+  `Artifact<SuitabilityPayload>` as the primary `--out` artifact and keeps the
+  v1 decision as a `.v1.json` parity sidecar.
+- `adc-lab/src/commands/report.rs`: `report operating-contract` now returns
+  and writes `reports/target_operating_contract.v2.json` while preserving v1
+  report artifacts for parity and Phase 5 cleanup.
+- `adc-lab/src/main.rs`: dispatches cutover command groups through
+  `commands/`, and probe commands write v2 sidecar artifacts through
+  `EvidenceStore` after their existing v1 writes.
+- `rules/suitability.rs`: projects legacy suitability decisions into the v2
+  artifact envelope during the transition.
+
+Phase 4 complexity budget and audit:
+
+- New CLI module budget: two command modules, `decide` and `report`.
+- New compatibility budget: one `.v1.json` sidecar path helper and one
+  legacy-to-v2 suitability projection helper.
+- Post-implementation decision: keep target/helper wire output unchanged in
+  this phase; the host CLI wraps parsed outputs into v2 artifacts so safety
+  semantics and SSH/helper contracts remain unchanged.
+
 ### Rules Engine
 
 Use Rust declaration tables with a small predicate vocabulary. Do not start
@@ -506,23 +597,23 @@ make verify
       boundary probe plan ownership, Makefile/COMMANDS coupling, and WBS
       granularity.
 - [x] Phase 0: Extract and freeze safety invariant tests.
-- [ ] Phase 1: Implement evidence kernel and schema generation.
-- [ ] Phase 1: Add `make schemas` to `Makefile` and register it in
+- [x] Phase 1: Implement evidence kernel and schema generation.
+- [x] Phase 1: Add `make schemas` to `Makefile` and register it in
       `COMMANDS.md`.
-- [ ] Phase 2: Implement `rules/engine.rs`.
-- [ ] Phase 2: Implement claim catalog and connect blocked-claim lookup.
-- [ ] Phase 2: Replace operating contract internals behind core APIs while
+- [x] Phase 2: Implement `rules/engine.rs`.
+- [x] Phase 2: Implement claim catalog and connect blocked-claim lookup.
+- [x] Phase 2: Replace operating contract internals behind core APIs while
       keeping CLI v1 output.
-- [ ] Phase 2: Replace suitability internals behind core APIs while keeping CLI
+- [x] Phase 2: Replace suitability internals behind core APIs while keeping CLI
       v1 output.
-- [ ] Phase 2: Connect `constraints check` to the claim catalog.
-- [ ] Phase 3: Replace probe outputs with `Artifact<P>`.
-- [ ] Phase 4: Split CLI modules and update target/helper payloads.
-- [ ] Phase 4: Cut CLI output and `cli.rs` expectations over to v2 together.
-- [ ] Phase 5: Delete v1 surfaces and compress docs.
-- [ ] Phase 5: Update `Makefile` `docs-smoke` paths in the same commit as
+- [x] Phase 2: Connect `constraints check` to the claim catalog.
+- [x] Phase 3: Replace probe outputs with `Artifact<P>`.
+- [x] Phase 4: Split CLI modules and update target/helper payloads.
+- [x] Phase 4: Cut CLI output and `cli.rs` expectations over to v2 together.
+- [x] Phase 5: Delete v1 surfaces and compress docs.
+- [x] Phase 5: Update `Makefile` `docs-smoke` paths in the same commit as
       normative doc deletion.
-- [ ] Run final whole-cutover `make verify`.
+- [x] Run final whole-cutover `make verify`.
 
 ## Surprises & Discoveries
 
@@ -539,6 +630,30 @@ make verify
   are crate-local:
   `crates/adc-lab-core/tests/safety_invariants.rs` and
   `crates/adc-lab/tests/safety_invariants.rs`.
+- Phase 1 schema generation uses `schemars` 0.8 because it fits the existing
+  serde DTO stack and does not force external schema DSL maintenance.
+- `ArtifactHeader` is intentionally not `deny_unknown_fields`: it is an
+  internal partial reader used to index a full strict artifact without parsing
+  the payload.
+- The generated `schemars::schema_for!` root stores envelope
+  `additionalProperties: false` at the root object, while nested properties
+  are under `properties`.
+- Phase 2 keeps the public CLI on v1 shapes. The new operating-contract and
+  suitability artifacts are exposed only through core API tests and generated
+  v2 schemas.
+- Making `Kind` `Copy` simplified rule-table evidence kind slices; existing
+  store code was updated to avoid clone-on-copy clippy failures.
+- Phase 3 wraps existing v1 probe outputs into compact v2 payloads instead of
+  deriving schemas for every nested v1 DTO. Rationale: Phase 4 owns the public
+  CLI cutover, and Phase 5 deletes obsolete v1 surfaces after parity.
+- Phase 4 changed public CLI output for `decide suitability` and
+  `report operating-contract` to v2 artifacts. Probe commands now write v2
+  sidecars, but still print their v1 result payloads until Phase 5 cleanup.
+- Phase 5 could not delete `platform_contract.rs` as a whole because that file
+  still owns the active pressure probe runtime (`run_resource_pressure`,
+  `run_composite_boundary`, `PressureProbeOptions`) used by the CLI. Phase 5
+  deleted the public v1 report/schema/demo surfaces and left the pressure
+  runtime for a later file-boundary split.
 
 ## Verification Log
 
@@ -572,6 +687,97 @@ make verify
   smoke, and command smoke.
 - Phase 0 PR: draft PR #30 opened at
   `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/30`.
+- Phase 1 schema generation: `make schemas` passed and regenerated
+  `schemas/generated/lab.artifact.v2.schema.json` plus
+  `schemas/generated/lab.claim_catalog_entry.v2.schema.json`.
+- Phase 1 focused verification:
+  `cargo test -p adc-lab-core --test evidence_kernel -- --nocapture` passed
+  with 7 tests.
+- Phase 1 contract gate:
+  `cargo test --workspace contract_validation -- --nocapture` passed and kept
+  the Phase 0 safety invariant integration tests green.
+- Phase 1 final gate: `make verify` passed after adding the evidence kernel,
+  schema generation, and command registry entry. The gate ran workspace build,
+  `cargo fmt --all --check`, clippy with `-D warnings`, library tests,
+  integration tests, contract validation, docs smoke, and command smoke.
+- Phase 1 PR: draft PR #31 opened at
+  `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/31`.
+- Phase 2 schema generation: `make schemas` passed and regenerated catalog
+  schema plus new `lab.report.operating_contract.v2.schema.json` and
+  `lab.report.suitability.v2.schema.json` snapshots.
+- Phase 2 focused verification:
+  `cargo test -p adc-lab-core --test rules_engine -- --nocapture` passed with
+  5 tests.
+- Phase 2 kernel regression:
+  `cargo test -p adc-lab-core --test evidence_kernel -- --nocapture` passed
+  with 7 tests.
+- Phase 2 contract gate:
+  `cargo test --workspace contract_validation -- --nocapture` passed and kept
+  Phase 0 safety invariant tests green.
+- Phase 2 final gate: `make verify` passed after adding the rules engine,
+  catalog-backed blocked claim terms, v2 report schemas, and focused tests.
+- Phase 2 PR: draft PR #32 opened at
+  `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/32`.
+- Phase 3 schema generation: `make schemas` passed and added
+  `lab.observation.v2.schema.json`, `lab.load.v2.schema.json`,
+  `lab.pressure.v2.schema.json`, `lab.composite.v2.schema.json`, and
+  `lab.workload.v2.schema.json`.
+- Phase 3 focused verification:
+  `cargo test -p adc-lab-core --test probe_artifacts -- --nocapture` passed
+  with 2 tests.
+- Phase 3 regression verification:
+  `cargo test -p adc-lab-core --test evidence_kernel -- --nocapture` passed
+  with 7 tests, and `cargo test -p adc-lab-core --test rules_engine -- --nocapture`
+  passed with 5 tests.
+- Phase 3 contract gate:
+  `cargo test --workspace contract_validation -- --nocapture` passed and kept
+  Phase 0 safety invariant tests green.
+- Phase 3 final gate: `make verify` passed after adding v2 probe artifact
+  adapters, generated schemas, and the dummy pressure-kind exercise.
+- Phase 3 PR: draft PR #33 opened at
+  `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/33`.
+- Phase 4 schema generation: `make schemas` passed with no schema command
+  failure after the CLI cutover changes.
+- Phase 4 focused CLI verification:
+  `cargo test -p adc-lab --test cli decide_suitability_reads_run_evidence_and_keeps_thermal_target_conditioned -- --nocapture`
+  passed.
+- Phase 4 focused CLI verification:
+  `cargo test -p adc-lab --test cli report_operating_contract_writes_contract_artifacts -- --nocapture`
+  passed.
+- Phase 4 full CLI verification:
+  `cargo test -p adc-lab --test cli -- --nocapture` passed with 32 tests.
+- Phase 4 contract gate:
+  `cargo test --workspace contract_validation -- --nocapture` passed and kept
+  Phase 0 safety invariant tests green.
+- Phase 4 final gate: `make verify` passed after CLI cutover, command module
+  split, v2 probe sidecar writes, and updated `cli.rs` expectations.
+- Phase 4 PR: draft PR #34 opened at
+  `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/34`.
+- Phase 5 schema generation: `make schemas` passed and regenerated the v2
+  generated schema set after deleting obsolete v1 report schemas.
+- Phase 5 schema count: `find schemas -maxdepth 1 -type f -name '*.schema.json' | wc -l`
+  reports 32 handwritten v1 schemas, down from the 40 baseline; generated v2
+  schemas remain 9.
+- Phase 5 focused CLI verification:
+  `cargo test -p adc-lab --test cli report_operating_contract_writes_contract_artifacts -- --nocapture`
+  passed.
+- Phase 5 focused CLI verification:
+  `cargo test -p adc-lab --test cli report_operating_contract_accepts_include_run_in_v2_store -- --nocapture`
+  passed.
+- Phase 5 focused CLI verification:
+  `cargo test -p adc-lab --test cli pressure_composite_promotes_coupling_evidence_class -- --nocapture`
+  passed after adding the v2 rule-required pressure artifact to the test setup.
+- Phase 5 full CLI verification:
+  `cargo test -p adc-lab --test cli -- --nocapture` passed with 31 tests.
+- Phase 5 contract gate:
+  `cargo test --workspace contract_validation -- --nocapture` passed with
+  Phase 0 safety invariant tests still green.
+- Phase 5 final gate: `make verify` passed after deleting the capability
+  profile module, capability cost model generator, public v1 report sidecars,
+  v1 report schemas/goldens, v1 demo packs, resource-smoke alias, and stale
+  docs.
+- Phase 5 PR: draft PR #36 opened at
+  `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/36`.
 
 ## Decision Log
 
@@ -602,15 +808,46 @@ make verify
 - 2026-06-11: Implement Phase 0 safety invariants as crate-local integration
   tests rather than repository-root tests. Rationale: the workspace root is not
   a Cargo package, so root `tests/` would not be executed by `make verify`.
+- 2026-06-11: Implement Phase 1 as a side-by-side v2 evidence kernel with no
+  CLI/report cutover. Rationale: this proves the envelope, store, schema, and
+  command surfaces while keeping existing public output and safety tests green.
+- 2026-06-11: Use `LabError::Validation` for evidence-store trust-boundary
+  refusals such as symlinks, malformed JSON artifacts, and path escapes.
+  Rationale: these are repository/run-directory contract violations, not claim
+  decisions.
+- 2026-06-11: Keep Phase 2 v2 operating-contract and suitability outputs
+  core-only. Rationale: this satisfies the table-driven rule acceptance
+  criteria without creating a dual public CLI contract before Phase 4.
+- 2026-06-11: Store blocked claim scan terms in the claim catalog while
+  preserving v1 `DesignConstraintPack` string shape. Rationale: constraints
+  can move to one source of truth without changing the CLI schema yet.
+- 2026-06-11: Keep Phase 3 probe v2 writes behind core APIs instead of changing
+  CLI persistence paths. Rationale: Phase 2-3 must keep CLI v1 shapes green,
+  with public cutover deferred to Phase 4.
+- 2026-06-11: Use compact v2 probe payloads as adapter outputs rather than
+  schema-deriving every nested v1 DTO. Rationale: this keeps the v2 artifact
+  contract strict and small while v1 payloads are still temporary.
+- 2026-06-11: Keep target/helper wire payloads unchanged in Phase 4 and wrap
+  them into v2 artifacts in the host CLI. Rationale: changing remote/helper
+  stdout at the same time as public CLI cutover would risk safety-boundary
+  regressions; Phase 0 safety invariant tests stay authoritative.
+- 2026-06-11: Keep v1 artifacts as explicit parity sidecars after public v2
+  cutover. Rationale: Phase 5 owns deletion after green parity evidence.
+- 2026-06-11: Delete public v1 report/schema/demo surfaces in Phase 5 while
+  leaving the pressure runtime in `platform_contract.rs` until it can be split
+  without changing probe behavior. Rationale: `platform_contract.rs` still owns
+  active bounded pressure execution, while the CLI no longer emits the deleted
+  v1 report artifacts.
 
 ## Handoff
 
-- Branch: `codex/adc-labv2`.
+- Branch: `codex/adc-labv2-phase5-cleanup`.
 - Baseline commit: `543edf0`.
-- Current status: Phase 0 implemented, verified, pushed, and published as draft
-  PR #30.
-- Uncommitted changes: none expected after the Phase 0 PR URL plan update is
-  committed and pushed.
+- Current status: Phase 5 implemented and verified locally. Phase 0 is draft
+  PR #30; Phase 1 is stacked draft PR #31; Phase 2 is stacked draft PR #32;
+  Phase 3 is stacked draft PR #33; Phase 4 is stacked draft PR #34; Phase 5 is
+  stacked draft PR #36.
+- Uncommitted changes: this plan update, pending handoff commit.
 - Commands run so far:
   - `sed -n ...` on the request attachment, `PLANS.md`, execution-plan
     references, existing plans, `COMMANDS.md`, Cargo manifests, Makefile, and
@@ -624,18 +861,27 @@ make verify
   - `cargo test -p adc-lab-core --test safety_invariants -- --nocapture`.
   - `cargo test -p adc-lab --test safety_invariants -- --nocapture`.
   - `cargo test --workspace contract_validation -- --nocapture`.
+  - `make schemas`.
+  - `cargo test -p adc-lab-core --test evidence_kernel -- --nocapture`.
+  - `cargo test -p adc-lab-core --test rules_engine -- --nocapture`.
+  - `cargo test -p adc-lab-core --test probe_artifacts -- --nocapture`.
+  - `cargo test -p adc-lab --test cli -- --nocapture`.
   - `make verify`.
 - Next steps:
-  1. Start Phase 1 from `codex/adc-labv2-phase0-safety-invariants`.
-  2. Keep the Phase 1 PR based on the Phase 0 branch while PR #30 is open.
-  3. Add `schemars` and `make schemas` only after this Phase 0 safety baseline.
+  1. Review/merge stacked PRs in order from #30 through #36.
+  2. Regenerate fresh v2 demo evidence if target-specific evidence is needed.
 - Read these files first when resuming:
   - `plans/20260611-v2-evidence-kernel.md`
   - `crates/adc-lab-core/src/control.rs`
   - `crates/adc-lab-core/src/platform_contract.rs`
   - `crates/adc-lab-core/src/report.rs`
+  - `crates/adc-lab-core/src/evidence/`
+  - `crates/adc-lab-core/src/probe/`
+  - `crates/adc-lab-core/src/rules/`
+  - `crates/adc-lab/src/commands/`
   - `crates/adc-lab/tests/cli.rs`
 
 ## Outcomes & Retrospective
 
-Pending implementation.
+Phase 0 through Phase 5 are implemented, locally verified, pushed, and
+published as stacked draft PRs.

@@ -14,17 +14,17 @@
 - lint: make lint
 - static analysis: make analysis
 - contract validation: make contract
+- schema generation: make schemas
 
 ## Tests
 - unit tests: make test-unit
 - integration/e2e tests: make test-integration
 - command smoke: make command-smoke
-- resource smoke compatibility alias: make resource-smoke
 
 ## Notes
 - If a command differs between local and CI, document both.
 - If a command is intentionally unavailable, explain the alternative.
-- `make command-smoke` / `make resource-smoke` verifies command wiring only. It does not collect resource metrics and does not support resource/NFR claims by itself.
+- `make command-smoke` verifies command wiring only. It does not collect resource metrics and does not support resource/NFR claims by itself.
 - GitHub CI runs `make verify`.
 - GitHub release workflow runs `make verify`, builds release binaries, packages tarballs, publishes `SHA256SUMS`, and does not support resource/NFR claims by itself.
 - If `make verify` fails during initialization, keep the verification placeholder and document the failure plus next steps in `INIT_REPORT.md` (or append to this file).
