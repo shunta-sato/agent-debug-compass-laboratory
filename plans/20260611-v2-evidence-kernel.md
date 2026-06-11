@@ -570,6 +570,8 @@ make verify
   tests. The gate ran workspace build, `cargo fmt --all --check`, clippy with
   `-D warnings`, library tests, integration tests, contract validation, docs
   smoke, and command smoke.
+- Phase 0 PR: draft PR #30 opened at
+  `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/30`.
 
 ## Decision Log
 
@@ -605,9 +607,10 @@ make verify
 
 - Branch: `codex/adc-labv2`.
 - Baseline commit: `543edf0`.
-- Current status: Phase 0 implemented and verified; Phase 0 PR publication is
-  next.
-- Uncommitted changes: this plan file plus Phase 0 test extraction changes.
+- Current status: Phase 0 implemented, verified, pushed, and published as draft
+  PR #30.
+- Uncommitted changes: none expected after the Phase 0 PR URL plan update is
+  committed and pushed.
 - Commands run so far:
   - `sed -n ...` on the request attachment, `PLANS.md`, execution-plan
     references, existing plans, `COMMANDS.md`, Cargo manifests, Makefile, and
@@ -623,9 +626,9 @@ make verify
   - `cargo test --workspace contract_validation -- --nocapture`.
   - `make verify`.
 - Next steps:
-  1. Commit Phase 0 on `codex/adc-labv2-phase0-safety-invariants`.
-  2. Push the branch and open a draft Phase 0 PR.
-  3. Start Phase 1 only after the Phase 0 PR exists.
+  1. Start Phase 1 from `codex/adc-labv2-phase0-safety-invariants`.
+  2. Keep the Phase 1 PR based on the Phase 0 branch while PR #30 is open.
+  3. Add `schemars` and `make schemas` only after this Phase 0 safety baseline.
 - Read these files first when resuming:
   - `plans/20260611-v2-evidence-kernel.md`
   - `crates/adc-lab-core/src/control.rs`
