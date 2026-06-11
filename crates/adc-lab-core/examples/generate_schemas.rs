@@ -1,7 +1,8 @@
 use adc_lab_core::{
-    Artifact, ClaimDefinition, CompositeBoundaryResult, CompositePayload, LoadPayload, LoadPlan,
-    LoadResult, ObservationPayload, OperatingContractPayload, PressurePayload,
-    ResourcePressureResult, RunReportPayload, SuitabilityPayload, WorkloadPayload,
+    Artifact, ClaimDefinition, CompositeBoundaryResult, CompositePayload, ConstraintCheckPayload,
+    ConstraintsPayload, LoadPayload, LoadPlan, LoadResult, ObservationPayload,
+    OperatingContractPayload, PressurePayload, ResourcePressureResult, RunReportPayload,
+    SuitabilityPayload, SuitabilityPolicy, WorkloadPayload,
 };
 use schemars::schema_for;
 use std::fs;
@@ -42,6 +43,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(
         out_dir.join("lab.report.suitability.v2.schema.json"),
         serde_json::to_vec_pretty(&suitability_schema)?,
+    )?;
+
+    let constraints_schema = schema_for!(Artifact<ConstraintsPayload>);
+    fs::write(
+        out_dir.join("lab.report.constraints.v2.schema.json"),
+        serde_json::to_vec_pretty(&constraints_schema)?,
+    )?;
+
+    let constraints_check_schema = schema_for!(Artifact<ConstraintCheckPayload>);
+    fs::write(
+        out_dir.join("lab.report.constraints_check.v2.schema.json"),
+        serde_json::to_vec_pretty(&constraints_check_schema)?,
+    )?;
+
+    let suitability_policy_schema = schema_for!(SuitabilityPolicy);
+    fs::write(
+        out_dir.join("lab.suitability_policy.v1.schema.json"),
+        serde_json::to_vec_pretty(&suitability_policy_schema)?,
     )?;
 
     let observation_schema = schema_for!(Artifact<ObservationPayload>);

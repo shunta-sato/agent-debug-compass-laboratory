@@ -70,10 +70,11 @@ Reframed quantitative targets:
   - blocked claim addition is one catalog entry plus expectation changes,
   - report behavior changes through rule rows, not bespoke generators,
   - generated schema drift is checked by `make verify`.
-- v2.1 LoC expectation: reduce current Rust total from 17,939 to roughly
-  16,400-17,000 if Phases 1-3 land and Phases 4-5 add their expected
-  structure/schema-test overhead. A 15,500-16,000 landing is a stretch outcome,
-  not an acceptance target.
+- v2.1 LoC expectation is forecast-driven, not fixed. The actuals table below
+  is authoritative when it differs from prose. After Phase 3, expected final
+  landing is roughly 18,024-18,424 Rust lines if Phase 4 and Phase 5 follow the
+  current remaining estimates. This is a guardrail record, not an acceptance
+  target.
 - File budgets after Phase 4:
   - `crates/adc-lab/src/main.rs` <= 800 lines,
   - `crates/adc-lab-core/src/report.rs` <= 900 lines or deleted,
@@ -102,11 +103,11 @@ Phase contribution forecast:
 |---|---:|---:|---|
 | Phase 1 report.run | -600 to -900 | -3 if all producers move | Includes report and experiment claim-trace producers. |
 | Phase 2 probe cutover | -300 to -500 | -3 to -4 | `load_plan` may become generated rather than deleted. |
-| Phase 3 suitability/constraints | -200 to -400 | -2 to -3 | `suitability_policy` may remain as generated input schema. |
+| Phase 3 suitability/constraints | -100 to +100 | -2 to -3 | Revised after Phase 1/2 showed v2 payload and test cost offsets deleted v1 DTOs. |
 | Phase 4 CLI module split | -100 to +100 | 0 | Better boundaries may add small module overhead. |
 | Phase 5 generated schemas | +200 to +400 | maintained-by-hand -> 0 | Derives, adapters, and compatibility tests add code. |
 | Phase 6 docs | 0 | 0 | Documentation-only. |
-| Total forecast | -900 to -1,500 | maintained-by-hand -> 0 | Expected landing: 16,400-17,000 Rust lines. |
+| Total forecast | Actuals plus remaining phase forecast | maintained-by-hand -> 0 | Current expected landing after Phase 3: 18,024-18,424 Rust lines. |
 
 Phase contribution actuals:
 
@@ -114,6 +115,7 @@ Phase contribution actuals:
 |---|---:|---:|---|
 | Phase 1 report.run | -200 total Rust LoC (`17,939` -> `17,739`) | top-level `32` -> `29`, generated `9` -> `10`, maintained-by-hand `32` -> `29` | Remaining phases now forecast final total around `16,939-17,739` unless later phases delete more code than expected. |
 | Phase 2 probe cutover | +117 total Rust LoC (`17,739` -> `17,856`) | top-level `29` -> `25`, generated `10` -> `14`, maintained-by-hand `29` -> `25` | Remaining phases now forecast final total around `17,556-18,156`; v2 public payload and generated v1 wire snapshots offset deleted schemas. |
+| Phase 3 suitability/constraints | +68 total Rust LoC (`17,856` -> `17,924`) | top-level `25` -> `22`, generated `14` -> `17`, maintained-by-hand `25` -> `22` | Remaining phases now forecast final total around `18,024-18,424`; LoC is effectively neutral while schema maintenance drops. |
 
 ## Context & Orientation
 
@@ -551,8 +553,8 @@ Quality gate rule:
       schemas after parity.
 - [x] Phase 2: Make load/pressure/composite v2 artifacts primary CLI outputs.
 - [x] Phase 2: Remove or generated-convert probe v1 schemas.
-- [ ] Phase 3: Make constraints generation/checking v2-native.
-- [ ] Phase 3: Retire v1 suitability/constraint schemas where public producers
+- [x] Phase 3: Make constraints generation/checking v2-native.
+- [x] Phase 3: Retire v1 suitability/constraint schemas where public producers
       are gone.
 - [ ] Phase 4: Split remaining command groups out of `main.rs`.
 - [ ] Phase 4: Wire `make file-budgets` into `make verify`.
@@ -605,6 +607,9 @@ Quality gate rule:
 - The `load cpu` v2 sidecar path was still `load/cpu.v2.json`, which would
   overwrite repeated load results. Phase 2 made load artifact paths result-id
   stable, matching pressure and composite behavior.
+- `blocked_claims_for` returns catalog blocked phrases, not claim IDs. Phase 3
+  kept v2 suitability/constraints payloads on stable claim IDs and uses catalog
+  phrases only for Markdown/check scanning.
 
 ## Decision Log
 
@@ -663,6 +668,15 @@ Quality gate rule:
   wire contracts added more code than schema/golden deletion removed. Reforecast
   final landing to roughly 17,556-18,156 unless Phase 4 deletes more command
   implementation than currently expected.
+- 2026-06-11: Re-baseline the LoC forecast after two same-direction misses and
+  before Phase 3 closeout. Rationale: public v2 payloads, generated snapshots,
+  and parity tests have a steady cost; the actuals table is authoritative and
+  Phase 3 is expected to land near neutral rather than remove hundreds of
+  lines.
+- 2026-06-11: Make constraints output/checking v2-native instead of preserving
+  a compatibility projection. Rationale: public suitability output is already a
+  v2 artifact, so generating v1 design packs would keep the public loop split
+  and retain prose-derived constraint state.
 
 ## Verification Log
 
@@ -799,22 +813,46 @@ Quality gate rule:
   `make verify` passed. The gate covered workspace build, format check, clippy,
   generated schema drift plus ledger coverage, unit tests, integration tests,
   safety invariants, contract validation, docs smoke, and command smoke.
+- Phase 3 branch setup:
+  `git fetch origin --prune` updated `origin/main` to `206db6b`; `git switch
+  -c codex/adc-labv21-suitability-constraints origin/main` created the Phase 3
+  branch.
+- Phase 3 focused verification:
+  `cargo check --workspace` passed.
+- Phase 3 focused verification:
+  `make schemas-check` passed with
+  `top_level=22 no_schema_wire=9 maintained_by_hand=22`.
+- Phase 3 focused verification:
+  `cargo test -p adc-lab-core --test rules_engine -- --nocapture` passed; 8
+  tests.
+- Phase 3 focused verification:
+  `cargo test -p adc-lab-core --test contract_validation -- --nocapture`
+  passed; 14 tests.
+- Phase 3 focused verification:
+  `cargo test -p adc-lab --test cli -- --nocapture` passed; 32 tests.
+- Phase 3 measurements before final gate:
+  total Rust lines `17,924`; top-level schemas `22`; generated schemas `17`;
+  `make file-budgets` passed in informational mode with one future violation,
+  `crates/adc-lab/src/main.rs` at 2,482 lines over the Phase 4 budget.
+- Phase 3 final gate:
+  `make verify` passed. The gate covered workspace build, format check, clippy,
+  generated schema drift plus ledger coverage, unit tests, integration tests,
+  safety invariants, contract validation, docs smoke, and command smoke.
 
 ## Handoff
 
-- Branch: `codex/adc-labv21-probe-cutover`.
-- Base commit: `229112a` (`origin/main` after PR #42).
-- Current status: Phase 2 implementation is complete locally with `make verify`
-  passing. Commit/PR publication is next.
+- Branch: `codex/adc-labv21-suitability-constraints`.
+- Base commit: `206db6b` (`origin/main` after PR #43).
+- Current status: Phase 3 implementation is complete locally with `make verify`
+  passing. Commit and PR publication are next.
 - Untracked local files exist and were not staged:
   `.DS_Store`, `._.DS_Store`,
   `reports/._20260611-v2-evidence-kernel-outcome-review.md`, and
   `reports/20260611-v2-evidence-kernel-outcome-review.md`.
 - Next steps:
-  1. Commit and publish the Phase 2 PR.
-  2. Start Phase 3 after Phase 2 lands.
-  3. Keep the Phase 2 LoC forecast miss visible when updating later phase
-     actuals.
+  1. Commit and publish the Phase 3 PR.
+  2. Start Phase 4 after Phase 3 lands, keeping the neutral LoC trend visible
+     in the actuals table.
 - Read first when resuming:
   - this plan,
   - `reports/20260611-v2-evidence-kernel-outcome-review.md`,
@@ -859,3 +897,19 @@ Phase 2 outcome:
   v1 wire DTOs.
 - `load` v2 artifacts now include result IDs in their file names so repeated
   load runs do not overwrite previous v2 evidence.
+
+Phase 3 outcome:
+
+- The public suitability/constraints loop is v2-native from
+  `report operating-contract` through `decide suitability`,
+  `constraints generate`, and `constraints check`.
+- `constraints generate` writes `Artifact<ConstraintsPayload>` with stable
+  blocked claim IDs; Markdown and check scanning use catalog blocked terms.
+- `constraints check` reads `report.constraints` artifacts and prints
+  `report.constraints_check` artifacts instead of `lab.constraint_check_result.v1`.
+- `lab.suitability_decision.v1` and `lab.design_constraint_pack.v1` schemas and
+  golden fixtures were deleted. `lab.suitability_policy.v1` remains an active
+  public input schema as a generated snapshot.
+- Phase 3 landed at +68 Rust lines while reducing maintained-by-hand schemas
+  from 25 to 22. LoC remains a guardrail; schema maintenance is the primary
+  completed objective for this phase.

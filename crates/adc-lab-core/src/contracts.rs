@@ -1011,43 +1011,6 @@ pub struct SuitabilityDimensionDecision {
     pub next_evidence_needed: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct SuitabilityDecision {
-    pub schema_version: String,
-    pub decision_id: String,
-    pub target_id: String,
-    pub workload_id: String,
-    pub policy_id: String,
-    pub overall_decision: SuitabilityDecisionValue,
-    pub selection_ready: bool,
-    pub dimensions: Vec<SuitabilityDimensionDecision>,
-    pub blocked_claims: Vec<String>,
-    pub data_quality: WorkloadDataQuality,
-    pub evidence_refs: Vec<String>,
-    pub time_unix_ms: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct DesignConstraintPack {
-    pub schema_version: String,
-    pub constraint_pack_id: String,
-    pub target_id: String,
-    pub workload_id: String,
-    pub allowed_patterns: Vec<String>,
-    pub burst_only_patterns: Vec<String>,
-    pub degraded_mode_triggers: Vec<String>,
-    pub forbidden_patterns: Vec<String>,
-    pub budget_constraints: Vec<String>,
-    pub required_runtime_guards: Vec<String>,
-    pub blocked_claims: Vec<String>,
-    pub agent_instructions: Vec<String>,
-    pub ci_rules: Vec<String>,
-    pub evidence_refs: Vec<String>,
-    pub time_unix_ms: u64,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum FactorKind {

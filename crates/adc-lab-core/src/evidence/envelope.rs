@@ -19,6 +19,10 @@ pub enum Kind {
     ReportOperatingContract,
     #[serde(rename = "report.suitability")]
     ReportSuitability,
+    #[serde(rename = "report.constraints")]
+    ReportConstraints,
+    #[serde(rename = "report.constraints_check")]
+    ReportConstraintsCheck,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]

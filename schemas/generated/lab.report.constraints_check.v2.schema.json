@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Artifact_for_PressurePayload",
+  "title": "Artifact_for_ConstraintCheckPayload",
   "type": "object",
   "required": [
     "claims",
@@ -59,7 +59,7 @@
       }
     },
     "payload": {
-      "$ref": "#/definitions/PressurePayload"
+      "$ref": "#/definitions/ConstraintCheckPayload"
     },
     "run_id": {
       "type": "string"
@@ -130,6 +130,49 @@
           "items": {
             "type": "string"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConstraintCheckMatch": {
+      "type": "object",
+      "required": [
+        "blocked_claim",
+        "claim_id",
+        "path"
+      ],
+      "properties": {
+        "blocked_claim": {
+          "type": "string"
+        },
+        "claim_id": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConstraintCheckPayload": {
+      "type": "object",
+      "required": [
+        "checked_path",
+        "matches",
+        "status"
+      ],
+      "properties": {
+        "checked_path": {
+          "type": "string"
+        },
+        "matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConstraintCheckMatch"
+          }
+        },
+        "status": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -243,56 +286,6 @@
         "value": {
           "type": "number",
           "format": "double"
-        }
-      },
-      "additionalProperties": false
-    },
-    "PressurePayload": {
-      "type": "object",
-      "required": [
-        "duration_ms",
-        "effect_observed",
-        "evidence_class",
-        "pressure_kind",
-        "source_schema_version"
-      ],
-      "properties": {
-        "duration_ms": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "effect_observed": {
-          "type": "boolean"
-        },
-        "evidence_class": {
-          "type": "string"
-        },
-        "network_endpoint_available": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "network_mode": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "network_traffic_generated_bytes": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "pressure_kind": {
-          "type": "string"
-        },
-        "source_schema_version": {
-          "type": "string"
         }
       },
       "additionalProperties": false

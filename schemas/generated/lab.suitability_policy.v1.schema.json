@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SuitabilityPolicy",
+  "type": "object",
+  "required": [
+    "optional_dimensions",
+    "policy_id",
+    "required_dimensions",
+    "rules",
+    "schema_version"
+  ],
+  "properties": {
+    "cpu": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/CpuSuitabilityPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "memory": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/MemorySuitabilityPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "optional_dimensions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SuitabilityDimensionKind"
+      }
+    },
+    "policy_id": {
+      "type": "string"
+    },
+    "required_dimensions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SuitabilityDimensionKind"
+      }
+    },
+    "rules": {
+      "$ref": "#/definitions/SuitabilityPolicyRules"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "thermal": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ThermalSuitabilityPolicy"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "CpuSuitabilityPolicy": {
+      "type": "object",
+      "required": [
+        "max_process_cpu_percent_avg"
+      ],
+      "properties": {
+        "max_process_cpu_percent_avg": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MemorySuitabilityPolicy": {
+      "type": "object",
+      "required": [
+        "min_memory_margin_mb"
+      ],
+      "properties": {
+        "min_memory_margin_mb": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "SuitabilityDimensionKind": {
+      "type": "string",
+      "enum": [
+        "cpu",
+        "thermal",
+        "memory",
+        "storage_io",
+        "network_io",
+        "latency_jitter",
+        "observer"
+      ]
+    },
+    "SuitabilityPolicyRules": {
+      "type": "object",
+      "required": [
+        "unknown_never_becomes_meet",
+        "unknown_required_dimension_blocks_selection"
+      ],
+      "properties": {
+        "unknown_never_becomes_meet": {
+          "type": "boolean"
+        },
+        "unknown_required_dimension_blocks_selection": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ThermalSuitabilityPolicy": {
+      "type": "object",
+      "required": [
+        "marginal_margin_c_below",
+        "max_temp_c"
+      ],
+      "properties": {
+        "marginal_margin_c_below": {
+          "type": "number",
+          "format": "double"
+        },
+        "max_temp_c": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
