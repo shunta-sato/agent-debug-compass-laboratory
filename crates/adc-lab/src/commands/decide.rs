@@ -13,8 +13,6 @@ pub(crate) fn command_decide_suitability(args: SuitabilityCommand) -> Result<()>
         path_ref(&args.workload_demand),
         path_ref(&args.policy),
     )?;
-    let legacy_out = legacy_v1_sidecar_path(&args.out);
-    write_json_pretty(&legacy_out, &decision)?;
     let artifact = suitability_artifact_from_legacy_decision_v2(
         &decision,
         run_id_from_run_dir(&args.target_run),

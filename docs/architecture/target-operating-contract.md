@@ -23,10 +23,7 @@ Which claims are still blocked?
 `adc-lab report operating-contract` writes:
 
 ```text
-lab.platform_mechanism_inventory.v1
-lab.boundary_probe_plan.v1
-lab.resource_coupling_report.v1
-lab.target_operating_contract.v1
+lab.artifact.v2 kind=report.operating_contract
 ```
 
 Typical command:
@@ -67,15 +64,11 @@ A generic rule is not the same as a measured target-specific rule.
 A useful target operating contract should identify:
 
 ```text
-measured mechanisms
-boundary evidence
-resource-coupling evidence class
-allowed patterns
-burst-only patterns
-degraded-mode triggers
-forbidden patterns
+rule evaluations
+matched evidence kinds
+catalog claim IDs
 blocked claims
-next evidence needed
+next evidence
 ```
 
 ## Claim discipline

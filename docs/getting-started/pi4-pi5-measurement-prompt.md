@@ -14,8 +14,9 @@ bin/adc-lab-target --version
 cat release-manifest.json
 ```
 
-Record the `--version` JSON and `release-manifest.json` in the later
-`lab.run_manifest.v1` or `lab.target_capability_profile.v1` evidence pack.
+Record the `--version` JSON and `release-manifest.json` in the later run
+manifest and v2 evidence artifacts. Do not reuse v1 demo packs for v2
+comparison evidence.
 
 ## Pi5 Controller To Pi4 Target
 

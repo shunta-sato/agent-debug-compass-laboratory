@@ -37,11 +37,13 @@
 - Platform Operating Contract discovery: command-triggered pressure probes for
   CPU, thermal, memory, storage, network, latency/jitter, and observer
   behavior. Probes are bounded by duration and byte ceilings, write typed
-  `lab.resource_pressure_result.v1` artifacts, and roll up to
-  `lab.target_operating_contract.v1`. Pressure artifacts carry
+  v2 evidence sidecars, and roll up to `kind = report.operating_contract`.
+  Pressure artifacts carry
   `evidence_class`, `pressure_effect`, and condition metadata so smoke evidence
   cannot be mistaken for boundary or coupling proof.
-- Measurement surfaces available in the demo: target55 procfs CPU/memory, sysfs thermal, sysfs cpufreq read surface. Demo artifacts live under `examples/demos/target55/`.
+- Measurement surfaces exercised by hardware-free tests remain limited to
+  command wiring and artifact semantics. Target-specific NFR claims still
+  require fresh target evidence.
 - Measurement surfaces unavailable or not yet reference-grade: wakeups,
   battery/power, flash wear, sustained storage/write cadence, pressure-specific
   latency/jitter, composite resource coupling, and sustained thermal recovery.
@@ -72,10 +74,8 @@
 | `adc-lab pressure run` | experimental-only burst | probe-specific bounded loop or I/O window | duration <=30s; memory <=128MiB; storage <=64MiB; network <=1MiB | no | hardware-free CLI/schema tests; target55 smoke required but not sufficient for coupling claims |
 | `adc-lab experiment run` | experimental-only burst | listed trial sequence | warmup <=60s, cooldown <=60s, repetitions <=10, expanded trials <=64 | no | PR6 hardware-free real-run/blocked tests |
 | `adc-lab report operating-point` | controller-side report | none on target | command lifetime | no | PR7 hardware-free coverage classification tests |
-| capability-cost model in `adc-lab report operating-point` | controller-side report | none on target | command lifetime | no | PR8 hardware-free capability-cost model tests |
 | `adc-lab tool qualify --manifest ...` with evidence files | controller-side qualification report | none on target | command lifetime | no | PR9 hardware-free adapter qualification tests |
 | `adc-lab privilege provider-status` | controller-side report | none on target | command lifetime | no | PR10 hardware-free provider status tests |
-| `adc-lab report capability-profile` | controller-side report | none on target | command lifetime | no | PR11 hardware-free profile generation tests |
 | GitHub Release binary packaging | build/package integrity | none on target | workflow duration | no | PR11 CI/CD workflow and local package smoke |
 | `adc-lab-target` | command-triggered | none while idle | process lifetime | no daemon | demo target55 smoke passed |
 
@@ -124,11 +124,7 @@
 - Platform Operating Contract verification is hardware-free in unit/CLI/schema
   tests for command wiring and status taxonomy. Target claims require a live
   pressure suite on the target and `adc-lab report operating-contract`.
-- Demo evidence pack: `examples/demos/target55/`.
-- Demo baseline: `examples/demos/target55/baselines/resource/`.
-- Demo report path: `examples/demos/target55/reports/operating-envelope/`, `examples/demos/target55/reports/target-characterization.json`.
-- Workload/profile examples: `examples/workloads/`,
-  `examples/demos/pi4/`, and `examples/demos/pi5/`.
+- Workload examples: `examples/workloads/`.
 - Remaining evidence gaps after pressure smoke: wakeups, battery/power, flash
   wear, composite memory/storage/network/latency coupling, sustained
   thermal/recovery/degraded envelope, controlled governor and

@@ -610,10 +610,10 @@ make verify
 - [x] Phase 3: Replace probe outputs with `Artifact<P>`.
 - [x] Phase 4: Split CLI modules and update target/helper payloads.
 - [x] Phase 4: Cut CLI output and `cli.rs` expectations over to v2 together.
-- [ ] Phase 5: Delete v1 surfaces and compress docs.
-- [ ] Phase 5: Update `Makefile` `docs-smoke` paths in the same commit as
+- [x] Phase 5: Delete v1 surfaces and compress docs.
+- [x] Phase 5: Update `Makefile` `docs-smoke` paths in the same commit as
       normative doc deletion.
-- [ ] Run final whole-cutover `make verify`.
+- [x] Run final whole-cutover `make verify`.
 
 ## Surprises & Discoveries
 
@@ -649,6 +649,11 @@ make verify
 - Phase 4 changed public CLI output for `decide suitability` and
   `report operating-contract` to v2 artifacts. Probe commands now write v2
   sidecars, but still print their v1 result payloads until Phase 5 cleanup.
+- Phase 5 could not delete `platform_contract.rs` as a whole because that file
+  still owns the active pressure probe runtime (`run_resource_pressure`,
+  `run_composite_boundary`, `PressureProbeOptions`) used by the CLI. Phase 5
+  deleted the public v1 report/schema/demo surfaces and left the pressure
+  runtime for a later file-boundary split.
 
 ## Verification Log
 
@@ -748,6 +753,29 @@ make verify
   split, v2 probe sidecar writes, and updated `cli.rs` expectations.
 - Phase 4 PR: draft PR #34 opened at
   `https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/34`.
+- Phase 5 schema generation: `make schemas` passed and regenerated the v2
+  generated schema set after deleting obsolete v1 report schemas.
+- Phase 5 schema count: `find schemas -maxdepth 1 -type f -name '*.schema.json' | wc -l`
+  reports 32 handwritten v1 schemas, down from the 40 baseline; generated v2
+  schemas remain 9.
+- Phase 5 focused CLI verification:
+  `cargo test -p adc-lab --test cli report_operating_contract_writes_contract_artifacts -- --nocapture`
+  passed.
+- Phase 5 focused CLI verification:
+  `cargo test -p adc-lab --test cli report_operating_contract_accepts_include_run_in_v2_store -- --nocapture`
+  passed.
+- Phase 5 focused CLI verification:
+  `cargo test -p adc-lab --test cli pressure_composite_promotes_coupling_evidence_class -- --nocapture`
+  passed after adding the v2 rule-required pressure artifact to the test setup.
+- Phase 5 full CLI verification:
+  `cargo test -p adc-lab --test cli -- --nocapture` passed with 31 tests.
+- Phase 5 contract gate:
+  `cargo test --workspace contract_validation -- --nocapture` passed with
+  Phase 0 safety invariant tests still green.
+- Phase 5 final gate: `make verify` passed after deleting the capability
+  profile module, capability cost model generator, public v1 report sidecars,
+  v1 report schemas/goldens, v1 demo packs, resource-smoke alias, and stale
+  docs.
 
 ## Decision Log
 
@@ -803,16 +831,22 @@ make verify
   regressions; Phase 0 safety invariant tests stay authoritative.
 - 2026-06-11: Keep v1 artifacts as explicit parity sidecars after public v2
   cutover. Rationale: Phase 5 owns deletion after green parity evidence.
+- 2026-06-11: Delete public v1 report/schema/demo surfaces in Phase 5 while
+  leaving the pressure runtime in `platform_contract.rs` until it can be split
+  without changing probe behavior. Rationale: `platform_contract.rs` still owns
+  active bounded pressure execution, while the CLI no longer emits the deleted
+  v1 report artifacts.
 
 ## Handoff
 
-- Branch: `codex/adc-labv2-phase4-cli-cutover`.
+- Branch: `codex/adc-labv2-phase5-cleanup`.
 - Baseline commit: `543edf0`.
-- Current status: Phase 4 implemented, verified, pushed, and published as
-  stacked draft PR #34. Phase 0 is draft PR #30; Phase 1 is stacked draft PR
-  #31; Phase 2 is stacked draft PR #32; Phase 3 is stacked draft PR #33.
-- Uncommitted changes: none expected after the Phase 4 PR URL plan update is
-  committed and pushed.
+- Current status: Phase 5 implemented and verified locally. Phase 0 is draft
+  PR #30; Phase 1 is stacked draft PR #31; Phase 2 is stacked draft PR #32;
+  Phase 3 is stacked draft PR #33; Phase 4 is stacked draft PR #34. Phase 5 PR
+  publication is next.
+- Uncommitted changes: Phase 5 implementation and this plan update, pending
+  commit.
 - Commands run so far:
   - `sed -n ...` on the request attachment, `PLANS.md`, execution-plan
     references, existing plans, `COMMANDS.md`, Cargo manifests, Makefile, and
@@ -833,10 +867,10 @@ make verify
   - `cargo test -p adc-lab --test cli -- --nocapture`.
   - `make verify`.
 - Next steps:
-  1. Start Phase 5 from `codex/adc-labv2-phase4-cli-cutover`.
-  2. Keep the Phase 5 PR based on the Phase 4 branch while PR #34 is open.
-  3. Delete obsolete v1 schemas/docs/surfaces and update `docs-smoke` in the
-     same commit as doc deletion.
+  1. Commit Phase 5 cleanup.
+  2. Push `codex/adc-labv2-phase5-cleanup`.
+  3. Open the stacked Phase 5 draft PR against
+     `codex/adc-labv2-phase4-cli-cutover`.
 - Read these files first when resuming:
   - `plans/20260611-v2-evidence-kernel.md`
   - `crates/adc-lab-core/src/control.rs`
@@ -850,5 +884,5 @@ make verify
 
 ## Outcomes & Retrospective
 
-Phase 0 through Phase 4 are complete and PR'd. Whole-cutover outcomes remain
-pending until Phase 5 is implemented and PR'd.
+Phase 0 through Phase 5 are implemented and locally verified. Whole-cutover
+outcomes remain pending only until the Phase 5 PR is published.
