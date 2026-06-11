@@ -240,7 +240,6 @@ fn decide_suitability_writes_v2_without_legacy_sidecar() {
     .unwrap();
     let demand_path = temp.path().join("workload_demand_profile.json");
     let policy_path = temp.path().join("policy.yaml");
-    let contract_path = temp.path().join("target_operating_contract.json");
     let out_path = temp.path().join("suitability_decision.json");
     fs::copy(
         workspace_root().join("tests/golden/lab.workload_demand_profile.v1.valid.json"),
@@ -252,38 +251,24 @@ fn decide_suitability_writes_v2_without_legacy_sidecar() {
         &policy_path,
     )
     .unwrap();
-    fs::write(
-        &contract_path,
-        serde_json::to_vec_pretty(&serde_json::json!({
-            "schema_version": "lab.target_operating_contract.v1",
-            "target_id": "raspberry_pi_4_target55",
-            "target_class": "raspberry_pi_4",
-            "contract_status": "insufficient",
-            "rules": [],
-            "boundaries": [
-                {
-                    "boundary_id": "compute_thermal",
-                    "statement": "Compute and thermal claims are bounded to measured load durations.",
-                    "status": "measured_partial",
-                    "evidence_refs": ["artifact://lab/runs/LAB-RUN-001/pressure/cpu_pressure.result.json"],
-                    "next_evidence_needed": [
-                        {
-                            "reason": "sustained all-core thermal margin is not proven by short bounded probes",
-                            "needed_probe": "repeated CPU thermal soak with cooldown curve",
-                            "blocking_missing_evidence": ["5/15/30 minute soak", "cooldown/recovery curve"],
-                            "next_action": "run approved thermal soak probes before sustained-design claims",
-                            "owner_surface": "operator_approval"
-                        }
-                    ]
-                }
-            ],
-            "unknowns": ["composite resource coupling not measured"],
-            "next_evidence_needed": ["collect composite resource coupling evidence"],
-            "time_unix_ms": 1780000000000u64
-        }))
-        .unwrap(),
-    )
-    .unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "operating-contract",
+            "--run",
+            target_run.to_str().unwrap(),
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--json",
+        ])
+        .assert()
+        .success();
+    let contract_path = target_run.join("reports/target_operating_contract.v2.json");
+    assert!(contract_path.exists());
 
     Command::cargo_bin("adc-lab")
         .unwrap()
@@ -311,6 +296,16 @@ fn decide_suitability_writes_v2_without_legacy_sidecar() {
     assert_eq!(decision["schema"], "lab.artifact.v2");
     assert_eq!(decision["kind"], "report.suitability");
     assert_eq!(decision["payload"]["selection_ready"], true);
+    let blocked_claims = decision["payload"]["blocked_claims"].as_array().unwrap();
+    assert!(blocked_claims
+        .iter()
+        .any(|claim| claim == "target.selection.production_ready"));
+    assert!(blocked_claims
+        .iter()
+        .any(|claim| claim == "boundary.thermal_sustained_soak"));
+    assert!(!blocked_claims
+        .iter()
+        .any(|claim| claim.as_str().is_some_and(|claim| claim.contains(' '))));
     assert!(!temp.path().join("suitability_decision.v1.json").exists());
 }
 
@@ -407,6 +402,11 @@ fn suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end() {
         serde_json::from_slice(&fs::read(&decision_path).unwrap()).unwrap();
     assert_eq!(decision["schema"], "lab.artifact.v2");
     assert_eq!(decision["kind"], "report.suitability");
+    assert!(decision["payload"]["blocked_claims"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|claim| claim == "target.selection.production_ready"));
     let constraints: serde_json::Value =
         serde_json::from_slice(&fs::read(&constraints_path).unwrap()).unwrap();
     assert_eq!(

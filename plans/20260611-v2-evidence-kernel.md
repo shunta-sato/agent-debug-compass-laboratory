@@ -642,6 +642,17 @@ make verify
         network bounded transfer, pressure jitter, and observer cadence.
   - [x] Regenerate schemas and record final Rust LoC plus handwritten/generated
         schema counts.
+- [x] Native suitability follow-up: remove the remaining v1 operating-contract
+      projection from the public `decide suitability` path.
+  - [x] Make `decide suitability` read only `Artifact<OperatingContractPayload>`
+        for `--target-contract`.
+  - [x] Build `Artifact<SuitabilityPayload>` directly from the existing numeric
+        suitability policy evaluator.
+  - [x] Keep v2 suitability `payload.blocked_claims` as stable catalog claim
+        IDs, not prose-derived legacy IDs.
+  - [x] Delete `TargetOperatingContract` projection helpers and now-unused DTOs.
+  - [x] Update CLI/core regressions to use tool-produced v2 artifacts.
+  - [x] Run final verification and record final LoC/schema counts.
 
 ## Surprises & Discoveries
 
@@ -702,6 +713,12 @@ make verify
   about two thousand lines from `platform_contract.rs`, but the whole-repo Rust
   LoC target of 40-50% reduction remains unmet because active probe, control,
   suitability, manifest, and report-pack code still exist.
+- Native suitability follow-up discovery: after the final cleanup follow-up,
+  the last `TargetOperatingContract` use was a compatibility projection inside
+  `decide suitability`. The documented public input was already
+  `target_operating_contract.v2.json`, so the remaining v1 DTO surface could be
+  removed by making the numeric suitability evaluator return
+  `Artifact<SuitabilityPayload>` directly.
 
 Review follow-up route summary:
 
@@ -792,6 +809,52 @@ Final cleanup follow-up route summary:
   - Kept `TargetOperatingContract` DTOs only for the existing suitability
     policy projection; removing them requires a separate suitability-engine
     replacement.
+
+Native suitability follow-up route summary:
+
+- Risk level: high. The change removes public core DTO exports and tightens the
+  `decide suitability --target-contract` input contract, but it does not touch
+  target/helper/control safety semantics.
+- Definition of Done:
+  - `decide suitability` consumes the v2 operating-contract artifact emitted by
+    `report operating-contract` without projecting it into v1 DTOs.
+  - v2 suitability artifacts use stable claim IDs in `payload.blocked_claims`;
+    legacy prose remains only in the v1 design-constraint-pack projection.
+  - dead `TargetOperatingContract` DTOs and projection helpers have no remaining
+    code/test references.
+  - focused CLI/core tests and `make verify` pass.
+- Test List:
+  - core unknown-required-dimension regression over a v2 operating-contract
+    artifact.
+  - CLI `decide suitability` with a tool-produced v2 operating-contract
+    artifact.
+  - CLI `report operating-contract` -> `decide suitability` ->
+    `constraints generate` loop.
+  - rules-engine catalog/projection regression.
+  - full `make verify`.
+- Responsibility map:
+  - `suitability.rs`: owns numeric policy evaluation and direct v2 suitability
+    artifact construction.
+  - `rules/suitability.rs`: owns the v2 payload shape plus v2-to-v1
+    constraint-pack projection.
+  - `rules/operating_contract.rs`: owns only v2 operating-contract rule output,
+    not v1 DTO projection.
+  - `adc-lab/src/commands/decide.rs`: owns CLI input validation, output write,
+    and audit event for suitability decisions.
+- Complexity budget:
+  - New modules/classes: 0.
+  - New helper functions: 4 local helpers for suitability policy evaluations,
+    next-evidence derivation, and rule ID suffixes.
+  - New dependencies: 0.
+  - Production line budget: net deletion, with no new public compatibility
+    layer.
+  - Test/docs/plan line budget: about 130 lines.
+- Post-implementation economy audit:
+  - Deleted the v2-to-v1-to-v2 projection instead of adding another adapter.
+  - Kept the existing numeric policy evaluator because it still owns useful
+    CPU/thermal/memory threshold semantics.
+  - Left the v1 `DesignConstraintPack` projection in place because
+    `constraints generate` still publishes that schema.
 
 ## Verification Log
 
@@ -986,6 +1049,59 @@ Final cleanup follow-up route summary:
   build, format check, clippy with `-D warnings`, generated schema drift check,
   library tests, integration tests, contract validation, docs smoke, and
   command smoke.
+- Native suitability follow-up baseline:
+  `git log --oneline -5` showed `35cb532`, the merged final-cleanup follow-up
+  main commit, as the current branch base.
+- Native suitability follow-up stale-surface scan:
+  `rg "TargetOperatingContract|OperatingContractRule|OperatingRuleCategory|ContractConfidence|OperatingRuleSource|OperatingBoundary|legacy_contract_from_v2_artifact|suitability_artifact_from_legacy_decision_v2|claim_id_for_blocked_claim|legacy\\.suitability|projected-v2-contract|target_operating_contract\\.json" crates/adc-lab-core/src crates/adc-lab/src crates/adc-lab-core/tests crates/adc-lab/tests schemas tests/golden -n`
+  returned no matches after the cleanup.
+- Native suitability follow-up focused verification:
+  `cargo check -p adc-lab-core` passed.
+- Native suitability follow-up focused verification:
+  `cargo test -p adc-lab-core suitability_policy_unknown_cannot_become_meet -- --nocapture`
+  passed.
+- Native suitability follow-up focused verification:
+  `cargo test -p adc-lab --test cli decide_suitability_writes_v2_without_legacy_sidecar -- --nocapture`
+  passed.
+- Native suitability follow-up focused verification:
+  `cargo test -p adc-lab --test cli suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end -- --nocapture`
+  passed.
+- Native suitability follow-up focused verification:
+  `cargo check --workspace` passed.
+- Native suitability follow-up focused verification:
+  `cargo fmt --all -- --check` passed.
+- Native suitability follow-up focused verification:
+  `cargo test -p adc-lab-core --test rules_engine -- --nocapture` passed with
+  8 tests.
+- Native suitability follow-up clippy fix:
+  the first `make verify` run failed on
+  `clippy::too_many_arguments` for `decide_suitability_artifact_v2`; the fix
+  introduced `SuitabilityArtifactContext` and reran focused checks.
+- Native suitability follow-up verification:
+  `cargo clippy --workspace --all-targets -- -D warnings` passed after the
+  context-struct fix.
+- Native suitability follow-up schema verification:
+  `make schemas` passed and regenerated the current generated schema snapshots.
+- Native suitability follow-up schema verification:
+  `make schemas-check` passed using a temporary schema output directory.
+- Native suitability follow-up final gate: `make verify` passed. The gate ran
+  workspace build, format check, clippy with `-D warnings`, generated schema
+  drift check, library tests, integration tests, contract validation, docs
+  smoke, and command smoke.
+- Native suitability follow-up measurement:
+  `find crates -name '*.rs' -type f -print0 | xargs -0 wc -l | tail -n 1`
+  reported 17,939 total Rust lines.
+- Native suitability follow-up measurement:
+  `find schemas -maxdepth 1 -type f -name '*.schema.json' | wc -l` reported
+  32 handwritten schema files.
+- Native suitability follow-up measurement:
+  `find schemas/generated -maxdepth 1 -type f -name '*.schema.json' | wc -l`
+  reported 9 generated schema files.
+- Native suitability follow-up large-file measurement:
+  `wc -l crates/adc-lab-core/src/contracts.rs crates/adc-lab-core/src/suitability.rs crates/adc-lab-core/src/rules/operating_contract.rs crates/adc-lab-core/src/rules/suitability.rs crates/adc-lab/src/commands/decide.rs crates/adc-lab/src/main.rs`
+  reported `contracts.rs` 1,321; `suitability.rs` 943;
+  `operating_contract.rs` 190; `rules/suitability.rs` 222;
+  `commands/decide.rs` 54; `main.rs` 2,595.
 
 ## Decision Log
 
@@ -1065,15 +1181,20 @@ Final cleanup follow-up route summary:
   rather than `Custom` closures. Rationale: thermal, network, observer, and
   jitter semantics are common enough to be first-class rule vocabulary, and
   artifact presence alone must not support claim boundaries.
+- 2026-06-11: Make public suitability decisions consume v2 operating-contract
+  artifacts directly and delete the `TargetOperatingContract` projection DTOs.
+  Rationale: the documented CLI input is already
+  `target_operating_contract.v2.json`; the old v2-to-v1-to-v2 path preserved a
+  dead public surface and allowed prose-derived claim IDs to leak into v2.
 
 ## Handoff
 
-- Branch: `codex/adc-labv2-final-cleanup`.
-- Baseline commit: `8e7036a`.
-- Current status: Phase 0-5 and the review follow-up were merged into `main`.
-  Final cleanup follow-up is implemented locally from `origin/main` with
-  `make verify` passing.
-- Uncommitted changes: final cleanup implementation pending commit/PR.
+- Branch: `codex/adc-labv2-suitability-native`.
+- Baseline commit: `35cb532`.
+- Current status: Phase 0-5, review follow-up, and final cleanup follow-up were
+  merged into `main`. Native suitability follow-up is implemented locally from
+  `origin/main` with `make verify` passing.
+- Uncommitted changes: native suitability follow-up pending commit/PR.
 - Commands run so far:
   - `sed -n ...` on the request attachment, `PLANS.md`, execution-plan
     references, existing plans, `COMMANDS.md`, Cargo manifests, Makefile, and
@@ -1114,8 +1235,23 @@ Final cleanup follow-up route summary:
   - `make schemas-check`.
   - `make verify`.
   - final LoC/schema measurement commands listed in the verification log.
+- Native suitability follow-up commands:
+  - `git switch -c codex/adc-labv2-suitability-native origin/main`.
+  - stale-surface `rg` checks listed in the verification log.
+  - `cargo check -p adc-lab-core`.
+  - `cargo test -p adc-lab-core suitability_policy_unknown_cannot_become_meet -- --nocapture`.
+  - `cargo test -p adc-lab --test cli decide_suitability_writes_v2_without_legacy_sidecar -- --nocapture`.
+  - `cargo test -p adc-lab --test cli suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end -- --nocapture`.
+  - `cargo check --workspace`.
+  - `cargo fmt --all -- --check`.
+  - `cargo test -p adc-lab-core --test rules_engine -- --nocapture`.
+  - `cargo clippy --workspace --all-targets -- -D warnings`.
+  - `make schemas`.
+  - `make schemas-check`.
+  - `make verify`.
+  - final LoC/schema measurement commands listed in the verification log.
 - Next steps:
-  1. Commit and push `codex/adc-labv2-final-cleanup`.
+  1. Commit and push `codex/adc-labv2-suitability-native`.
   2. Open a PR targeting `main`.
   3. Watch CI for `make verify`.
 - Read these files first when resuming:
@@ -1167,3 +1303,21 @@ Final cleanup follow-up outcome:
   schema files. The original "0 handwritten schemas" quantitative target
   remains unmet because active v1 control, run manifest, workload, suitability,
   and report-pack surfaces still publish v1 schemas.
+
+Native suitability follow-up outcome:
+
+- `decide suitability` now consumes only v2
+  `Artifact<OperatingContractPayload>` input for `--target-contract` and builds
+  `Artifact<SuitabilityPayload>` directly from the numeric suitability policy
+  evaluator.
+- The old v2 operating-contract -> `TargetOperatingContract` ->
+  v2 suitability projection is removed, along with `TargetOperatingContract`,
+  `OperatingContractRule`, `OperatingBoundary`, and related enum DTOs.
+- v2 suitability `payload.blocked_claims` now stays in stable catalog claim IDs;
+  legacy prose rendering remains confined to the current
+  `DesignConstraintPack` projection.
+- Final measured Rust implementation total is 17,939 lines versus the original
+  19,311-line denominator, a 1,372-line reduction. The planned 40-50% overall
+  code-reduction target remains unmet.
+- Final schema counts remain 32 handwritten v1 schema files and 9 generated v2
+  schema files.
