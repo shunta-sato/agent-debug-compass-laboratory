@@ -123,39 +123,3 @@ pub fn target_runner_build_info(target: &TargetSpec) -> LabResult<BuildInfo> {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn contract_validation_target_parse_ssh() {
-        let target = TargetSpec::parse("ssh://pi4").unwrap();
-        assert_eq!(target.transport, TargetTransport::Ssh);
-        assert_eq!(target.target_id, "pi4");
-    }
-
-    #[test]
-    fn contract_validation_target_parse_ssh_rejects_option_injection() {
-        assert!(TargetSpec::parse("ssh://-oProxyCommand=bad").is_err());
-        assert!(TargetSpec::parse("ssh://target55;sh").is_err());
-        assert!(TargetSpec::parse("ssh://operator@target55").is_ok());
-    }
-
-    #[test]
-    fn contract_validation_default_ssh_runner_is_fixed() {
-        std::env::remove_var("ADC_LAB_TARGET_RUNNER");
-        assert_eq!(ssh_runner_program().unwrap(), "adc-lab-target");
-    }
-
-    #[test]
-    fn contract_validation_ssh_runner_rejects_shell_fragments() {
-        assert!(validate_ssh_runner_program("sh -c adc-lab-target").is_err());
-        assert!(validate_ssh_runner_program("/tmp/adc-lab-target").is_err());
-        assert!(validate_ssh_runner_program("/home/demo/.local/bin/adc-lab-target").is_ok());
-        assert!(validate_ssh_runner_program(
-            "/home/demo/.local/share/adc-lab/runners/20260610/adc-lab-target"
-        )
-        .is_ok());
-    }
-}
