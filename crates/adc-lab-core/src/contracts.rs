@@ -236,56 +236,6 @@ pub enum ContractEvidenceStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct PlatformMechanism {
-    pub domain: String,
-    pub mechanism_id: String,
-    pub description: String,
-    pub visibility_status: ContractEvidenceStatus,
-    pub platform_control_status: ContractEvidenceStatus,
-    pub pressure_probe_status: ContractEvidenceStatus,
-    pub evidence_status: ContractEvidenceStatus,
-    pub evidence_refs: Vec<String>,
-    pub reason: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct PlatformMechanismInventory {
-    pub schema_version: String,
-    pub target_id: String,
-    pub target_class: String,
-    pub mechanisms: Vec<PlatformMechanism>,
-    pub evidence_refs: Vec<String>,
-    pub time_unix_ms: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct BoundaryProbe {
-    pub probe_id: String,
-    pub boundary: String,
-    pub controlled_factors: Vec<String>,
-    pub observed_covariates: Vec<String>,
-    pub uncontrolled_confounders: Vec<String>,
-    pub safety_abort_condition: Vec<String>,
-    pub restore_cleanup: Vec<String>,
-    pub claim_supported: String,
-    pub claim_blocked: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct BoundaryProbePlan {
-    pub schema_version: String,
-    pub plan_id: String,
-    pub target_id: String,
-    pub target_class: String,
-    pub probes: Vec<BoundaryProbe>,
-    pub time_unix_ms: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ResourcePressureKind {
     MemoryPressure,
@@ -468,35 +418,6 @@ pub enum ResourceCouplingEvidenceClass {
     CouplingNotMeasured,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct ResourceCouplingChain {
-    pub chain_id: String,
-    pub pressure: String,
-    pub platform_response: String,
-    pub secondary_pressure: String,
-    pub performance_degradation: String,
-    pub recovery_behavior: String,
-    pub status: ContractEvidenceStatus,
-    pub coupling_evidence_class: ResourceCouplingEvidenceClass,
-    pub evidence_refs: Vec<String>,
-    pub next_evidence_needed: Vec<ContractEvidenceGap>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct ResourceCouplingReport {
-    pub schema_version: String,
-    pub report_id: String,
-    pub target_id: String,
-    pub report_status: ContractEvidenceStatus,
-    pub chains: Vec<ResourceCouplingChain>,
-    pub evidence_refs: Vec<String>,
-    pub unknowns: Vec<String>,
-    pub next_evidence_needed: Vec<String>,
-    pub time_unix_ms: u64,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum TargetOperatingContractStatus {
@@ -566,71 +487,6 @@ pub struct TargetOperatingContract {
     pub boundaries: Vec<OperatingBoundary>,
     pub unknowns: Vec<String>,
     pub next_evidence_needed: Vec<String>,
-    pub time_unix_ms: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-#[serde(rename_all = "snake_case")]
-pub enum OperatingContractPackStatus {
-    ObservationalReadOnly,
-    ReadOnlyPlusPressureProbes,
-    ExploratoryPressureSmoke,
-    ControlledGovernorSubset,
-    ControlledOperatingPointSubset,
-    CompositeCouplingProbe,
-    PlatformOperatingContractCandidate,
-    PlatformOperatingContractReference,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum RunSetRole {
-    Primary,
-    IncludedEvidence,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct RunSetEntry {
-    pub run_id: String,
-    pub run_dir: String,
-    pub role: RunSetRole,
-    pub evidence_refs: Vec<String>,
-    pub operations_summary: BTreeMap<String, String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct RunSetManifest {
-    pub schema_version: String,
-    pub run_set_id: String,
-    pub target_id: String,
-    pub target_class: String,
-    pub pack_status: OperatingContractPackStatus,
-    pub runs: Vec<RunSetEntry>,
-    pub operations_summary: BTreeMap<String, String>,
-    pub included_surfaces: Vec<String>,
-    pub evidence_refs: Vec<String>,
-    pub blocked_evidence: Vec<ContractEvidenceGap>,
-    pub time_unix_ms: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct MultiRunOperatingContract {
-    pub schema_version: String,
-    pub contract_id: String,
-    pub target_id: String,
-    pub target_class: String,
-    pub pack_status: OperatingContractPackStatus,
-    pub contract_status: TargetOperatingContractStatus,
-    pub run_set_ref: Option<String>,
-    pub source_runs: Vec<RunSetEntry>,
-    pub rules: Vec<OperatingContractRule>,
-    pub boundaries: Vec<OperatingBoundary>,
-    pub unknowns: Vec<String>,
-    pub next_evidence_needed: Vec<String>,
-    pub evidence_refs: Vec<String>,
     pub time_unix_ms: u64,
 }
 

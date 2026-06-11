@@ -133,6 +133,68 @@ fn operating_contract_coupling_requires_measured_effect_not_just_presence() {
 }
 
 #[test]
+fn operating_contract_covers_core_boundary_claims_conservatively() {
+    let temp = tempfile::tempdir().unwrap();
+    let store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+
+    let contract = evaluate_operating_contract_v2(&store, "LAB-RUN-001", "target55");
+    let rule_ids = contract
+        .payload
+        .evaluations
+        .iter()
+        .map(|entry| entry.rule_id.as_str())
+        .collect::<Vec<_>>();
+
+    for expected in [
+        "operating.memory_storage_coupling_requires_composite",
+        "operating.sustained_thermal_requires_soak",
+        "operating.storage_default_writes_require_bounded_probe",
+        "operating.network_background_io_requires_bounded_transfer",
+        "operating.real_time_pressure_requires_jitter_evidence",
+        "operating.observer_cadence_requires_bounded_samples",
+        "operating.production_readiness_requires_run_report",
+    ] {
+        assert!(rule_ids.contains(&expected), "missing rule {expected}");
+    }
+    for claim_id in [
+        claim::THERMAL_SUSTAINED_SOAK,
+        claim::NETWORK_BOUNDED_TRANSFER,
+        claim::OBSERVER_CADENCE_BOUNDED,
+        claim::REAL_TIME_PRESSURE_SAFE,
+    ] {
+        assert!(
+            contract
+                .payload
+                .blocked_claims
+                .contains(&claim_id.to_string()),
+            "missing blocked claim {claim_id}"
+        );
+    }
+}
+
+#[test]
+fn operating_contract_network_boundary_requires_bounded_transfer_payload() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+    write_network_pressure(&mut store, temp.path());
+
+    let contract = evaluate_operating_contract_v2(&store, "LAB-RUN-001", "target55");
+    let network = contract
+        .payload
+        .evaluations
+        .iter()
+        .find(|entry| entry.rule_id == "operating.network_background_io_requires_bounded_transfer")
+        .unwrap();
+
+    assert!(network.matched);
+    assert_eq!(network.decision, Decision::Provisional);
+    assert!(!contract
+        .payload
+        .blocked_claims
+        .contains(&claim::NETWORK_BOUNDED_TRANSFER.to_string()));
+}
+
+#[test]
 fn operating_contract_custom_rule_row_changes_payload_without_generator() {
     let temp = tempfile::tempdir().unwrap();
     let store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
@@ -242,10 +304,37 @@ fn write_pressure(
             evidence_class: "pressure_induced".to_string(),
             effect_observed,
             duration_ms: 100,
+            network_mode: None,
+            network_endpoint_available: None,
+            network_traffic_generated_bytes: None,
         },
         1,
     );
     store.write(run_dir, Path::new(path), &artifact).unwrap();
+}
+
+fn write_network_pressure(store: &mut EvidenceStore, run_dir: &Path) {
+    let artifact = Artifact::new(
+        Kind::Pressure,
+        "ARTIFACT-network",
+        "LAB-RUN-001",
+        "target55",
+        Status::MeasuredPartial,
+        PressurePayload {
+            source_schema_version: "lab.resource_pressure_result.v1".to_string(),
+            pressure_kind: "network_io".to_string(),
+            evidence_class: "boundary_probe".to_string(),
+            effect_observed: true,
+            duration_ms: 100,
+            network_mode: Some("bounded_transfer".to_string()),
+            network_endpoint_available: Some(true),
+            network_traffic_generated_bytes: Some(4096),
+        },
+        1,
+    );
+    store
+        .write(run_dir, Path::new("pressure/network.json"), &artifact)
+        .unwrap();
 }
 
 fn write_composite(

@@ -266,6 +266,26 @@
         "evidence_class": {
           "type": "string"
         },
+        "network_endpoint_available": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "network_mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "network_traffic_generated_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0.0
+        },
         "pressure_kind": {
           "type": "string"
         },

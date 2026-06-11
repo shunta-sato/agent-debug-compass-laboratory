@@ -9,11 +9,12 @@ The claim catalog is the source for blocked-claim identity and scan terms.
 free-form blocked-claim text.
 
 Rule predicates remain typed and small: `Present`, `PressureEffect`,
-`CompositeMeasured`, boolean composition, and catalog-registered `Custom`
-predicates. `PressureEffect` and `CompositeMeasured` inspect artifact status and
+`CompositeMeasured`, `LoadDurationAtLeastSeconds`, `NetworkBoundedTransfer`,
+`ObservationSamplesAtLeast`, boolean composition, and catalog-registered
+`Custom` predicates. The evidence predicates inspect artifact status and
 payload evidence; artifact presence alone is not a measured claim boundary.
-When three custom predicates share the same shape, promote that shape into the
-core predicate vocabulary.
+When three custom predicates share the same shape, promote that shape into core
+predicate vocabulary.
 
 `report operating-contract` writes `lab.artifact.v2` with
 `kind = report.operating_contract`. With `--include-run`, all run directories

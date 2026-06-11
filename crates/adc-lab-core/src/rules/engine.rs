@@ -1,7 +1,7 @@
 use crate::evidence::{
     claim_definition, ArtifactMeta, Claim, Decision, EvidenceStore, Kind, Status,
 };
-use crate::probe::{CompositePayload, PressurePayload};
+use crate::probe::{CompositePayload, LoadPayload, ObservationPayload, PressurePayload};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -10,6 +10,9 @@ pub enum Pred {
     Present(Kind),
     PressureEffect(&'static str),
     CompositeMeasured(&'static str),
+    LoadDurationAtLeastSeconds(u64),
+    NetworkBoundedTransfer,
+    ObservationSamplesAtLeast(usize),
     All(Vec<Pred>),
     Any(Vec<Pred>),
     Not(Box<Pred>),
@@ -104,6 +107,11 @@ fn eval_pred(store: &EvidenceStore, pred: &Pred) -> bool {
         Pred::Present(kind) => store.iter(*kind).next().is_some(),
         Pred::PressureEffect(pressure_kind) => pressure_effect_observed(store, pressure_kind),
         Pred::CompositeMeasured(scenario) => composite_measured(store, scenario),
+        Pred::LoadDurationAtLeastSeconds(seconds) => {
+            load_duration_at_least_seconds(store, *seconds)
+        }
+        Pred::NetworkBoundedTransfer => network_bounded_transfer(store),
+        Pred::ObservationSamplesAtLeast(samples) => observation_samples_at_least(store, *samples),
         Pred::All(preds) => preds.iter().all(|pred| eval_pred(store, pred)),
         Pred::Any(preds) => preds.iter().any(|pred| eval_pred(store, pred)),
         Pred::Not(pred) => !eval_pred(store, pred),
@@ -128,6 +136,40 @@ fn composite_measured(store: &EvidenceStore, scenario: &str) -> bool {
                 && artifact.payload.scenario == scenario
                 && artifact.payload.coupling_evidence_class == "composite_measured"
         })
+    })
+}
+
+fn load_duration_at_least_seconds(store: &EvidenceStore, seconds: u64) -> bool {
+    let minimum_ms = seconds.saturating_mul(1000);
+    store.iter(Kind::Load).any(|meta| {
+        store.load::<LoadPayload>(meta).is_ok_and(|artifact| {
+            is_measured_status(&artifact.status) && artifact.payload.duration_ms >= minimum_ms
+        })
+    })
+}
+
+fn network_bounded_transfer(store: &EvidenceStore) -> bool {
+    store.iter(Kind::Pressure).any(|meta| {
+        store.load::<PressurePayload>(meta).is_ok_and(|artifact| {
+            is_measured_status(&artifact.status)
+                && artifact.payload.pressure_kind == "network_io"
+                && artifact.payload.network_mode.as_deref() == Some("bounded_transfer")
+                && artifact.payload.network_endpoint_available == Some(true)
+                && artifact
+                    .payload
+                    .network_traffic_generated_bytes
+                    .is_some_and(|bytes| bytes > 0)
+        })
+    })
+}
+
+fn observation_samples_at_least(store: &EvidenceStore, samples: usize) -> bool {
+    store.iter(Kind::Observation).any(|meta| {
+        store
+            .load::<ObservationPayload>(meta)
+            .is_ok_and(|artifact| {
+                is_measured_status(&artifact.status) && artifact.payload.sample_count >= samples
+            })
     })
 }
 

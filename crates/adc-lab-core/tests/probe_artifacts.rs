@@ -89,6 +89,9 @@ fn dummy_pressure_kind_extension_exercise_stays_within_three_hand_edited_files()
             evidence_class: "smoke".to_string(),
             effect_observed: true,
             duration_ms: 1,
+            network_mode: None,
+            network_endpoint_available: None,
+            network_traffic_generated_bytes: None,
         },
         1,
     );
