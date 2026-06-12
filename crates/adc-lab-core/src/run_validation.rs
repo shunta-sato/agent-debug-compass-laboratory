@@ -10,6 +10,7 @@ use crate::probe::LoadPayload;
 use crate::{LabError, LabResult, RunContext};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -70,8 +71,25 @@ pub struct GovernorSweepPolicyPayload {
     pub duration_seconds_max: u64,
     pub thermal_celsius_abort: Option<f64>,
     pub expires_at_unix_ms: u64,
-    pub approved_by: Actor,
+    pub requested_by: Actor,
+    pub approved_by: Option<Actor>,
+    pub policy_state: GovernorSweepPolicyState,
     pub policy_digest: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum GovernorSweepPolicyState {
+    Requested,
+    Approved,
+}
+
+pub fn governor_sweep_policy_digest(payload: &GovernorSweepPolicyPayload) -> LabResult<String> {
+    let mut canonical = payload.clone();
+    canonical.policy_digest.clear();
+    let bytes = serde_json::to_vec(&canonical)?;
+    let digest = Sha256::digest(bytes);
+    Ok(format!("sha256:{digest:x}"))
 }
 
 #[derive(Debug, Clone)]
@@ -546,9 +564,15 @@ fn read_plan_entries(run: &RunContext) -> LabResult<Vec<PlanEntry>> {
 fn read_approval_entries(run: &RunContext) -> LabResult<Vec<ApprovalEntry>> {
     let mut entries = Vec::new();
     for path in json_files(run.run_dir.join("approvals"))? {
+        let value: serde_json::Value = read_json(&path)?;
+        if value.get("schema_version").and_then(|value| value.as_str())
+            != Some("lab.approval_record.v1")
+        {
+            continue;
+        }
         entries.push(ApprovalEntry {
             artifact_ref: run.artifact_uri(&path)?,
-            value: read_json(&path)?,
+            value: serde_json::from_value(value)?,
         });
     }
     Ok(entries)
