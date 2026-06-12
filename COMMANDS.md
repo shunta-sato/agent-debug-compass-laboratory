@@ -22,12 +22,14 @@
 ## Tests
 - unit tests: make test-unit
 - integration/e2e tests: make test-integration
+- docs smoke and artifact-heuristic guard: make docs-smoke
 - command smoke: make command-smoke
 
 ## Notes
 - If a command differs between local and CI, document both.
 - If a command is intentionally unavailable, explain the alternative.
 - `make command-smoke` verifies command wiring only. It does not collect resource metrics and does not support resource/NFR claims by itself.
+- `make docs-smoke` verifies required docs exist and rejects docs/examples that teach plan/approval/control artifact selection by `find`, `sort`, `tail`, or `ls -t`.
 - GitHub CI runs `make verify`, including generated schema drift detection.
 - `make schemas-check` also validates that schema-versioned wire contracts are covered by `schemas/schema-ledger.tsv` and that final generated-schema enforcement has no maintained-by-hand contracts.
 - `make file-budgets` enforces configured production Rust file budgets and is part of `make verify`.
