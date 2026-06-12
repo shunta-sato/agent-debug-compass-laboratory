@@ -12,6 +12,7 @@ an operator-facing path; the stable contract is the envelope `kind`.
 | Command surface | Default or example path | Artifact kind |
 | --- | --- | --- |
 | `familiarize read-only`, `report pack`, `report operating-point` | `reports/run_report.v2.json` | `report.run` |
+| `report validate-run` | `reports/run_validation.v2.json` | `report.run_validation` |
 | `report operating-contract` | `reports/target_operating_contract.v2.json` | `report.operating_contract` |
 | `decide suitability --out ...` | `reports/suitability.v2.json` | `report.suitability` |
 | `constraints generate --out ...` | `reports/constraints.v2.json` | `report.constraints` |
@@ -90,6 +91,24 @@ adc-lab health-check --target local
 Remove `--dry-run` only after the fixed-path helper is installed, the operator has reviewed the approval artifact, and restore expectations are understood.
 
 Privileged helper invocation uses the fixed `/usr/local/libexec/adc-lab-priv-helper` path. The controller CLI must not become a public arbitrary-helper or root-shell wrapper.
+
+## Full-set run validation
+
+```sh
+adc-lab report validate-run \
+  --run lab/runs/LAB-RUN-... \
+  --profile target-operating-contract-fullset \
+  --expected-governors ondemand,performance,powersave \
+  --json
+```
+
+The validator writes `reports/run_validation.v2.json` and `reports/GAPS.md`.
+It correlates control plans, approvals, apply results, linked load evidence,
+restore results, and restore health checks by typed IDs and artifact refs. It
+does not infer a controlled-governor measurement from file names or timestamp
+order. By default it exits non-zero after writing the artifacts when any
+requested governor is not `measured`; pass `--allow-non-measured` only for
+exploratory review runs where that failure is expected.
 
 ## Bounded CPU load
 

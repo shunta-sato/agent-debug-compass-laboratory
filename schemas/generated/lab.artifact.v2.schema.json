@@ -219,7 +219,9 @@
         "report.operating_contract",
         "report.suitability",
         "report.constraints",
-        "report.constraints_check"
+        "report.constraints_check",
+        "report.run_validation",
+        "control.governor_sweep_policy"
       ]
     },
     "Metric": {

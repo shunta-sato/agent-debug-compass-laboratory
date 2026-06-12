@@ -38,6 +38,15 @@ pub struct LoadPayload {
     pub thermal_surface_available: bool,
     pub restore_on_abort_status: String,
     pub worker_iterations: Vec<u64>,
+    pub control_result_ref: Option<String>,
+    pub operating_point_snapshot: Option<OperatingPointSnapshot>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OperatingPointSnapshot {
+    pub governor: Option<String>,
+    pub control_result_ref: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -132,6 +141,8 @@ pub fn load_artifact_v2(run_id: impl Into<String>, result: LoadResult) -> Artifa
             )
             .to_string(),
             worker_iterations: result.worker_iterations,
+            control_result_ref: None,
+            operating_point_snapshot: None,
         },
         now_unix_ms(),
     );
@@ -140,6 +151,23 @@ pub fn load_artifact_v2(run_id: impl Into<String>, result: LoadResult) -> Artifa
         notes: vec!["wrapped from v1 load result".to_string()],
     });
     artifact
+}
+
+pub fn attach_load_control_context(
+    artifact: &mut Artifact<LoadPayload>,
+    control_result_ref: Option<String>,
+    governor: Option<String>,
+) {
+    artifact.payload.control_result_ref = control_result_ref.clone();
+    artifact.payload.operating_point_snapshot =
+        if control_result_ref.is_some() || governor.is_some() {
+            Some(OperatingPointSnapshot {
+                governor,
+                control_result_ref,
+            })
+        } else {
+            None
+        };
 }
 
 pub fn pressure_artifact_v2(

@@ -430,6 +430,7 @@ enum ReportCommand {
     Pack(ReportPackCommand),
     OperatingPoint(ReportPackCommand),
     OperatingContract(OperatingContractCommand),
+    ValidateRun(ValidateRunCommand),
 }
 
 #[derive(Debug, Args)]
@@ -454,6 +455,24 @@ struct OperatingContractCommand {
     target_id: String,
     #[arg(long, default_value = "unknown-target-class")]
     target_class: String,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
+struct ValidateRunCommand {
+    #[arg(long)]
+    run: PathBuf,
+    #[arg(long, default_value = "target-operating-contract-fullset")]
+    profile: String,
+    #[arg(long = "expected-governors", value_delimiter = ',')]
+    expected_governors: Vec<String>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long = "gaps-out")]
+    gaps_out: Option<PathBuf>,
+    #[arg(long)]
+    allow_non_measured: bool,
     #[arg(long)]
     json: bool,
 }
@@ -569,6 +588,7 @@ fn main() -> Result<()> {
             ReportCommand::OperatingContract(args) => {
                 commands::report::command_report_operating_contract(args)
             }
+            ReportCommand::ValidateRun(args) => commands::report::command_report_validate_run(args),
         },
         Commands::HealthCheck(args) => commands::target::command_health_check(args),
         Commands::Privilege { command } => match command {

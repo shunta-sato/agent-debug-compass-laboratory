@@ -1,6 +1,59 @@
 use super::super::*;
 use super::common::*;
 use adc_lab_core::ids::now_unix_ms;
+use anyhow::bail;
+
+pub(crate) fn command_report_validate_run(args: ValidateRunCommand) -> Result<()> {
+    if args.profile != FULLSET_PROFILE {
+        bail!(
+            "unsupported validation profile {}; expected {}",
+            args.profile,
+            FULLSET_PROFILE
+        );
+    }
+    let run = existing_run_context(args.run);
+    let validation = validate_fullset_run(&run, args.expected_governors.clone())?;
+    let validation_path = args
+        .out
+        .unwrap_or_else(|| run.run_dir.join("reports/run_validation.v2.json"));
+    let validation_ref = write_json_artifact(&run, &validation_path, &validation)?;
+    let gaps_path = args
+        .gaps_out
+        .unwrap_or_else(|| run.run_dir.join("reports/GAPS.md"));
+    write_text_file(&gaps_path, &render_run_validation_gaps(&validation))?;
+    let has_non_measured = validation.payload.overall_validity != GovernorValidity::Measured;
+    append_audit_event(
+        &run,
+        AuditInput {
+            target_id: validation.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "report.validate_run".to_string(),
+            operation_id: Some(validation.id.clone()),
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: serde_json::to_string(&validation.status)
+                .unwrap_or_else(|_| "unknown".to_string())
+                .trim_matches('"')
+                .to_string(),
+        },
+    )?;
+    let output = ArtifactOutput {
+        artifact_ref: validation_ref,
+        value: serde_json::json!({
+            "validation": validation,
+            "gaps_ref": run.artifact_uri(&gaps_path)?,
+        }),
+    };
+    print_json(&output)?;
+    if !args.allow_non_measured && has_non_measured {
+        bail!(
+            "run validation contains non-measured governor evidence; see {}",
+            gaps_path.display()
+        );
+    }
+    Ok(())
+}
 
 pub(crate) fn command_report_operating_contract(args: OperatingContractCommand) -> Result<()> {
     let run = existing_run_context(args.run);

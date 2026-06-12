@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Artifact_for_RunReportPayload",
+  "title": "Artifact_for_GovernorSweepPolicyPayload",
   "type": "object",
   "required": [
     "claims",
@@ -59,7 +59,7 @@
       }
     },
     "payload": {
-      "$ref": "#/definitions/RunReportPayload"
+      "$ref": "#/definitions/GovernorSweepPolicyPayload"
     },
     "run_id": {
       "type": "string"
@@ -81,6 +81,30 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "Actor": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ActorKind"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActorKind": {
+      "type": "string",
+      "enum": [
+        "agent",
+        "human",
+        "system"
+      ]
+    },
     "Bounds": {
       "type": "object",
       "required": [
@@ -207,6 +231,52 @@
       },
       "additionalProperties": false
     },
+    "GovernorSweepPolicyPayload": {
+      "type": "object",
+      "required": [
+        "approved_by",
+        "duration_seconds_max",
+        "expires_at_unix_ms",
+        "governors",
+        "policy_digest",
+        "target_id"
+      ],
+      "properties": {
+        "approved_by": {
+          "$ref": "#/definitions/Actor"
+        },
+        "duration_seconds_max": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "expires_at_unix_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "governors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "policy_digest": {
+          "type": "string"
+        },
+        "target_id": {
+          "type": "string"
+        },
+        "thermal_celsius_abort": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        }
+      },
+      "additionalProperties": false
+    },
     "Kind": {
       "type": "string",
       "enum": [
@@ -245,250 +315,6 @@
         "value": {
           "type": "number",
           "format": "double"
-        }
-      },
-      "additionalProperties": false
-    },
-    "RuleEvaluation": {
-      "type": "object",
-      "required": [
-        "claim_id",
-        "decision",
-        "evidence_refs",
-        "matched",
-        "missing",
-        "next_evidence",
-        "rule_id"
-      ],
-      "properties": {
-        "claim_id": {
-          "type": "string"
-        },
-        "decision": {
-          "$ref": "#/definitions/Decision"
-        },
-        "evidence_refs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "matched": {
-          "type": "boolean"
-        },
-        "missing": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "next_evidence": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "rule_id": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunOperatingPointBlocked": {
-      "type": "object",
-      "required": [
-        "coverage_status",
-        "factor_id",
-        "next_evidence",
-        "reason"
-      ],
-      "properties": {
-        "coverage_status": {
-          "type": "string"
-        },
-        "factor_id": {
-          "type": "string"
-        },
-        "next_evidence": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "reason": {
-          "type": "string"
-        },
-        "requested_level": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunOperatingPointControlled": {
-      "type": "object",
-      "required": [
-        "claim_boundary",
-        "evidence_refs",
-        "factor_id",
-        "level"
-      ],
-      "properties": {
-        "claim_boundary": {
-          "type": "string"
-        },
-        "evidence_refs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "factor_id": {
-          "type": "string"
-        },
-        "level": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunOperatingPointObserved": {
-      "type": "object",
-      "required": [
-        "claim_boundary",
-        "evidence_refs",
-        "factor_id",
-        "level"
-      ],
-      "properties": {
-        "claim_boundary": {
-          "type": "string"
-        },
-        "evidence_refs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "factor_id": {
-          "type": "string"
-        },
-        "level": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunOperatingPointSummary": {
-      "type": "object",
-      "required": [
-        "blocked_points",
-        "controlled_points",
-        "coverage_status",
-        "observed_points"
-      ],
-      "properties": {
-        "blocked_points": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/RunOperatingPointBlocked"
-          }
-        },
-        "controlled_points": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/RunOperatingPointControlled"
-          }
-        },
-        "coverage_status": {
-          "type": "string"
-        },
-        "observed_points": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/RunOperatingPointObserved"
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunReportPayload": {
-      "type": "object",
-      "required": [
-        "artifact_refs",
-        "audit_event_count",
-        "blocked_claims",
-        "evaluations",
-        "indexed_v2_artifact_refs",
-        "next_evidence",
-        "operating_point",
-        "operation_audit_refs",
-        "operations_summary",
-        "report_status",
-        "restore_status",
-        "rule_set_id"
-      ],
-      "properties": {
-        "artifact_refs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "audit_event_count": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0.0
-        },
-        "blocked_claims": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "evaluations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/RuleEvaluation"
-          }
-        },
-        "indexed_v2_artifact_refs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "next_evidence": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "operating_point": {
-          "$ref": "#/definitions/RunOperatingPointSummary"
-        },
-        "operation_audit_refs": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "operations_summary": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "report_status": {
-          "type": "string"
-        },
-        "restore_status": {
-          "type": "string"
-        },
-        "rule_set_id": {
-          "type": "string"
         }
       },
       "additionalProperties": false

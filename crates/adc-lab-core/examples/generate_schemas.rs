@@ -17,6 +17,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "lab.report.operating_contract.v2.schema.json",
     )?;
     write_schema::<Artifact<RunReportPayload>>(&out_dir, "lab.report.run.v2.schema.json")?;
+    write_schema::<Artifact<RunValidationPayload>>(
+        &out_dir,
+        "lab.report.run_validation.v2.schema.json",
+    )?;
     write_schema::<Artifact<SuitabilityPayload>>(
         &out_dir,
         "lab.report.suitability.v2.schema.json",
@@ -41,6 +45,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write_schema::<CompositeBoundaryResult>(
         &out_dir,
         "lab.composite_boundary_result.v1.schema.json",
+    )?;
+    write_schema::<Artifact<GovernorSweepPolicyPayload>>(
+        &out_dir,
+        "lab.control.governor_sweep_policy.v2.schema.json",
     )?;
     write_schema::<ControlPlan>(&out_dir, "lab.control_plan.v1.schema.json")?;
     write_schema::<ControlResult>(&out_dir, "lab.control_result.v1.schema.json")?;
