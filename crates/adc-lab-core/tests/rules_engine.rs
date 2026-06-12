@@ -1,8 +1,9 @@
 use adc_lab_core::{
     claim, evaluate_operating_contract_v2, evaluate_rules, evaluate_suitability_v2,
     generate_constraints_artifact_v2, operating_contract_from_rules_v2,
-    render_agent_constraints_markdown, Artifact, CompositePayload, Decision, EvidenceStore, Kind,
-    Pred, PressurePayload, Rule, Status, SuitabilityDecisionValue, SuitabilityPayload,
+    render_agent_constraints_markdown, Artifact, CompositePayload, Decision, EvidenceStore,
+    GovernorValidation, GovernorValidity, Kind, Pred, PressurePayload, Rule, RunValidationPayload,
+    Status, SuitabilityDecisionValue, SuitabilityPayload, FULLSET_PROFILE,
 };
 use std::path::Path;
 
@@ -195,6 +196,134 @@ fn operating_contract_network_boundary_requires_bounded_transfer_payload() {
 }
 
 #[test]
+fn operating_contract_requires_measured_run_validation_for_production_readiness() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+    write_marker(
+        &mut store,
+        temp.path(),
+        Kind::ReportRun,
+        "reports/run_report.v2.json",
+    );
+
+    let contract = evaluate_operating_contract_v2(&store, "LAB-RUN-001", "target55");
+    let production_ready = contract
+        .payload
+        .evaluations
+        .iter()
+        .find(|entry| entry.rule_id == "operating.production_readiness_requires_run_report")
+        .unwrap();
+
+    assert!(!production_ready.matched);
+    assert_eq!(production_ready.decision, Decision::Blocked);
+    assert!(contract
+        .payload
+        .blocked_claims
+        .contains(&claim::PRODUCTION_READY.to_string()));
+}
+
+#[test]
+fn operating_contract_blocks_contaminated_run_validation_for_production_readiness() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+    write_marker(
+        &mut store,
+        temp.path(),
+        Kind::ReportRun,
+        "reports/run_report.v2.json",
+    );
+    write_run_validation(
+        &mut store,
+        temp.path(),
+        "reports/run_validation.v2.json",
+        GovernorValidity::Contaminated,
+    );
+
+    let contract = evaluate_operating_contract_v2(&store, "LAB-RUN-001", "target55");
+    let production_ready = contract
+        .payload
+        .evaluations
+        .iter()
+        .find(|entry| entry.rule_id == "operating.production_readiness_requires_run_report")
+        .unwrap();
+
+    assert!(!production_ready.matched);
+    assert_eq!(production_ready.decision, Decision::Blocked);
+    assert!(contract
+        .payload
+        .blocked_claims
+        .contains(&claim::PRODUCTION_READY.to_string()));
+}
+
+#[test]
+fn operating_contract_allows_production_readiness_only_with_measured_run_validation() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+    write_marker(
+        &mut store,
+        temp.path(),
+        Kind::ReportRun,
+        "reports/run_report.v2.json",
+    );
+    write_run_validation(
+        &mut store,
+        temp.path(),
+        "reports/run_validation.v2.json",
+        GovernorValidity::Measured,
+    );
+
+    let contract = evaluate_operating_contract_v2(&store, "LAB-RUN-001", "target55");
+    let production_ready = contract
+        .payload
+        .evaluations
+        .iter()
+        .find(|entry| entry.rule_id == "operating.production_readiness_requires_run_report")
+        .unwrap();
+
+    assert!(production_ready.matched);
+    assert_eq!(production_ready.decision, Decision::Provisional);
+    assert!(!contract
+        .payload
+        .blocked_claims
+        .contains(&claim::PRODUCTION_READY.to_string()));
+}
+
+#[test]
+fn operating_contract_blocks_mixed_measured_and_contaminated_run_validation() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+    write_marker(
+        &mut store,
+        temp.path(),
+        Kind::ReportRun,
+        "reports/run_report.v2.json",
+    );
+    write_run_validation(
+        &mut store,
+        temp.path(),
+        "reports/run_validation-measured.v2.json",
+        GovernorValidity::Measured,
+    );
+    write_run_validation(
+        &mut store,
+        temp.path(),
+        "reports/run_validation-contaminated.v2.json",
+        GovernorValidity::Contaminated,
+    );
+
+    let contract = evaluate_operating_contract_v2(&store, "LAB-RUN-001", "target55");
+    let production_ready = contract
+        .payload
+        .evaluations
+        .iter()
+        .find(|entry| entry.rule_id == "operating.production_readiness_requires_run_report")
+        .unwrap();
+
+    assert!(!production_ready.matched);
+    assert_eq!(production_ready.decision, Decision::Blocked);
+}
+
+#[test]
 fn operating_contract_custom_rule_row_changes_payload_without_generator() {
     let temp = tempfile::tempdir().unwrap();
     let store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
@@ -286,6 +415,69 @@ fn write_marker(store: &mut EvidenceStore, run_dir: &Path, kind: Kind, path: &st
         "target55",
         Status::Measured,
         serde_json::json!({ "marker": format!("{kind:?}") }),
+        1,
+    );
+    store.write(run_dir, Path::new(path), &artifact).unwrap();
+}
+
+fn write_run_validation(
+    store: &mut EvidenceStore,
+    run_dir: &Path,
+    path: &str,
+    validity: GovernorValidity,
+) {
+    let status = match validity {
+        GovernorValidity::Measured => Status::Measured,
+        GovernorValidity::MeasuredPartial => Status::MeasuredPartial,
+        GovernorValidity::Refused => Status::Refused {
+            code: adc_lab_core::EvidenceRefusalCode::PolicyViolation,
+            message: "refused control evidence".to_string(),
+        },
+        GovernorValidity::Contaminated => Status::UnsafeBlocked {
+            reason: "contaminated control evidence".to_string(),
+        },
+        GovernorValidity::NotApplicable => Status::NotApplicable {
+            reason: "not applicable".to_string(),
+        },
+        GovernorValidity::Insufficient | GovernorValidity::Unknown => Status::Insufficient,
+    };
+    let artifact = Artifact::new(
+        Kind::ReportRunValidation,
+        format!("RUN-VALIDATION-{path}"),
+        "LAB-RUN-001",
+        "target55",
+        status,
+        RunValidationPayload {
+            profile: FULLSET_PROFILE.to_string(),
+            requested_governors: vec!["performance".to_string()],
+            governor_results: vec![GovernorValidation {
+                governor: "performance".to_string(),
+                validity: validity.clone(),
+                plan_ref: Some(
+                    "artifact://lab/runs/LAB-RUN-001/plans/performance.json".to_string(),
+                ),
+                approval_ref: Some(
+                    "artifact://lab/runs/LAB-RUN-001/approvals/performance.json".to_string(),
+                ),
+                control_result_ref: Some(
+                    "artifact://lab/runs/LAB-RUN-001/plans/performance.result.json".to_string(),
+                ),
+                load_ref: Some(
+                    "artifact://lab/runs/LAB-RUN-001/load/performance.v2.json".to_string(),
+                ),
+                restore_result_ref: Some(
+                    "artifact://lab/runs/LAB-RUN-001/restore/performance.result.json".to_string(),
+                ),
+                health_check_ref: Some(
+                    "artifact://lab/runs/LAB-RUN-001/health/restore_health_check.json".to_string(),
+                ),
+                messages: vec!["test validation".to_string()],
+                next_evidence: Vec::new(),
+            }],
+            overall_validity: validity,
+            gaps: Vec::new(),
+            audit_refs: vec!["artifact://lab/runs/LAB-RUN-001/audit.jsonl".to_string()],
+        },
         1,
     );
     store.write(run_dir, Path::new(path), &artifact).unwrap();
