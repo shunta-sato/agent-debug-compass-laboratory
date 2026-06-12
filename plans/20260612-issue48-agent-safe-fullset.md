@@ -188,6 +188,15 @@ Current facts:
 - [x] run report surfaces measured governor validation as controlled governor
       points, and non-measured validation as blocked governor points.
 
+### Phase 5 Test List
+
+- [x] default `constraints check` keeps candidate-content lint strict and
+      fails when blocked positive claim text appears in checked content.
+- [x] `constraints check --mode generated-constraints` passes generated
+      constraints markdown that contains its expected `Blocked claims` section.
+- [x] generated-constraints mode fails when the checked constraints artifact
+      does not match the expected generated constraints artifact.
+
 ### Phase 0-2 Responsibility Map
 
 | Unit | Name | Responsibility sentence | Reason to change | Dependency direction |
@@ -257,6 +266,29 @@ layer.
 - Production Rust budget: +80 to +180 lines; tests +80 to +180 lines.
 - Abstraction rule: do not generalize validation queries beyond
   `report.run_validation` until another claim family needs the same mechanism.
+
+### Phase 5 Responsibility Map
+
+| Unit | Name | Responsibility sentence | Reason to change | Dependency direction |
+|---|---|---|---|---|
+| core enum | `ConstraintCheckMode` | Separate candidate-content lint from generated-constraints self-check. | Constraint-check semantics change. | CLI passes it to core; schema generator records it. |
+| core checker | generated constraints self-check helpers | Validate generated JSON/markdown structure without treating blocked-claims explanations as positive claims. | Generated artifact self-check rules change. | Depends on `ConstraintsPayload` and claim catalog. |
+| CLI arg | `--mode` on `constraints check` | Expose the mode split without changing the default candidate lint. | Public command semantics change. | Converts to core mode. |
+
+Layout decision: keep the split inside existing constraints check rather than
+adding a new subcommand. Rejected alternative: `constraints self-check`,
+because the same inputs and result artifact are used and the safety-relevant
+distinction is a check mode.
+
+### Phase 5 Complexity Budget
+
+- Changed files target: 5-7 including generated schema, tests, docs, and plan.
+- New modules target: 0.
+- New helpers target: 3-5 small generated self-check helpers.
+- Production Rust budget: +80 to +180 lines; tests +80 to +160 lines.
+- Abstraction rule: keep the mode split explicit; do not introduce a generic
+  document linter framework.
+
 
 ### Artifact Model
 
@@ -600,7 +632,7 @@ Phase risk / size forecast:
 - [x] Create this ExecPlan and execution GOAL.
 - [x] Phase 0: Add characterization tests for mismatched approval and
       unlinked load evidence.
-- [ ] Phase 0: Add generated constraints self-check characterization before
+- [x] Phase 0: Add generated constraints self-check characterization before
       Phase 5.
 - [x] Phase 0: Define validation artifact schema and status vocabulary.
 - [x] Phase 0: Record approval-model decision.
@@ -617,7 +649,7 @@ Phase risk / size forecast:
       explicit exploratory opt-out only if justified.
 - [x] Phase 4: Wire validation into full-set summaries / operating-contract
       claims.
-- [ ] Phase 5: Split constraints check semantics.
+- [x] Phase 5: Split constraints check semantics.
 - [ ] Phase 6: Add docs/examples grep guard against plan / approval filename
       heuristics.
 - [ ] Phase 6: Update docs/examples and close final outcomes.
@@ -721,16 +753,24 @@ No named design deliverable is deferred.
   operating-point summaries. Rationale: measured governor validation is useful
   summary evidence only when it is explicit, while contaminated/refused/unknown
   validation must remain a blocked operating point with next evidence.
+- 2026-06-12: Split `constraints check` with an explicit mode instead of
+  weakening the default scan. Rationale: downstream candidate content should
+  still fail on blocked positive claims, while generated constraints documents
+  must be allowed to contain their explanatory `Blocked claims` section.
+- 2026-06-12: Keep generated constraints self-check in the same
+  `report.constraints_check` artifact and record `payload.mode`. Rationale:
+  both modes are checks over the same constraints source; recording the mode
+  prevents consumers from confusing self-check evidence with candidate-content
+  lint evidence.
 
 ## Handoff
 
-- Branch: `codex/issue48-validation-aware-contract`, stacked on
-  `codex/issue48-governor-sweep`.
+- Branch: `codex/issue48-constraints-check-split`, stacked on
+  `codex/issue48-validation-aware-contract`.
 - Baseline: `27204c1` (`origin/main`, tagged `v0.2.1`).
-- Current status: Phase 0-4 implementation is in progress across stacked
+- Current status: Phase 0-5 implementation is in progress across stacked
   branches. PR #49 contains Phase 0-2. PR #50 contains Phase 3. This branch
-  adds Phase 4 validation-aware run-report and operating-contract semantics on
-  top of PR #50.
+  adds Phase 5 constraints-check mode split on top of PR #51.
 - Untracked local files were present before this plan and were not staged:
   `.DS_Store`, `._.DS_Store`,
   `plans/._20260611-v21-kernel-completion.md`,
@@ -739,9 +779,10 @@ No named design deliverable is deferred.
   `reports/20260611-planning-skills-improvement-proposal.md`, and
   `reports/20260611-v2-evidence-kernel-outcome-review.md`.
 - Next steps:
-  1. Run full Phase 4 verification with `make verify`.
-  2. Open a stacked Phase 4 PR targeting `codex/issue48-governor-sweep`.
-  3. Continue with Phase 5 constraints-check mode split after review/merge.
+  1. Run full Phase 5 verification with `make verify`.
+  2. Open a stacked Phase 5 PR targeting
+     `codex/issue48-validation-aware-contract`.
+  3. Continue with Phase 6 docs/examples heuristic guard cleanup.
 - Read first when resuming:
   - this plan,
   - issue #48,
@@ -826,4 +867,24 @@ Phase 4 implementation snapshot, 2026-06-12:
   - `cargo test -p adc-lab-core run_report_ -- --nocapture`: pass.
   - `cargo clippy --workspace --all-targets -- -D warnings`: pass.
   - `make schemas-check`: pass.
+  - `make verify`: pass.
+
+Phase 5 implementation snapshot, 2026-06-12:
+
+- Added `ConstraintCheckMode` with `candidate_content` and
+  `generated_constraints` modes and recorded the mode in
+  `report.constraints_check`.
+- Default `constraints check` remains the candidate-content lint and still
+  fails when blocked claim text appears in downstream content.
+- `--mode generated-constraints` validates generated constraints JSON identity
+  or generated markdown structure/blocked claim IDs without failing on the
+  expected `Blocked claims` section.
+- Updated the generated `lab.report.constraints_check.v2` schema and CLI
+  reference examples.
+- Implementation economy actuals: one enum, one CLI argument, and local
+  generated self-check helpers; no new command or linter framework.
+- Verification so far:
+  - `cargo test -p adc-lab --test cli constraints_check_ -- --nocapture`: pass.
+  - `make schemas-check`: pass.
+  - `cargo clippy --workspace --all-targets -- -D warnings`: pass.
   - `make verify`: pass.
