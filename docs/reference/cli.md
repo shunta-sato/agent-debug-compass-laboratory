@@ -92,6 +92,41 @@ Remove `--dry-run` only after the fixed-path helper is installed, the operator h
 
 Privileged helper invocation uses the fixed `/usr/local/libexec/adc-lab-priv-helper` path. The controller CLI must not become a public arbitrary-helper or root-shell wrapper.
 
+## Governor sweep workflow
+
+```sh
+adc-lab control governor-sweep prepare \
+  --target local \
+  --governors ondemand,performance,powersave \
+  --duration-seconds-max 60 \
+  --thermal-celsius-abort 75 \
+  --requested-by codex \
+  --out lab/runs/LAB-RUN-.../approvals/governor_sweep_policy_request.v2.json \
+  --json
+
+adc-lab control governor-sweep approve \
+  --request lab/runs/LAB-RUN-.../approvals/governor_sweep_policy_request.v2.json \
+  --approved-by operator \
+  --out lab/runs/LAB-RUN-.../approvals/governor_sweep_policy.v2.json \
+  --json
+
+adc-lab control governor-sweep run \
+  --target local \
+  --governors ondemand,performance,powersave \
+  --approval-policy lab/runs/LAB-RUN-.../approvals/governor_sweep_policy.v2.json \
+  --duration-seconds-max 60 \
+  --load-workers 2 \
+  --load-duration 5s \
+  --restore-after-each \
+  --json
+```
+
+Real sweep apply requires an approved sweep policy artifact. Passing
+`--approved-by` directly to `run` does not authorize apply. The command writes
+typed control artifacts, audit events, and a `report.run_validation` summary;
+non-measured governor evidence exits non-zero after the summary is written
+unless `--allow-non-measured` is used for an exploratory dry run.
+
 ## Full-set run validation
 
 ```sh
