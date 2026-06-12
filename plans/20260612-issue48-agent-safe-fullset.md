@@ -160,8 +160,21 @@ Current facts:
 - [x] `report validate-run` writes `report.run_validation` and `GAPS.md`.
 - [x] generated schema drift and schema-ledger check include
       `report.run_validation` and `control.governor_sweep_policy`.
-- [ ] non-dry-run sweep self-approval refusal is captured as a safety invariant
+- [x] non-dry-run sweep self-approval refusal is captured as a safety invariant
       seed before Phase 3 implementation.
+
+### Phase 3 Test List
+
+- [x] non-dry-run `control governor-sweep run` with `--approved-by` but no
+      approved policy refuses before helper invocation.
+- [x] `control governor-sweep prepare` writes a requested sweep policy
+      artifact that cannot authorize real apply.
+- [x] `control governor-sweep approve` converts a requested policy into an
+      approved policy with a scope-bound digest.
+- [x] approved-policy dry-run sweep writes typed per-governor plan, approval,
+      dry-run result, audit, validation artifact, and gaps.
+- [x] policy scope mismatch (target/governor/bounds/expiry/digest) refuses
+      before helper invocation.
 
 ### Phase 0-2 Responsibility Map
 
@@ -186,6 +199,30 @@ sweeps need the same correlation semantics.
 - Production Rust budget: +350 to +550 lines; tests +120 to +220 lines.
 - Abstraction rule: keep the validator data-oriented; do not introduce a
   second evidence store or bespoke query DSL.
+
+### Phase 3 Responsibility Map
+
+| Unit | Name | Responsibility sentence | Reason to change | Dependency direction |
+|---|---|---|---|---|
+| CLI command group | `control governor-sweep` | Orchestrate prepare / approve / run for a requested governor set. | Sweep workflow semantics change. | Depends on existing control/load/report helpers and core policy DTOs. |
+| policy payload | `GovernorSweepPolicyPayload` | Bind target, governors, bounds, expiry, approver, and digest for sweep authorization. | Sweep approval contract changes. | Produced/validated by CLI; schema generator depends on it. |
+| control command helpers | sweep helpers in `commands/control.rs` | Persist typed artifacts and enforce policy scope before helper invocation. | CLI orchestration safety changes. | Depends on existing control primitives; no new helper backend. |
+
+Layout decision: keep Phase 3 in `commands/control.rs` instead of adding a new
+command module. Rejected alternative: a separate sweep module, because the
+implementation must reuse private control persistence/helper boundaries and
+should not create a second control orchestration layer yet.
+
+### Phase 3 Complexity Budget
+
+- Changed files target: 5-9 including tests, docs, plan, and generated schema.
+- New modules target: 0; keep orchestration inside existing control command
+  boundary.
+- New helpers target: local policy normalization/validation/persistence
+  helpers only.
+- Production Rust budget: +180 to +320 lines; tests +120 to +220 lines.
+- Abstraction rule: no new backend abstraction until a fake non-dry-run sweep
+  is needed for Phase 4 summary semantics.
 
 ### Artifact Model
 
@@ -533,7 +570,7 @@ Phase risk / size forecast:
       Phase 5.
 - [x] Phase 0: Define validation artifact schema and status vocabulary.
 - [x] Phase 0: Record approval-model decision.
-- [ ] Phase 0: Add safety invariant seed that sweep apply cannot self-approve
+- [x] Phase 0: Add safety invariant seed that sweep apply cannot self-approve
       with `--approved-by` before Phase 3 implementation.
 - [x] Phase 0: Record load/control causality decision and fixture old unlinked
       loads as unknown/contaminated.
@@ -541,8 +578,8 @@ Phase risk / size forecast:
       `report.run_validation` and `control.governor_sweep_policy`.
 - [x] Phase 1: Implement core run-validation engine.
 - [x] Phase 2: Add `report validate-run`.
-- [ ] Phase 3: Add `control governor-sweep`.
-- [ ] Phase 3: Make non-measured sweep results non-zero by default with an
+- [x] Phase 3: Add `control governor-sweep`.
+- [x] Phase 3: Make non-measured sweep results non-zero by default with an
       explicit exploratory opt-out only if justified.
 - [ ] Phase 4: Wire validation into full-set summaries / operating-contract
       claims.
@@ -623,16 +660,29 @@ No named design deliverable is deferred.
   non-measured requested governors while still writing the validation artifact,
   gaps markdown, and audit event first. Rationale: Agents may rely on exit
   status, but reviewers still need durable failure evidence.
+- 2026-06-12: Implement sweep approval as a prepare / approve / run workflow.
+  Rationale: this preserves a separate human approval step while removing
+  filename-order artifact discovery from the normal Agent workflow.
+- 2026-06-12: Require an approved sweep policy for the initial dry-run sweep
+  implementation too. Rationale: the dry-run path still generates per-governor
+  approval artifacts and should exercise the same scope-bound policy contract;
+  a looser exploratory mode can be added later without changing real-apply
+  safety.
+- 2026-06-12: Attempt restore after a successful real apply even when the
+  following load step errors. Rationale: restore is safety-critical and must
+  not be skipped by a later Tier 1 load failure.
+- 2026-06-12: Require `--restore-after-each` for real governor sweep runs.
+  Rationale: repeated governor changes without per-step restore can make the
+  original operating point ambiguous across the sweep.
 
 ## Handoff
 
-- Branch: `codex/issue48-agent-safe-fullset-plan`.
+- Branch: `codex/issue48-governor-sweep`, stacked on
+  `codex/issue48-agent-safe-fullset-plan`.
 - Baseline: `27204c1` (`origin/main`, tagged `v0.2.1`).
-- Current status: Phase 0-2 implementation is in progress on this branch.
-  Added the core run validator, `report validate-run`, generated schema rows
-  for `report.run_validation` and `control.governor_sweep_policy`, load
-  causal-link fields, and a CLI reference skeleton. Phase 3 sweep execution is
-  not implemented in this PR scope.
+- Current status: Phase 0-3 implementation is in progress across stacked
+  branches. PR #49 contains Phase 0-2. This branch adds Phase 3 governor sweep
+  prepare / approve / run on top of that base.
 - Untracked local files were present before this plan and were not staged:
   `.DS_Store`, `._.DS_Store`,
   `plans/._20260611-v21-kernel-completion.md`,
@@ -641,10 +691,11 @@ No named design deliverable is deferred.
   `reports/20260611-planning-skills-improvement-proposal.md`, and
   `reports/20260611-v2-evidence-kernel-outcome-review.md`.
 - Next steps:
-  1. Finish Phase 0-2 verification with `make verify`.
-  2. Open the Phase 0-2 PR for review.
-  3. Start Phase 3 only after the validator/report surface lands; first Phase
-     3 commit must add the non-dry-run sweep self-approval refusal invariant.
+  1. Finish Phase 3 verification with `make verify`.
+  2. Open a stacked Phase 3 PR targeting
+     `codex/issue48-agent-safe-fullset-plan`.
+  3. After PR #49 lands, retarget the Phase 3 PR to `main` and rerun
+     `make verify`.
 - Read first when resuming:
   - this plan,
   - issue #48,
@@ -683,5 +734,25 @@ Phase 0-2 implementation snapshot, 2026-06-12:
   - `make verify`: pass.
 - Deferred by decision:
   - generated constraints self-check characterization remains for Phase 5;
-  - sweep self-approval safety invariant remains for the first Phase 3 commit,
-    where the real command surface exists.
+  - Phase 4 summary/operating-contract consumption of validation state remains
+    for the next PR.
+
+Phase 3 implementation snapshot, 2026-06-12:
+
+- Added `control governor-sweep prepare`, `approve`, and `run`.
+- `prepare` writes a requested `control.governor_sweep_policy` artifact.
+- `approve` converts the requested policy into an approved, scope-digested
+  policy artifact.
+- `run` refuses real apply without an approved policy even if `--approved-by`
+  is supplied, validates target/governor/bounds/expiry/digest before creating
+  per-governor artifacts, and writes validation/gaps after the sweep.
+- Dry-run sweep uses the approved policy to create typed per-governor plan,
+  approval, dry-run result, audit, validation artifact, and gaps without
+  invoking the privileged helper.
+- Verification so far:
+  - `cargo test -p adc-lab --test safety_invariants contract_validation_governor_sweep_cannot_self_approve_real_apply -- --nocapture`: pass.
+  - `cargo test -p adc-lab --test cli governor_sweep -- --nocapture`: pass.
+  - `cargo test -p adc-lab-core run_validation -- --nocapture`: pass.
+  - `make schemas-check`: pass.
+  - `cargo clippy --workspace --all-targets -- -D warnings`: pass.
+  - `make verify`: pass.
