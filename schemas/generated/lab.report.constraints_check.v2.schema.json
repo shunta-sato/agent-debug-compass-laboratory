@@ -154,11 +154,19 @@
       },
       "additionalProperties": false
     },
+    "ConstraintCheckMode": {
+      "type": "string",
+      "enum": [
+        "candidate_content",
+        "generated_constraints"
+      ]
+    },
     "ConstraintCheckPayload": {
       "type": "object",
       "required": [
         "checked_path",
         "matches",
+        "mode",
         "status"
       ],
       "properties": {
@@ -170,6 +178,9 @@
           "items": {
             "$ref": "#/definitions/ConstraintCheckMatch"
           }
+        },
+        "mode": {
+          "$ref": "#/definitions/ConstraintCheckMode"
         },
         "status": {
           "type": "string"

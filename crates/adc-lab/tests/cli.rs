@@ -523,10 +523,126 @@ fn constraints_check_fails_on_blocked_claim_fixture() {
 }
 
 #[test]
+fn constraints_check_generated_mode_allows_generated_blocked_claims_section() {
+    let temp = tempfile::tempdir().unwrap();
+    let pack_path = temp.path().join("constraints.json");
+    let generated_md = temp.path().join("agent_constraints.md");
+    write_minimal_constraints_pack(&pack_path);
+    fs::write(
+        &generated_md,
+        [
+            "# Target Constraints for target55 / workload-001",
+            "",
+            "Source:",
+            "- suitability_artifact: artifact://lab/runs/LAB-RUN-001/reports/suitability.v2.json",
+            "",
+            "## Must obey",
+            "",
+            "- Do not claim production readiness from this v2 workload suitability slice.",
+            "",
+            "## Blocked claims",
+            "",
+            "- `target.selection.production_ready`: \"production readiness\"",
+        ]
+        .join("\n"),
+    )
+    .unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "constraints",
+            "check",
+            "--constraints",
+            pack_path.to_str().unwrap(),
+            "--path",
+            generated_md.to_str().unwrap(),
+            "--mode",
+            "generated-constraints",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"kind\": \"report.constraints_check\""))
+        .stdout(contains("\"mode\": \"generated_constraints\""))
+        .stdout(contains("\"status\": \"pass\""));
+}
+
+#[test]
+fn constraints_check_generated_mode_fails_on_mismatched_constraints_artifact() {
+    let temp = tempfile::tempdir().unwrap();
+    let pack_path = temp.path().join("constraints.json");
+    let other_pack_path = temp.path().join("other_constraints.json");
+    write_minimal_constraints_pack(&pack_path);
+    write_minimal_constraints_pack(&other_pack_path);
+    let mut other: serde_json::Value =
+        serde_json::from_slice(&fs::read(&other_pack_path).unwrap()).unwrap();
+    other["id"] = serde_json::json!("CONSTRAINTS-OTHER");
+    fs::write(&other_pack_path, serde_json::to_vec_pretty(&other).unwrap()).unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "constraints",
+            "check",
+            "--constraints",
+            pack_path.to_str().unwrap(),
+            "--path",
+            other_pack_path.to_str().unwrap(),
+            "--mode",
+            "generated-constraints",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stdout(contains("\"kind\": \"report.constraints_check\""))
+        .stdout(contains("\"mode\": \"generated_constraints\""))
+        .stdout(contains("\"status\": \"fail\""))
+        .stdout(contains("id mismatch"));
+}
+
+#[test]
 fn version_commands_emit_build_info_json() {
     assert_build_info("adc-lab");
     assert_build_info("adc-lab-target");
     assert_build_info("adc-lab-priv-helper");
+}
+
+fn write_minimal_constraints_pack(path: &std::path::Path) {
+    fs::write(
+        path,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "schema": "lab.artifact.v2",
+            "kind": "report.constraints",
+            "id": "CONSTRAINTS-001",
+            "run_id": "LAB-RUN-001",
+            "target_id": "target55",
+            "status": { "state": "insufficient" },
+            "bounds": null,
+            "factors": { "controlled": [], "observed": [], "confounders": [] },
+            "metrics": [],
+            "claims": [],
+            "evidence_refs": [],
+            "data_quality": { "level": "partial", "notes": [] },
+            "payload": {
+                "source_suitability_id": "SUITABILITY-001",
+                "workload_id": "workload-001",
+                "policy_id": "policy-001",
+                "allowed_patterns": [],
+                "burst_only_patterns": [],
+                "degraded_mode_triggers": [],
+                "forbidden_patterns": [],
+                "budget_constraints": [],
+                "required_runtime_guards": [],
+                "blocked_claims": ["target.selection.production_ready"],
+                "agent_instructions": [],
+                "ci_rules": []
+            },
+            "time_unix_ms": 1
+        }))
+        .unwrap(),
+    )
+    .unwrap();
 }
 
 fn assert_build_info(binary: &str) {

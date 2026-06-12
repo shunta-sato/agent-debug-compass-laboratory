@@ -51,7 +51,11 @@ pub(crate) fn command_constraints_check(args: ConstraintsCheckCommand) -> Result
     if constraints.schema != ARTIFACT_SCHEMA_V2 || constraints.kind != Kind::ReportConstraints {
         anyhow::bail!("constraints check --constraints must be a v2 report.constraints artifact");
     }
-    let result = check_constraints_v2(&constraints, &args.path)?;
+    let mode = match args.mode {
+        ConstraintsCheckModeArg::CandidateContent => ConstraintCheckMode::CandidateContent,
+        ConstraintsCheckModeArg::GeneratedConstraints => ConstraintCheckMode::GeneratedConstraints,
+    };
+    let result = check_constraints_v2(&constraints, &args.path, mode)?;
     print_json(&result)?;
     if result.payload.status == "fail" {
         anyhow::bail!("constraint check failed");
