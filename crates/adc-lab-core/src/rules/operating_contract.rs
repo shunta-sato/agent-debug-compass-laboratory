@@ -86,11 +86,17 @@ pub fn operating_contract_rules() -> Vec<Rule> {
         Rule {
             id: "operating.production_readiness_requires_run_report",
             claim_id: claim::PRODUCTION_READY,
-            when: Pred::Present(Kind::ReportRun),
+            when: Pred::All(vec![
+                Pred::Present(Kind::ReportRun),
+                Pred::RunValidationMeasured,
+            ]),
             on_match: Decision::Provisional,
             on_miss: Decision::Blocked,
-            evidence_kinds: &[Kind::ReportRun],
-            next_evidence: &["generate v2 run report from the same operation sequence"],
+            evidence_kinds: &[Kind::ReportRun, Kind::ReportRunValidation],
+            next_evidence: &[
+                "generate v2 run report from the same operation sequence",
+                "validate the full-set governor run with measured evidence",
+            ],
         },
     ]
 }

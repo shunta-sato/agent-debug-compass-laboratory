@@ -176,6 +176,18 @@ Current facts:
 - [x] policy scope mismatch (target/governor/bounds/expiry/digest) refuses
       before helper invocation.
 
+### Phase 4 Test List
+
+- [x] operating-contract production-readiness evaluation remains blocked when
+      no `report.run_validation` artifact exists.
+- [x] operating-contract production-readiness evaluation remains blocked when
+      run validation is contaminated, refused, insufficient, or unknown.
+- [x] operating-contract production-readiness evaluation may become
+      provisional only when a measured run-validation artifact and run report
+      are both present.
+- [x] run report surfaces measured governor validation as controlled governor
+      points, and non-measured validation as blocked governor points.
+
 ### Phase 0-2 Responsibility Map
 
 | Unit | Name | Responsibility sentence | Reason to change | Dependency direction |
@@ -223,6 +235,28 @@ should not create a second control orchestration layer yet.
 - Production Rust budget: +180 to +320 lines; tests +120 to +220 lines.
 - Abstraction rule: no new backend abstraction until a fake non-dry-run sweep
   is needed for Phase 4 summary semantics.
+
+### Phase 4 Responsibility Map
+
+| Unit | Name | Responsibility sentence | Reason to change | Dependency direction |
+|---|---|---|---|---|
+| rules predicate | `RunValidationMeasured` | Decide whether a run has measured full-set validation evidence. | Validation-to-claim gating semantics change. | Depends on `EvidenceStore` and `RunValidationPayload`; operating-contract rules depend on it. |
+| run-report summary | validation-aware operating point summary | Project measured/non-measured governor validation into controlled/blocked operating points. | Full-set summary semantics change. | Depends on validation artifacts already indexed or present in the run dir. |
+| tests | Phase 4 rule/report tests | Prove summaries and contract claims fail closed without measured validation. | Acceptance criteria or regression cases change. | Depend on core DTOs and existing store helpers. |
+
+Layout decision: reuse the existing rules engine and run-report summary
+boundary. Rejected alternative: a new full-set summary module, because Phase 4
+only needs one validation gate and one summary projection, not another report
+layer.
+
+### Phase 4 Complexity Budget
+
+- Changed files target: 4-6 including tests and this plan.
+- New modules target: 0.
+- New helpers target: 2-4 local validation artifact lookup/projection helpers.
+- Production Rust budget: +80 to +180 lines; tests +80 to +180 lines.
+- Abstraction rule: do not generalize validation queries beyond
+  `report.run_validation` until another claim family needs the same mechanism.
 
 ### Artifact Model
 
@@ -581,7 +615,7 @@ Phase risk / size forecast:
 - [x] Phase 3: Add `control governor-sweep`.
 - [x] Phase 3: Make non-measured sweep results non-zero by default with an
       explicit exploratory opt-out only if justified.
-- [ ] Phase 4: Wire validation into full-set summaries / operating-contract
+- [x] Phase 4: Wire validation into full-set summaries / operating-contract
       claims.
 - [ ] Phase 5: Split constraints check semantics.
 - [ ] Phase 6: Add docs/examples grep guard against plan / approval filename
@@ -674,15 +708,29 @@ No named design deliverable is deferred.
 - 2026-06-12: Require `--restore-after-each` for real governor sweep runs.
   Rationale: repeated governor changes without per-step restore can make the
   original operating point ambiguous across the sweep.
+- 2026-06-12: Gate operating-contract production-readiness on measured
+  full-set run validation, not only the presence of a run report. Rationale:
+  issue #48 showed that summary existence can overclaim when plan, approval,
+  apply, load, restore, and health-check evidence do not correlate.
+- 2026-06-12: Treat mixed full-set validation artifacts as not measured for
+  operating-contract claims. Rationale: choosing the measured artifact by file
+  name, timestamp, or optimistic existence would recreate the artifact
+  selection failure mode; all full-set validation artifacts in scope must be
+  measured before the higher-level claim can advance.
+- 2026-06-12: Project run-validation governor results into run-report
+  operating-point summaries. Rationale: measured governor validation is useful
+  summary evidence only when it is explicit, while contaminated/refused/unknown
+  validation must remain a blocked operating point with next evidence.
 
 ## Handoff
 
-- Branch: `codex/issue48-governor-sweep`, stacked on
-  `codex/issue48-agent-safe-fullset-plan`.
+- Branch: `codex/issue48-validation-aware-contract`, stacked on
+  `codex/issue48-governor-sweep`.
 - Baseline: `27204c1` (`origin/main`, tagged `v0.2.1`).
-- Current status: Phase 0-3 implementation is in progress across stacked
-  branches. PR #49 contains Phase 0-2. This branch adds Phase 3 governor sweep
-  prepare / approve / run on top of that base.
+- Current status: Phase 0-4 implementation is in progress across stacked
+  branches. PR #49 contains Phase 0-2. PR #50 contains Phase 3. This branch
+  adds Phase 4 validation-aware run-report and operating-contract semantics on
+  top of PR #50.
 - Untracked local files were present before this plan and were not staged:
   `.DS_Store`, `._.DS_Store`,
   `plans/._20260611-v21-kernel-completion.md`,
@@ -691,11 +739,9 @@ No named design deliverable is deferred.
   `reports/20260611-planning-skills-improvement-proposal.md`, and
   `reports/20260611-v2-evidence-kernel-outcome-review.md`.
 - Next steps:
-  1. Finish Phase 3 verification with `make verify`.
-  2. Open a stacked Phase 3 PR targeting
-     `codex/issue48-agent-safe-fullset-plan`.
-  3. After PR #49 lands, retarget the Phase 3 PR to `main` and rerun
-     `make verify`.
+  1. Run full Phase 4 verification with `make verify`.
+  2. Open a stacked Phase 4 PR targeting `codex/issue48-governor-sweep`.
+  3. Continue with Phase 5 constraints-check mode split after review/merge.
 - Read first when resuming:
   - this plan,
   - issue #48,
@@ -755,4 +801,29 @@ Phase 3 implementation snapshot, 2026-06-12:
   - `cargo test -p adc-lab-core run_validation -- --nocapture`: pass.
   - `make schemas-check`: pass.
   - `cargo clippy --workspace --all-targets -- -D warnings`: pass.
+  - `make verify`: pass.
+
+Phase 4 implementation snapshot, 2026-06-12:
+
+- Added a `RunValidationMeasured` rule predicate and changed
+  `operating.production_readiness_requires_run_report` so a run report alone
+  cannot advance production-readiness; measured full-set run validation is
+  also required.
+- The predicate fails closed for mixed validation evidence: if any in-scope
+  full-set validation artifact is contaminated/refused/insufficient/unknown,
+  the operating-contract claim remains blocked.
+- Run report operating-point summaries now project measured governor
+  validation into controlled governor points and non-measured governor
+  validation into blocked governor points with explicit next evidence.
+- Implementation economy actuals: one rules predicate plus local run-report
+  projection helpers; no new modules or generic query layer. Production code
+  grew more than the initial low estimate because run-report projection needs
+  evidence-ref dedupe, conservative conflict handling, and human-readable
+  blocked reasons. Accepted because the logic stays inside the existing report
+  summary boundary.
+- Verification so far:
+  - `cargo test -p adc-lab-core --test rules_engine operating_contract -- --nocapture`: pass.
+  - `cargo test -p adc-lab-core run_report_ -- --nocapture`: pass.
+  - `cargo clippy --workspace --all-targets -- -D warnings`: pass.
+  - `make schemas-check`: pass.
   - `make verify`: pass.
