@@ -197,6 +197,15 @@ Current facts:
 - [x] generated-constraints mode fails when the checked constraints artifact
       does not match the expected generated constraints artifact.
 
+### Phase 6 Test List
+
+- [x] docs/examples do not teach `find`, `sort`, `tail`, or `ls -t` selection
+      for plan, approval, or control artifacts.
+- [x] `make docs-smoke` runs a regression guard for artifact filename-order
+      heuristics.
+- [x] README/getting-started/resource-harness docs point Agents toward
+      governor sweep and run validation for full-set governor evidence.
+
 ### Phase 0-2 Responsibility Map
 
 | Unit | Name | Responsibility sentence | Reason to change | Dependency direction |
@@ -288,6 +297,29 @@ distinction is a check mode.
 - Production Rust budget: +80 to +180 lines; tests +80 to +160 lines.
 - Abstraction rule: keep the mode split explicit; do not introduce a generic
   document linter framework.
+
+### Phase 6 Responsibility Map
+
+| Unit | Name | Responsibility sentence | Reason to change | Dependency direction |
+|---|---|---|---|---|
+| docs guard | `check-no-artifact-heuristics.py` | Reject docs/examples that teach filename-order plan/approval/control artifact selection. | Agent-facing workflow safety wording changes. | Called by `make docs-smoke`; independent of Rust code. |
+| docs | README/getting-started/resource harness updates | Point full-set governor workflows to sweep and run validation. | Public workflow guidance changes. | Depends on CLI surfaces from Phase 2-5. |
+
+Layout decision: add a small docs smoke script instead of embedding a complex
+shell pipeline in the Makefile. Rejected alternative: only manual review,
+because issue #48 is specifically about preventing Agent-visible workflow
+regression.
+
+### Phase 6 Complexity Budget
+
+- Changed files target: 5-7 including docs, Makefile, COMMANDS, script, and
+  plan.
+- New modules target: 0.
+- New helpers target: 1 docs guard script.
+- Production Rust budget: 0 lines.
+- Abstraction rule: keep the guard text-based and scoped to docs/examples; do
+  not build a general documentation linter.
+
 
 
 ### Artifact Model
@@ -650,9 +682,9 @@ Phase risk / size forecast:
 - [x] Phase 4: Wire validation into full-set summaries / operating-contract
       claims.
 - [x] Phase 5: Split constraints check semantics.
-- [ ] Phase 6: Add docs/examples grep guard against plan / approval filename
+- [x] Phase 6: Add docs/examples grep guard against plan / approval filename
       heuristics.
-- [ ] Phase 6: Update docs/examples and close final outcomes.
+- [x] Phase 6: Update docs/examples and close final outcomes.
 
 ## Design -> WBS Coverage Check
 
@@ -762,15 +794,20 @@ No named design deliverable is deferred.
   both modes are checks over the same constraints source; recording the mode
   prevents consumers from confusing self-check evidence with candidate-content
   lint evidence.
+- 2026-06-12: Add a docs-smoke guard for filename-order artifact heuristics.
+  Rationale: issue #48 was triggered by Agent-visible shell artifact
+  selection; documentation must not regress to teaching `find`, `sort`, `tail`,
+  or `ls -t` for plan/approval/control artifact selection.
 
 ## Handoff
 
-- Branch: `codex/issue48-constraints-check-split`, stacked on
-  `codex/issue48-validation-aware-contract`.
+- Branch: `codex/issue48-docs-heuristic-guard`, stacked on
+  `codex/issue48-constraints-check-split`.
 - Baseline: `27204c1` (`origin/main`, tagged `v0.2.1`).
-- Current status: Phase 0-5 implementation is in progress across stacked
+- Current status: Phase 0-6 implementation is in progress across stacked
   branches. PR #49 contains Phase 0-2. PR #50 contains Phase 3. This branch
-  adds Phase 5 constraints-check mode split on top of PR #51.
+  adds Phase 6 docs/examples cleanup and artifact-heuristic guard on top of
+  PR #52.
 - Untracked local files were present before this plan and were not staged:
   `.DS_Store`, `._.DS_Store`,
   `plans/._20260611-v21-kernel-completion.md`,
@@ -779,10 +816,11 @@ No named design deliverable is deferred.
   `reports/20260611-planning-skills-improvement-proposal.md`, and
   `reports/20260611-v2-evidence-kernel-outcome-review.md`.
 - Next steps:
-  1. Run full Phase 5 verification with `make verify`.
-  2. Open a stacked Phase 5 PR targeting
-     `codex/issue48-validation-aware-contract`.
-  3. Continue with Phase 6 docs/examples heuristic guard cleanup.
+  1. Run full Phase 6 verification with `make verify`.
+  2. Open a stacked Phase 6 PR targeting
+     `codex/issue48-constraints-check-split`.
+  3. After stacked PRs land, retarget each branch to `main` as needed and
+     rerun `make verify`.
 - Read first when resuming:
   - this plan,
   - issue #48,
@@ -887,4 +925,20 @@ Phase 5 implementation snapshot, 2026-06-12:
   - `cargo test -p adc-lab --test cli constraints_check_ -- --nocapture`: pass.
   - `make schemas-check`: pass.
   - `cargo clippy --workspace --all-targets -- -D warnings`: pass.
+  - `make verify`: pass.
+
+Phase 6 implementation snapshot, 2026-06-12:
+
+- Added `scripts/docs/check-no-artifact-heuristics.py` and wired it into
+  `make docs-smoke`.
+- Updated README, Pi5/Pi4 getting-started guidance, and resource harness docs
+  so full-set governor evidence points to governor sweep plus
+  `report validate-run`, not manual artifact discovery.
+- Updated COMMANDS.md to register the docs artifact-heuristic guard under the
+  canonical docs smoke command.
+- Implementation economy actuals: one text-based docs guard script and docs
+  edits only; no Rust production code.
+- Verification so far:
+  - `python3 scripts/docs/check-no-artifact-heuristics.py`: pass.
+  - `make docs-smoke`: pass.
   - `make verify`: pass.

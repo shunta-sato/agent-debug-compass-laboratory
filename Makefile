@@ -72,6 +72,7 @@ docs-smoke:
 	test -f docs/reference/pressure-probes.md
 	test -f docs/getting-started/install-release-binaries.md
 	test -f reports/resource/nfr-gate-report.md
+	python3 scripts/docs/check-no-artifact-heuristics.py
 
 command-smoke:
 	scripts/resource/run-resource-smoke.sh --host-fallback

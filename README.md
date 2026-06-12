@@ -450,8 +450,11 @@ For repeated privileged experiments, the recommended workflow is:
 1. Operator installs the helper with the release installer or reviewed local
    build.
 2. Operator configures the minimal helper-only sudo rule if appropriate.
-3. Agent runs `adc-lab` experiments non-interactively.
-4. Agent verifies restore and health.
+3. Agent uses `adc-lab control governor-sweep prepare`, an operator-approved
+   sweep policy, and `adc-lab control governor-sweep run` for full-set governor
+   collection.
+4. Agent verifies `report.run_validation` and `GAPS.md` before using any
+   controlled-governor evidence in reports.
 5. Operator removes helper/sudoers when the lab session is done.
 
 See [CLI reference](docs/reference/cli.md#privileged-operating-point-workflow) and [Privilege Model Option A](docs/architecture/privilege-model-option-a.md) for details.
@@ -510,10 +513,10 @@ The point is to keep the Agent honest.
 | Read-only familiarization | `adc-lab familiarize read-only ...` to learn what the target is and which signals are visible. |
 | Bounded CPU load | `adc-lab load cpu ...` to map short CPU / thermal response. |
 | Pressure probe | `adc-lab pressure run ...` to create bounded pressure evidence. |
-| Operating point experiment | `adc-lab control plan`, approve, apply, load, restore, and health-check. |
+| Operating point experiment | `adc-lab control governor-sweep prepare`, approve the sweep policy, `adc-lab control governor-sweep run`, then `adc-lab report validate-run`. |
 | Operating contract generation | `adc-lab report operating-contract ...` after one or more pressure or control runs. |
 | Local workload suitability | `adc-lab workload run`, `adc-lab decide suitability`, and `adc-lab constraints generate`. |
-| Constraint lint | `adc-lab constraints check ...` to fail on blocked claim text in candidate agent-facing content. |
+| Constraint lint | `adc-lab constraints check --mode candidate-content ...` for downstream content; use `--mode generated-constraints` only for generated constraints artifacts/instructions. |
 
 Local workload suitability decisions can produce meet / marginal / fail /
 unknown for one target/workload/policy evidence body, but they still cannot say:

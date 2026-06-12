@@ -55,13 +55,16 @@ adc-lab pressure composite \
   --run-dir lab/runs/LAB-RUN-<target>-composite-memory-storage-jitter
 ```
 
-Multi-run aggregation can combine the pressure suite, governor-control run,
-composite run, and network-transfer run into a candidate pack:
+Multi-run aggregation can combine the pressure suite, governor-sweep run,
+composite run, and network-transfer run into a candidate pack. The governor
+run must include `reports/run_validation.v2.json`; operating-contract claims
+do not infer controlled-governor evidence from raw plan, approval, or load
+files.
 
 ```sh
 adc-lab report operating-contract \
   --run lab/runs/LAB-RUN-<target>-platform-contract \
-  --include-run lab/runs/LAB-RUN-<target>-governor-control \
+  --include-run lab/runs/LAB-RUN-<target>-governor-sweep \
   --include-run lab/runs/LAB-RUN-<target>-composite-memory-storage-jitter \
   --include-run lab/runs/LAB-RUN-<target>-network-bounded-transfer \
   --target-id <target-id> \
