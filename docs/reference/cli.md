@@ -312,11 +312,22 @@ Run the minimal blocked-claim lint:
 ```sh
 adc-lab constraints check \
   --constraints lab/runs/LAB-RUN-workload-.../reports/constraints.v2.json \
+  --mode candidate-content \
   --path .
 ```
 
 This check is intentionally small. It fails when blocked claim text appears in
-candidate agent-facing content; it is not a full static analyzer.
+candidate agent-facing content; it is not a full static analyzer. To validate
+the generated constraints artifact or generated agent instructions themselves,
+use the generated self-check mode so the expected `Blocked claims` section is
+not treated as downstream positive claim text:
+
+```sh
+adc-lab constraints check \
+  --constraints lab/runs/LAB-RUN-workload-.../reports/constraints.v2.json \
+  --mode generated-constraints \
+  --path lab/runs/LAB-RUN-workload-.../reports/agent_constraints.md
+```
 
 ## Experiment matrix
 

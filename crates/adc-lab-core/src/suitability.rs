@@ -29,9 +29,17 @@ pub struct TargetRunNumericEvidence {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ConstraintCheckPayload {
+    pub mode: ConstraintCheckMode,
     pub status: String,
     pub checked_path: String,
     pub matches: Vec<ConstraintCheckMatch>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ConstraintCheckMode {
+    CandidateContent,
+    GeneratedConstraints,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -415,10 +423,19 @@ pub fn render_agent_constraints_markdown(
 pub fn check_constraints_v2(
     constraints: &Artifact<ConstraintsPayload>,
     path: &Path,
+    mode: ConstraintCheckMode,
 ) -> LabResult<Artifact<ConstraintCheckPayload>> {
     let mut matches = Vec::new();
-    scan_path_for_blocked_claims(&constraints.payload.blocked_claims, path, &mut matches)?;
+    match mode {
+        ConstraintCheckMode::CandidateContent => {
+            scan_path_for_blocked_claims(&constraints.payload.blocked_claims, path, &mut matches)?;
+        }
+        ConstraintCheckMode::GeneratedConstraints => {
+            check_generated_constraints(constraints, path, &mut matches)?;
+        }
+    }
     let payload = ConstraintCheckPayload {
+        mode,
         status: if matches.is_empty() {
             "pass".to_string()
         } else {
@@ -912,6 +929,149 @@ fn scan_path_for_blocked_claims(
         }
     }
     Ok(())
+}
+
+fn check_generated_constraints(
+    constraints: &Artifact<ConstraintsPayload>,
+    path: &Path,
+    matches: &mut Vec<ConstraintCheckMatch>,
+) -> LabResult<()> {
+    if path.is_dir() {
+        push_generated_constraint_mismatch(
+            path,
+            "generated constraints self-check expects a generated file path",
+            matches,
+        );
+        return Ok(());
+    }
+    let text = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(_) => {
+            push_generated_constraint_mismatch(
+                path,
+                "generated constraints self-check could not read the file",
+                matches,
+            );
+            return Ok(());
+        }
+    };
+    if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
+        check_generated_constraints_json(constraints, path, &text, matches)?;
+    } else {
+        check_generated_constraints_markdown(constraints, path, &text, matches);
+    }
+    Ok(())
+}
+
+fn check_generated_constraints_json(
+    expected: &Artifact<ConstraintsPayload>,
+    path: &Path,
+    text: &str,
+    matches: &mut Vec<ConstraintCheckMatch>,
+) -> LabResult<()> {
+    let generated: Artifact<ConstraintsPayload> = match serde_json::from_str(text) {
+        Ok(generated) => generated,
+        Err(_) => {
+            push_generated_constraint_mismatch(
+                path,
+                "generated constraints JSON is not a report.constraints artifact",
+                matches,
+            );
+            return Ok(());
+        }
+    };
+    for (label, expected_value, actual_value) in [
+        (
+            "schema",
+            expected.schema.as_str(),
+            generated.schema.as_str(),
+        ),
+        (
+            "kind",
+            "report.constraints",
+            match generated.kind {
+                Kind::ReportConstraints => "report.constraints",
+                _ => "other",
+            },
+        ),
+        ("id", expected.id.as_str(), generated.id.as_str()),
+        (
+            "run_id",
+            expected.run_id.as_str(),
+            generated.run_id.as_str(),
+        ),
+        (
+            "target_id",
+            expected.target_id.as_str(),
+            generated.target_id.as_str(),
+        ),
+        (
+            "source_suitability_id",
+            expected.payload.source_suitability_id.as_str(),
+            generated.payload.source_suitability_id.as_str(),
+        ),
+    ] {
+        if expected_value != actual_value {
+            push_generated_constraint_mismatch(
+                path,
+                &format!(
+                    "generated constraints JSON {label} mismatch: expected {expected_value}, got {actual_value}"
+                ),
+                matches,
+            );
+        }
+    }
+    if expected.payload.blocked_claims != generated.payload.blocked_claims {
+        push_generated_constraint_mismatch(
+            path,
+            "generated constraints JSON blocked_claims mismatch",
+            matches,
+        );
+    }
+    Ok(())
+}
+
+fn check_generated_constraints_markdown(
+    constraints: &Artifact<ConstraintsPayload>,
+    path: &Path,
+    text: &str,
+    matches: &mut Vec<ConstraintCheckMatch>,
+) {
+    for required in [
+        "# Target Constraints",
+        "Source:",
+        "## Must obey",
+        "## Blocked claims",
+    ] {
+        if !text.contains(required) {
+            push_generated_constraint_mismatch(
+                path,
+                &format!("generated constraints markdown is missing section {required}"),
+                matches,
+            );
+        }
+    }
+    for claim_id in &constraints.payload.blocked_claims {
+        if !text.contains(claim_id) {
+            push_generated_constraint_mismatch(
+                path,
+                &format!("generated constraints markdown is missing blocked claim id {claim_id}"),
+                matches,
+            );
+        }
+    }
+}
+
+fn push_generated_constraint_mismatch(
+    path: &Path,
+    reason: &str,
+    matches: &mut Vec<ConstraintCheckMatch>,
+) {
+    matches.push(ConstraintCheckMatch {
+        path: path.display().to_string(),
+        claim_id: "report.constraints".to_string(),
+        blocked_claim: reason.to_string(),
+    });
 }
 
 fn should_skip_path(path: &Path) -> bool {

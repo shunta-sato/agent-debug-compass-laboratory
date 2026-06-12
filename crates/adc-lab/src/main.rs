@@ -358,8 +358,16 @@ struct ConstraintsCheckCommand {
     constraints: PathBuf,
     #[arg(long)]
     path: PathBuf,
+    #[arg(long, value_enum, default_value_t = ConstraintsCheckModeArg::CandidateContent)]
+    mode: ConstraintsCheckModeArg,
     #[arg(long)]
     json: bool,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum ConstraintsCheckModeArg {
+    CandidateContent,
+    GeneratedConstraints,
 }
 
 #[derive(Debug, Subcommand)]
