@@ -234,16 +234,24 @@
     "GovernorSweepPolicyPayload": {
       "type": "object",
       "required": [
-        "approved_by",
         "duration_seconds_max",
         "expires_at_unix_ms",
         "governors",
         "policy_digest",
+        "policy_state",
+        "requested_by",
         "target_id"
       ],
       "properties": {
         "approved_by": {
-          "$ref": "#/definitions/Actor"
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Actor"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "duration_seconds_max": {
           "type": "integer",
@@ -264,6 +272,12 @@
         "policy_digest": {
           "type": "string"
         },
+        "policy_state": {
+          "$ref": "#/definitions/GovernorSweepPolicyState"
+        },
+        "requested_by": {
+          "$ref": "#/definitions/Actor"
+        },
         "target_id": {
           "type": "string"
         },
@@ -276,6 +290,13 @@
         }
       },
       "additionalProperties": false
+    },
+    "GovernorSweepPolicyState": {
+      "type": "string",
+      "enum": [
+        "requested",
+        "approved"
+      ]
     },
     "Kind": {
       "type": "string",

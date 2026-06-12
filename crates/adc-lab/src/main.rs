@@ -121,6 +121,18 @@ enum ControlCommand {
     Plan(ControlPlanCommand),
     Approve(ControlApproveCommand),
     Apply(ControlApplyCommand),
+    #[command(name = "governor-sweep")]
+    GovernorSweep {
+        #[command(subcommand)]
+        command: GovernorSweepCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum GovernorSweepCommand {
+    Prepare(GovernorSweepPrepareCommand),
+    Approve(GovernorSweepApproveCommand),
+    Run(GovernorSweepRunCommand),
 }
 
 #[derive(Debug, Args)]
@@ -170,6 +182,74 @@ struct ControlApplyCommand {
     run_dir: Option<PathBuf>,
     #[arg(long)]
     dry_run: bool,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
+struct GovernorSweepPrepareCommand {
+    #[arg(long, default_value = "local")]
+    target: String,
+    #[arg(long, value_delimiter = ',')]
+    governors: Vec<String>,
+    #[arg(long, default_value_t = 60)]
+    duration_seconds_max: u64,
+    #[arg(long)]
+    thermal_celsius_abort: Option<f64>,
+    #[arg(long, default_value_t = 3600)]
+    expires_in_seconds: u64,
+    #[arg(long, default_value = "codex")]
+    requested_by: String,
+    #[arg(long)]
+    run_dir: Option<PathBuf>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
+struct GovernorSweepApproveCommand {
+    #[arg(long)]
+    request: PathBuf,
+    #[arg(long)]
+    approved_by: String,
+    #[arg(long)]
+    run_dir: Option<PathBuf>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
+struct GovernorSweepRunCommand {
+    #[arg(long, default_value = "local")]
+    target: String,
+    #[arg(long, value_delimiter = ',')]
+    governors: Vec<String>,
+    #[arg(long = "approval-policy")]
+    approval_policy: Option<PathBuf>,
+    #[arg(long)]
+    approved_by: Option<String>,
+    #[arg(long, default_value_t = 60)]
+    duration_seconds_max: u64,
+    #[arg(long)]
+    thermal_celsius_abort: Option<f64>,
+    #[arg(long, default_value_t = 1)]
+    load_workers: usize,
+    #[arg(long, default_value = "1s")]
+    load_duration: String,
+    #[arg(long)]
+    load_abort_temp_c: Option<f64>,
+    #[arg(long)]
+    restore_after_each: bool,
+    #[arg(long)]
+    run_dir: Option<PathBuf>,
+    #[arg(long)]
+    dry_run: bool,
+    #[arg(long)]
+    allow_non_measured: bool,
     #[arg(long)]
     json: bool,
 }
@@ -278,8 +358,16 @@ struct ConstraintsCheckCommand {
     constraints: PathBuf,
     #[arg(long)]
     path: PathBuf,
+    #[arg(long, value_enum, default_value_t = ConstraintsCheckModeArg::CandidateContent)]
+    mode: ConstraintsCheckModeArg,
     #[arg(long)]
     json: bool,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum ConstraintsCheckModeArg {
+    CandidateContent,
+    GeneratedConstraints,
 }
 
 #[derive(Debug, Subcommand)]
@@ -542,6 +630,17 @@ fn main() -> Result<()> {
             ControlCommand::Plan(args) => commands::control::command_control_plan(args),
             ControlCommand::Approve(args) => commands::control::command_control_approve(args),
             ControlCommand::Apply(args) => commands::control::command_control_apply(args),
+            ControlCommand::GovernorSweep { command } => match command {
+                GovernorSweepCommand::Prepare(args) => {
+                    commands::control::command_control_governor_sweep_prepare(args)
+                }
+                GovernorSweepCommand::Approve(args) => {
+                    commands::control::command_control_governor_sweep_approve(args)
+                }
+                GovernorSweepCommand::Run(args) => {
+                    commands::control::command_control_governor_sweep_run(args)
+                }
+            },
         },
         Commands::Restore(args) => commands::control::command_restore(args),
         Commands::Load { command } => match command {

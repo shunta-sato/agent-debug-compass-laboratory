@@ -1,5 +1,6 @@
 use adc_lab_core::{
-    canonical_plan_digest, Actor, ActorKind, ApprovalBounds, ApprovalRecord, ControlPlan, RiskTier,
+    canonical_plan_digest, governor_sweep_policy_digest, Actor, ActorKind, ApprovalBounds,
+    ApprovalRecord, Artifact, ControlPlan, GovernorSweepPolicyPayload, RiskTier,
 };
 use assert_cmd::Command;
 use predicates::str::contains;
@@ -522,10 +523,126 @@ fn constraints_check_fails_on_blocked_claim_fixture() {
 }
 
 #[test]
+fn constraints_check_generated_mode_allows_generated_blocked_claims_section() {
+    let temp = tempfile::tempdir().unwrap();
+    let pack_path = temp.path().join("constraints.json");
+    let generated_md = temp.path().join("agent_constraints.md");
+    write_minimal_constraints_pack(&pack_path);
+    fs::write(
+        &generated_md,
+        [
+            "# Target Constraints for target55 / workload-001",
+            "",
+            "Source:",
+            "- suitability_artifact: artifact://lab/runs/LAB-RUN-001/reports/suitability.v2.json",
+            "",
+            "## Must obey",
+            "",
+            "- Do not claim production readiness from this v2 workload suitability slice.",
+            "",
+            "## Blocked claims",
+            "",
+            "- `target.selection.production_ready`: \"production readiness\"",
+        ]
+        .join("\n"),
+    )
+    .unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "constraints",
+            "check",
+            "--constraints",
+            pack_path.to_str().unwrap(),
+            "--path",
+            generated_md.to_str().unwrap(),
+            "--mode",
+            "generated-constraints",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"kind\": \"report.constraints_check\""))
+        .stdout(contains("\"mode\": \"generated_constraints\""))
+        .stdout(contains("\"status\": \"pass\""));
+}
+
+#[test]
+fn constraints_check_generated_mode_fails_on_mismatched_constraints_artifact() {
+    let temp = tempfile::tempdir().unwrap();
+    let pack_path = temp.path().join("constraints.json");
+    let other_pack_path = temp.path().join("other_constraints.json");
+    write_minimal_constraints_pack(&pack_path);
+    write_minimal_constraints_pack(&other_pack_path);
+    let mut other: serde_json::Value =
+        serde_json::from_slice(&fs::read(&other_pack_path).unwrap()).unwrap();
+    other["id"] = serde_json::json!("CONSTRAINTS-OTHER");
+    fs::write(&other_pack_path, serde_json::to_vec_pretty(&other).unwrap()).unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "constraints",
+            "check",
+            "--constraints",
+            pack_path.to_str().unwrap(),
+            "--path",
+            other_pack_path.to_str().unwrap(),
+            "--mode",
+            "generated-constraints",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stdout(contains("\"kind\": \"report.constraints_check\""))
+        .stdout(contains("\"mode\": \"generated_constraints\""))
+        .stdout(contains("\"status\": \"fail\""))
+        .stdout(contains("id mismatch"));
+}
+
+#[test]
 fn version_commands_emit_build_info_json() {
     assert_build_info("adc-lab");
     assert_build_info("adc-lab-target");
     assert_build_info("adc-lab-priv-helper");
+}
+
+fn write_minimal_constraints_pack(path: &std::path::Path) {
+    fs::write(
+        path,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "schema": "lab.artifact.v2",
+            "kind": "report.constraints",
+            "id": "CONSTRAINTS-001",
+            "run_id": "LAB-RUN-001",
+            "target_id": "target55",
+            "status": { "state": "insufficient" },
+            "bounds": null,
+            "factors": { "controlled": [], "observed": [], "confounders": [] },
+            "metrics": [],
+            "claims": [],
+            "evidence_refs": [],
+            "data_quality": { "level": "partial", "notes": [] },
+            "payload": {
+                "source_suitability_id": "SUITABILITY-001",
+                "workload_id": "workload-001",
+                "policy_id": "policy-001",
+                "allowed_patterns": [],
+                "burst_only_patterns": [],
+                "degraded_mode_triggers": [],
+                "forbidden_patterns": [],
+                "budget_constraints": [],
+                "required_runtime_guards": [],
+                "blocked_claims": ["target.selection.production_ready"],
+                "agent_instructions": [],
+                "ci_rules": []
+            },
+            "time_unix_ms": 1
+        }))
+        .unwrap(),
+    )
+    .unwrap();
 }
 
 fn assert_build_info(binary: &str) {
@@ -820,6 +937,254 @@ fn report_validate_run_writes_artifact_gaps_and_fails_closed_for_non_measured() 
     assert!(gaps.contains("insufficient"));
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"report.validate_run\""));
+}
+
+#[test]
+fn governor_sweep_prepare_approve_and_dry_run_writes_validation() {
+    let temp = tempfile::tempdir().unwrap();
+    let request_path = temp.path().join("approvals/governor_sweep_request.v2.json");
+    let policy_path = temp.path().join("approvals/governor_sweep_policy.v2.json");
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "governor-sweep",
+            "prepare",
+            "--target",
+            "local",
+            "--governors",
+            "performance,powersave",
+            "--duration-seconds-max",
+            "45",
+            "--thermal-celsius-abort",
+            "70",
+            "--requested-by",
+            "codex",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--out",
+            request_path.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"kind\": \"control.governor_sweep_policy\""))
+        .stdout(contains("\"policy_state\": \"requested\""));
+    let request: serde_json::Value =
+        serde_json::from_slice(&fs::read(&request_path).unwrap()).unwrap();
+    assert_eq!(request["payload"]["policy_state"], "requested");
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "governor-sweep",
+            "run",
+            "--target",
+            "local",
+            "--governors",
+            "performance",
+            "--approval-policy",
+            request_path.to_str().unwrap(),
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("approved sweep policy"));
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "governor-sweep",
+            "approve",
+            "--request",
+            request_path.to_str().unwrap(),
+            "--approved-by",
+            "operator",
+            "--out",
+            policy_path.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"policy_state\": \"approved\""));
+    let policy: serde_json::Value =
+        serde_json::from_slice(&fs::read(&policy_path).unwrap()).unwrap();
+    assert_eq!(policy["payload"]["policy_state"], "approved");
+    assert_eq!(policy["payload"]["approved_by"]["id"], "operator");
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "governor-sweep",
+            "run",
+            "--target",
+            "local",
+            "--governors",
+            "performance",
+            "--approval-policy",
+            policy_path.to_str().unwrap(),
+            "--duration-seconds-max",
+            "45",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--dry-run",
+            "--allow-non-measured",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"kind\": \"report.run_validation\""));
+
+    assert!(temp.path().join("reports/run_validation.v2.json").exists());
+    assert!(temp.path().join("reports/GAPS.md").exists());
+    let plan_files = fs::read_dir(temp.path().join("plans"))
+        .unwrap()
+        .flatten()
+        .filter(|entry| {
+            entry
+                .path()
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(".json"))
+        })
+        .count();
+    assert_eq!(plan_files, 2);
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"control.governor_sweep.prepare\""));
+    assert!(audit.contains("\"operation\":\"control.governor_sweep.approve\""));
+    assert!(audit.contains("\"operation\":\"control.governor_sweep\""));
+}
+
+#[test]
+fn governor_sweep_policy_scope_and_digest_mismatch_refuse_before_plans() {
+    let temp = tempfile::tempdir().unwrap();
+    let request_path = temp.path().join("approvals/governor_sweep_request.v2.json");
+    let policy_path = temp.path().join("approvals/governor_sweep_policy.v2.json");
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "governor-sweep",
+            "prepare",
+            "--target",
+            "local",
+            "--governors",
+            "performance",
+            "--duration-seconds-max",
+            "45",
+            "--requested-by",
+            "codex",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--out",
+            request_path.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "governor-sweep",
+            "approve",
+            "--request",
+            request_path.to_str().unwrap(),
+            "--approved-by",
+            "operator",
+            "--out",
+            policy_path.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "governor-sweep",
+            "run",
+            "--target",
+            "local",
+            "--governors",
+            "powersave",
+            "--approval-policy",
+            policy_path.to_str().unwrap(),
+            "--duration-seconds-max",
+            "45",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--dry-run",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("does not include governor powersave"));
+    assert_eq!(fs::read_dir(temp.path().join("plans")).unwrap().count(), 0);
+
+    let mut policy: Artifact<GovernorSweepPolicyPayload> =
+        serde_json::from_slice(&fs::read(&policy_path).unwrap()).unwrap();
+    policy.payload.governors.push("powersave".to_string());
+    fs::write(&policy_path, serde_json::to_vec_pretty(&policy).unwrap()).unwrap();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "governor-sweep",
+            "run",
+            "--target",
+            "local",
+            "--governors",
+            "powersave",
+            "--approval-policy",
+            policy_path.to_str().unwrap(),
+            "--duration-seconds-max",
+            "45",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--dry-run",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("policy digest mismatch"));
+    assert_eq!(fs::read_dir(temp.path().join("plans")).unwrap().count(), 0);
+
+    policy.payload.policy_digest = governor_sweep_policy_digest(&policy.payload).unwrap();
+    policy.payload.expires_at_unix_ms = 1;
+    policy.payload.policy_digest = governor_sweep_policy_digest(&policy.payload).unwrap();
+    fs::write(&policy_path, serde_json::to_vec_pretty(&policy).unwrap()).unwrap();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "governor-sweep",
+            "run",
+            "--target",
+            "local",
+            "--governors",
+            "powersave",
+            "--approval-policy",
+            policy_path.to_str().unwrap(),
+            "--duration-seconds-max",
+            "45",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--dry-run",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("policy is expired"));
+    assert_eq!(fs::read_dir(temp.path().join("plans")).unwrap().count(), 0);
 }
 
 #[test]

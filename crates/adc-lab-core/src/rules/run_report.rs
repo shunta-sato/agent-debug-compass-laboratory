@@ -10,6 +10,7 @@ use crate::report::{
     OP_BOUNDED_LOAD, OP_CONTROLLED_OPERATING_POINT, STATUS_COMPLETED,
 };
 use crate::rules::engine::RuleEvaluation;
+use crate::run_validation::{GovernorValidity, RunValidationPayload, FULLSET_PROFILE};
 use crate::LabResult;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -84,7 +85,7 @@ pub fn evaluate_run_report_v2(
     let report_status = pack_status(&summary);
     let artifact_refs = collect_artifact_refs(run_dir, &summary.run_id)?;
     let indexed_v2_artifact_refs = indexed_v2_artifact_refs(store);
-    let operating_point = operating_point_summary(run_dir, &summary)?;
+    let operating_point = operating_point_summary(store, run_dir, &summary)?;
     let evaluations = run_report_evaluations(run_dir, &summary, &operating_point)?;
     let blocked_claims = blocked_claims(&evaluations);
     let next_evidence = next_evidence(&evaluations);
@@ -163,6 +164,7 @@ fn data_quality_for_summary(summary: &RunEvidenceSummary) -> DataQuality {
 }
 
 fn operating_point_summary(
+    store: &EvidenceStore,
     run_dir: &Path,
     summary: &RunEvidenceSummary,
 ) -> LabResult<RunOperatingPointSummary> {
@@ -202,6 +204,12 @@ fn operating_point_summary(
             }
         }
     }
+    add_validation_operating_points(
+        store,
+        &mut controlled_keys,
+        &mut controlled_points,
+        &mut blocked_points,
+    )?;
     ensure_fixed_frequency_blocked(&mut blocked_points);
     let coverage_status =
         coverage_status(&observed_points, &controlled_points, &blocked_points).to_string();
@@ -262,6 +270,118 @@ fn add_blocked_trial_points(
             next_evidence: next_evidence_for_blocked_factor(factor_id),
         });
     }
+}
+
+fn add_validation_operating_points(
+    store: &EvidenceStore,
+    controlled_keys: &mut BTreeSet<(String, String)>,
+    controlled_points: &mut Vec<RunOperatingPointControlled>,
+    blocked_points: &mut Vec<RunOperatingPointBlocked>,
+) -> LabResult<()> {
+    let mut measured_governors = BTreeMap::new();
+    let mut blocked_governors = BTreeMap::new();
+    for meta in store.iter(Kind::ReportRunValidation) {
+        let artifact: Artifact<RunValidationPayload> = store.load(meta)?;
+        if artifact.payload.profile != FULLSET_PROFILE {
+            continue;
+        }
+        for result in &artifact.payload.governor_results {
+            let evidence_refs = validation_evidence_refs(&meta.artifact_ref, result);
+            if result.validity == GovernorValidity::Measured {
+                measured_governors
+                    .entry(result.governor.clone())
+                    .or_insert_with(Vec::new)
+                    .extend(evidence_refs);
+            } else {
+                blocked_governors
+                    .entry(result.governor.clone())
+                    .or_insert_with(|| RunOperatingPointBlocked {
+                        factor_id: "governor".to_string(),
+                        requested_level: Some(result.governor.clone()),
+                        coverage_status: validation_status_label(&result.validity).to_string(),
+                        reason: validation_reason(result),
+                        next_evidence: validation_next_evidence(result),
+                    });
+            }
+        }
+    }
+
+    for blocked in blocked_governors.values() {
+        blocked_points.push(blocked.clone());
+    }
+    for (governor, mut evidence_refs) in measured_governors {
+        if blocked_governors.contains_key(&governor) {
+            continue;
+        }
+        if !controlled_keys.insert(("governor".to_string(), governor.clone())) {
+            continue;
+        }
+        evidence_refs.sort();
+        evidence_refs.dedup();
+        controlled_points.push(RunOperatingPointControlled {
+            factor_id: "governor".to_string(),
+            level: governor,
+            evidence_refs,
+            claim_boundary:
+                "Governor control is treated as measured only through report.run_validation evidence linking plan, approval, apply, load, restore, and health-check artifacts."
+                    .to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn validation_evidence_refs(
+    validation_ref: &str,
+    result: &crate::run_validation::GovernorValidation,
+) -> Vec<String> {
+    let mut refs = vec![validation_ref.to_string()];
+    refs.extend(
+        [
+            result.plan_ref.clone(),
+            result.approval_ref.clone(),
+            result.control_result_ref.clone(),
+            result.load_ref.clone(),
+            result.restore_result_ref.clone(),
+            result.health_check_ref.clone(),
+        ]
+        .into_iter()
+        .flatten(),
+    );
+    refs.sort();
+    refs.dedup();
+    refs
+}
+
+fn validation_status_label(validity: &GovernorValidity) -> &'static str {
+    match validity {
+        GovernorValidity::Measured => "measured",
+        GovernorValidity::MeasuredPartial => "measured_partial",
+        GovernorValidity::Insufficient => "insufficient",
+        GovernorValidity::Refused => "refused",
+        GovernorValidity::Contaminated => "contaminated",
+        GovernorValidity::NotApplicable => "not_applicable",
+        GovernorValidity::Unknown => "unknown",
+    }
+}
+
+fn validation_reason(result: &crate::run_validation::GovernorValidation) -> String {
+    if result.messages.is_empty() {
+        return format!(
+            "run validation classified governor evidence as {}",
+            validation_status_label(&result.validity)
+        );
+    }
+    result.messages.join("; ")
+}
+
+fn validation_next_evidence(result: &crate::run_validation::GovernorValidation) -> Vec<String> {
+    if result.next_evidence.is_empty() {
+        return vec![
+            "rerun governor sweep so plan, approval, apply, load, restore, and health-check evidence are linked"
+                .to_string(),
+        ];
+    }
+    result.next_evidence.clone()
 }
 
 fn ensure_fixed_frequency_blocked(blocked_points: &mut Vec<RunOperatingPointBlocked>) {
@@ -607,6 +727,9 @@ fn next_evidence(evaluations: &[RuleEvaluation]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::run_validation::{
+        GovernorValidation, GovernorValidity, RunValidationPayload, FULLSET_PROFILE,
+    };
     use std::fs;
 
     #[test]
@@ -684,6 +807,58 @@ mod tests {
         }));
     }
 
+    #[test]
+    fn run_report_projects_measured_governor_validation_as_controlled_point() {
+        let temp = tempfile::tempdir().unwrap();
+        let run_dir = temp.path().join("LAB-RUN-001");
+        create_completed_core_artifacts(&run_dir);
+        let mut store = EvidenceStore::open(std::slice::from_ref(&run_dir)).unwrap();
+        write_validation_artifact(&mut store, &run_dir, GovernorValidity::Measured);
+
+        let report = evaluate_run_report_v2(&store, &run_dir, "local-target").unwrap();
+
+        assert!(report
+            .payload
+            .operating_point
+            .controlled_points
+            .iter()
+            .any(|point| point.factor_id == "governor" && point.level == "performance"));
+        assert!(!report
+            .payload
+            .operating_point
+            .blocked_points
+            .iter()
+            .any(|point| point.factor_id == "governor"));
+    }
+
+    #[test]
+    fn run_report_projects_contaminated_governor_validation_as_blocked_point() {
+        let temp = tempfile::tempdir().unwrap();
+        let run_dir = temp.path().join("LAB-RUN-001");
+        create_completed_core_artifacts(&run_dir);
+        let mut store = EvidenceStore::open(std::slice::from_ref(&run_dir)).unwrap();
+        write_validation_artifact(&mut store, &run_dir, GovernorValidity::Contaminated);
+
+        let report = evaluate_run_report_v2(&store, &run_dir, "local-target").unwrap();
+
+        assert!(!report
+            .payload
+            .operating_point
+            .controlled_points
+            .iter()
+            .any(|point| point.factor_id == "governor"));
+        assert!(report
+            .payload
+            .operating_point
+            .blocked_points
+            .iter()
+            .any(|point| {
+                point.factor_id == "governor"
+                    && point.requested_level.as_deref() == Some("performance")
+                    && point.coverage_status == "contaminated"
+            }));
+    }
+
     fn create_completed_core_artifacts(run_dir: &Path) {
         fs::create_dir_all(run_dir.join("inventory")).unwrap();
         fs::create_dir_all(run_dir.join("toolchain")).unwrap();
@@ -695,13 +870,16 @@ mod tests {
         fs::write(run_dir.join("observations/observe.json"), "{}").unwrap();
         fs::write(
             run_dir.join("audit.jsonl"),
-            [
-                audit_line("LAB-RUN-001", "inventory"),
-                audit_line("LAB-RUN-001", "toolchain.discover"),
-                audit_line("LAB-RUN-001", "tool.qualify_inventory"),
-                audit_line("LAB-RUN-001", "observe"),
-            ]
-            .join("\n"),
+            format!(
+                "{}\n",
+                [
+                    audit_line("LAB-RUN-001", "inventory"),
+                    audit_line("LAB-RUN-001", "toolchain.discover"),
+                    audit_line("LAB-RUN-001", "tool.qualify_inventory"),
+                    audit_line("LAB-RUN-001", "observe"),
+                ]
+                .join("\n"),
+            ),
         )
         .unwrap();
     }
@@ -723,5 +901,75 @@ mod tests {
             "time_unix_ms": 1
         })
         .to_string()
+    }
+
+    fn write_validation_artifact(
+        store: &mut EvidenceStore,
+        run_dir: &Path,
+        validity: GovernorValidity,
+    ) {
+        let status = match validity {
+            GovernorValidity::Measured => Status::Measured,
+            GovernorValidity::MeasuredPartial => Status::MeasuredPartial,
+            GovernorValidity::Refused => Status::Refused {
+                code: crate::evidence::EvidenceRefusalCode::PolicyViolation,
+                message: "refused control evidence".to_string(),
+            },
+            GovernorValidity::Contaminated => Status::UnsafeBlocked {
+                reason: "contaminated control evidence".to_string(),
+            },
+            GovernorValidity::NotApplicable => Status::NotApplicable {
+                reason: "not applicable".to_string(),
+            },
+            GovernorValidity::Insufficient | GovernorValidity::Unknown => Status::Insufficient,
+        };
+        let artifact = Artifact::new(
+            Kind::ReportRunValidation,
+            "RUN-VALIDATION-001",
+            "LAB-RUN-001",
+            "local-target",
+            status,
+            RunValidationPayload {
+                profile: FULLSET_PROFILE.to_string(),
+                requested_governors: vec!["performance".to_string()],
+                governor_results: vec![GovernorValidation {
+                    governor: "performance".to_string(),
+                    validity: validity.clone(),
+                    plan_ref: Some(
+                        "artifact://lab/runs/LAB-RUN-001/plans/performance.json".to_string(),
+                    ),
+                    approval_ref: Some(
+                        "artifact://lab/runs/LAB-RUN-001/approvals/performance.json".to_string(),
+                    ),
+                    control_result_ref: Some(
+                        "artifact://lab/runs/LAB-RUN-001/plans/performance.result.json".to_string(),
+                    ),
+                    load_ref: Some(
+                        "artifact://lab/runs/LAB-RUN-001/load/performance.v2.json".to_string(),
+                    ),
+                    restore_result_ref: Some(
+                        "artifact://lab/runs/LAB-RUN-001/restore/performance.result.json"
+                            .to_string(),
+                    ),
+                    health_check_ref: Some(
+                        "artifact://lab/runs/LAB-RUN-001/health/restore_health_check.json"
+                            .to_string(),
+                    ),
+                    messages: vec!["test validation".to_string()],
+                    next_evidence: vec!["rerun governor sweep".to_string()],
+                }],
+                overall_validity: validity,
+                gaps: Vec::new(),
+                audit_refs: vec!["artifact://lab/runs/LAB-RUN-001/audit.jsonl".to_string()],
+            },
+            1,
+        );
+        store
+            .write(
+                run_dir,
+                Path::new("reports/run_validation.v2.json"),
+                &artifact,
+            )
+            .unwrap();
     }
 }

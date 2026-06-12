@@ -167,6 +167,36 @@ fn contract_validation_control_apply_has_no_public_helper_override() {
 }
 
 #[test]
+fn contract_validation_governor_sweep_cannot_self_approve_real_apply() {
+    let temp = tempfile::tempdir().unwrap();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "governor-sweep",
+            "run",
+            "--target",
+            "local",
+            "--governors",
+            "performance",
+            "--approved-by",
+            "operator",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("approved sweep policy"));
+
+    let plan_files = fs::read_dir(temp.path().join("plans"))
+        .unwrap()
+        .flatten()
+        .count();
+    assert_eq!(plan_files, 0);
+}
+
+#[test]
 fn contract_validation_restore_has_no_public_helper_override() {
     Command::cargo_bin("adc-lab")
         .unwrap()

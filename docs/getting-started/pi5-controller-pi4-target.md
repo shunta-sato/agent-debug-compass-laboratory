@@ -76,6 +76,12 @@ MVP, privileged apply/restore is local-target only; remote privileged apply is
 deferred until a target-local helper transport is implemented. Do not grant an
 agent a root shell.
 
+For full-set governor evidence, prefer the high-level sweep workflow in
+`docs/reference/cli.md#governor-sweep-workflow`: prepare a sweep policy,
+approve that policy out of band, run the sweep, then validate the run with
+`adc-lab report validate-run`. The single-plan flow below is for one reviewed
+control operation, not for selecting full-set plan or approval artifacts.
+
 Local-only dry-run workflow:
 
 ```sh

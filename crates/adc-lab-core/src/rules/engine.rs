@@ -2,6 +2,7 @@ use crate::evidence::{
     claim_definition, ArtifactMeta, Claim, Decision, EvidenceStore, Kind, Status,
 };
 use crate::probe::{CompositePayload, LoadPayload, ObservationPayload, PressurePayload};
+use crate::run_validation::{GovernorValidity, RunValidationPayload, FULLSET_PROFILE};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -13,6 +14,7 @@ pub enum Pred {
     LoadDurationAtLeastSeconds(u64),
     NetworkBoundedTransfer,
     ObservationSamplesAtLeast(usize),
+    RunValidationMeasured,
     All(Vec<Pred>),
     Any(Vec<Pred>),
     Not(Box<Pred>),
@@ -112,11 +114,35 @@ fn eval_pred(store: &EvidenceStore, pred: &Pred) -> bool {
         }
         Pred::NetworkBoundedTransfer => network_bounded_transfer(store),
         Pred::ObservationSamplesAtLeast(samples) => observation_samples_at_least(store, *samples),
+        Pred::RunValidationMeasured => run_validation_measured(store),
         Pred::All(preds) => preds.iter().all(|pred| eval_pred(store, pred)),
         Pred::Any(preds) => preds.iter().any(|pred| eval_pred(store, pred)),
         Pred::Not(pred) => !eval_pred(store, pred),
         Pred::Custom(_, func) => func(store),
     }
+}
+
+fn run_validation_measured(store: &EvidenceStore) -> bool {
+    let mut saw_fullset_validation = false;
+    let mut all_fullset_validations_measured = true;
+    for meta in store.iter(Kind::ReportRunValidation) {
+        let Ok(artifact) = store.load::<RunValidationPayload>(meta) else {
+            all_fullset_validations_measured = false;
+            continue;
+        };
+        if artifact.payload.profile != FULLSET_PROFILE {
+            continue;
+        }
+        saw_fullset_validation = true;
+        all_fullset_validations_measured &= is_measured_status(&artifact.status)
+            && artifact.payload.overall_validity == GovernorValidity::Measured
+            && artifact
+                .payload
+                .governor_results
+                .iter()
+                .all(|result| result.validity == GovernorValidity::Measured);
+    }
+    saw_fullset_validation && all_fullset_validations_measured
 }
 
 fn pressure_effect_observed(store: &EvidenceStore, pressure_kind: &str) -> bool {

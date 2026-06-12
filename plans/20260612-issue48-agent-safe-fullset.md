@@ -160,8 +160,51 @@ Current facts:
 - [x] `report validate-run` writes `report.run_validation` and `GAPS.md`.
 - [x] generated schema drift and schema-ledger check include
       `report.run_validation` and `control.governor_sweep_policy`.
-- [ ] non-dry-run sweep self-approval refusal is captured as a safety invariant
+- [x] non-dry-run sweep self-approval refusal is captured as a safety invariant
       seed before Phase 3 implementation.
+
+### Phase 3 Test List
+
+- [x] non-dry-run `control governor-sweep run` with `--approved-by` but no
+      approved policy refuses before helper invocation.
+- [x] `control governor-sweep prepare` writes a requested sweep policy
+      artifact that cannot authorize real apply.
+- [x] `control governor-sweep approve` converts a requested policy into an
+      approved policy with a scope-bound digest.
+- [x] approved-policy dry-run sweep writes typed per-governor plan, approval,
+      dry-run result, audit, validation artifact, and gaps.
+- [x] policy scope mismatch (target/governor/bounds/expiry/digest) refuses
+      before helper invocation.
+
+### Phase 4 Test List
+
+- [x] operating-contract production-readiness evaluation remains blocked when
+      no `report.run_validation` artifact exists.
+- [x] operating-contract production-readiness evaluation remains blocked when
+      run validation is contaminated, refused, insufficient, or unknown.
+- [x] operating-contract production-readiness evaluation may become
+      provisional only when a measured run-validation artifact and run report
+      are both present.
+- [x] run report surfaces measured governor validation as controlled governor
+      points, and non-measured validation as blocked governor points.
+
+### Phase 5 Test List
+
+- [x] default `constraints check` keeps candidate-content lint strict and
+      fails when blocked positive claim text appears in checked content.
+- [x] `constraints check --mode generated-constraints` passes generated
+      constraints markdown that contains its expected `Blocked claims` section.
+- [x] generated-constraints mode fails when the checked constraints artifact
+      does not match the expected generated constraints artifact.
+
+### Phase 6 Test List
+
+- [x] docs/examples do not teach `find`, `sort`, `tail`, or `ls -t` selection
+      for plan, approval, or control artifacts.
+- [x] `make docs-smoke` runs a regression guard for artifact filename-order
+      heuristics.
+- [x] README/getting-started/resource-harness docs point Agents toward
+      governor sweep and run validation for full-set governor evidence.
 
 ### Phase 0-2 Responsibility Map
 
@@ -186,6 +229,98 @@ sweeps need the same correlation semantics.
 - Production Rust budget: +350 to +550 lines; tests +120 to +220 lines.
 - Abstraction rule: keep the validator data-oriented; do not introduce a
   second evidence store or bespoke query DSL.
+
+### Phase 3 Responsibility Map
+
+| Unit | Name | Responsibility sentence | Reason to change | Dependency direction |
+|---|---|---|---|---|
+| CLI command group | `control governor-sweep` | Orchestrate prepare / approve / run for a requested governor set. | Sweep workflow semantics change. | Depends on existing control/load/report helpers and core policy DTOs. |
+| policy payload | `GovernorSweepPolicyPayload` | Bind target, governors, bounds, expiry, approver, and digest for sweep authorization. | Sweep approval contract changes. | Produced/validated by CLI; schema generator depends on it. |
+| control command helpers | sweep helpers in `commands/control.rs` | Persist typed artifacts and enforce policy scope before helper invocation. | CLI orchestration safety changes. | Depends on existing control primitives; no new helper backend. |
+
+Layout decision: keep Phase 3 in `commands/control.rs` instead of adding a new
+command module. Rejected alternative: a separate sweep module, because the
+implementation must reuse private control persistence/helper boundaries and
+should not create a second control orchestration layer yet.
+
+### Phase 3 Complexity Budget
+
+- Changed files target: 5-9 including tests, docs, plan, and generated schema.
+- New modules target: 0; keep orchestration inside existing control command
+  boundary.
+- New helpers target: local policy normalization/validation/persistence
+  helpers only.
+- Production Rust budget: +180 to +320 lines; tests +120 to +220 lines.
+- Abstraction rule: no new backend abstraction until a fake non-dry-run sweep
+  is needed for Phase 4 summary semantics.
+
+### Phase 4 Responsibility Map
+
+| Unit | Name | Responsibility sentence | Reason to change | Dependency direction |
+|---|---|---|---|---|
+| rules predicate | `RunValidationMeasured` | Decide whether a run has measured full-set validation evidence. | Validation-to-claim gating semantics change. | Depends on `EvidenceStore` and `RunValidationPayload`; operating-contract rules depend on it. |
+| run-report summary | validation-aware operating point summary | Project measured/non-measured governor validation into controlled/blocked operating points. | Full-set summary semantics change. | Depends on validation artifacts already indexed or present in the run dir. |
+| tests | Phase 4 rule/report tests | Prove summaries and contract claims fail closed without measured validation. | Acceptance criteria or regression cases change. | Depend on core DTOs and existing store helpers. |
+
+Layout decision: reuse the existing rules engine and run-report summary
+boundary. Rejected alternative: a new full-set summary module, because Phase 4
+only needs one validation gate and one summary projection, not another report
+layer.
+
+### Phase 4 Complexity Budget
+
+- Changed files target: 4-6 including tests and this plan.
+- New modules target: 0.
+- New helpers target: 2-4 local validation artifact lookup/projection helpers.
+- Production Rust budget: +80 to +180 lines; tests +80 to +180 lines.
+- Abstraction rule: do not generalize validation queries beyond
+  `report.run_validation` until another claim family needs the same mechanism.
+
+### Phase 5 Responsibility Map
+
+| Unit | Name | Responsibility sentence | Reason to change | Dependency direction |
+|---|---|---|---|---|
+| core enum | `ConstraintCheckMode` | Separate candidate-content lint from generated-constraints self-check. | Constraint-check semantics change. | CLI passes it to core; schema generator records it. |
+| core checker | generated constraints self-check helpers | Validate generated JSON/markdown structure without treating blocked-claims explanations as positive claims. | Generated artifact self-check rules change. | Depends on `ConstraintsPayload` and claim catalog. |
+| CLI arg | `--mode` on `constraints check` | Expose the mode split without changing the default candidate lint. | Public command semantics change. | Converts to core mode. |
+
+Layout decision: keep the split inside existing constraints check rather than
+adding a new subcommand. Rejected alternative: `constraints self-check`,
+because the same inputs and result artifact are used and the safety-relevant
+distinction is a check mode.
+
+### Phase 5 Complexity Budget
+
+- Changed files target: 5-7 including generated schema, tests, docs, and plan.
+- New modules target: 0.
+- New helpers target: 3-5 small generated self-check helpers.
+- Production Rust budget: +80 to +180 lines; tests +80 to +160 lines.
+- Abstraction rule: keep the mode split explicit; do not introduce a generic
+  document linter framework.
+
+### Phase 6 Responsibility Map
+
+| Unit | Name | Responsibility sentence | Reason to change | Dependency direction |
+|---|---|---|---|---|
+| docs guard | `check-no-artifact-heuristics.py` | Reject docs/examples that teach filename-order plan/approval/control artifact selection. | Agent-facing workflow safety wording changes. | Called by `make docs-smoke`; independent of Rust code. |
+| docs | README/getting-started/resource harness updates | Point full-set governor workflows to sweep and run validation. | Public workflow guidance changes. | Depends on CLI surfaces from Phase 2-5. |
+
+Layout decision: add a small docs smoke script instead of embedding a complex
+shell pipeline in the Makefile. Rejected alternative: only manual review,
+because issue #48 is specifically about preventing Agent-visible workflow
+regression.
+
+### Phase 6 Complexity Budget
+
+- Changed files target: 5-7 including docs, Makefile, COMMANDS, script, and
+  plan.
+- New modules target: 0.
+- New helpers target: 1 docs guard script.
+- Production Rust budget: 0 lines.
+- Abstraction rule: keep the guard text-based and scoped to docs/examples; do
+  not build a general documentation linter.
+
+
 
 ### Artifact Model
 
@@ -529,11 +664,11 @@ Phase risk / size forecast:
 - [x] Create this ExecPlan and execution GOAL.
 - [x] Phase 0: Add characterization tests for mismatched approval and
       unlinked load evidence.
-- [ ] Phase 0: Add generated constraints self-check characterization before
+- [x] Phase 0: Add generated constraints self-check characterization before
       Phase 5.
 - [x] Phase 0: Define validation artifact schema and status vocabulary.
 - [x] Phase 0: Record approval-model decision.
-- [ ] Phase 0: Add safety invariant seed that sweep apply cannot self-approve
+- [x] Phase 0: Add safety invariant seed that sweep apply cannot self-approve
       with `--approved-by` before Phase 3 implementation.
 - [x] Phase 0: Record load/control causality decision and fixture old unlinked
       loads as unknown/contaminated.
@@ -541,15 +676,15 @@ Phase risk / size forecast:
       `report.run_validation` and `control.governor_sweep_policy`.
 - [x] Phase 1: Implement core run-validation engine.
 - [x] Phase 2: Add `report validate-run`.
-- [ ] Phase 3: Add `control governor-sweep`.
-- [ ] Phase 3: Make non-measured sweep results non-zero by default with an
+- [x] Phase 3: Add `control governor-sweep`.
+- [x] Phase 3: Make non-measured sweep results non-zero by default with an
       explicit exploratory opt-out only if justified.
-- [ ] Phase 4: Wire validation into full-set summaries / operating-contract
+- [x] Phase 4: Wire validation into full-set summaries / operating-contract
       claims.
-- [ ] Phase 5: Split constraints check semantics.
-- [ ] Phase 6: Add docs/examples grep guard against plan / approval filename
+- [x] Phase 5: Split constraints check semantics.
+- [x] Phase 6: Add docs/examples grep guard against plan / approval filename
       heuristics.
-- [ ] Phase 6: Update docs/examples and close final outcomes.
+- [x] Phase 6: Update docs/examples and close final outcomes.
 
 ## Design -> WBS Coverage Check
 
@@ -623,16 +758,56 @@ No named design deliverable is deferred.
   non-measured requested governors while still writing the validation artifact,
   gaps markdown, and audit event first. Rationale: Agents may rely on exit
   status, but reviewers still need durable failure evidence.
+- 2026-06-12: Implement sweep approval as a prepare / approve / run workflow.
+  Rationale: this preserves a separate human approval step while removing
+  filename-order artifact discovery from the normal Agent workflow.
+- 2026-06-12: Require an approved sweep policy for the initial dry-run sweep
+  implementation too. Rationale: the dry-run path still generates per-governor
+  approval artifacts and should exercise the same scope-bound policy contract;
+  a looser exploratory mode can be added later without changing real-apply
+  safety.
+- 2026-06-12: Attempt restore after a successful real apply even when the
+  following load step errors. Rationale: restore is safety-critical and must
+  not be skipped by a later Tier 1 load failure.
+- 2026-06-12: Require `--restore-after-each` for real governor sweep runs.
+  Rationale: repeated governor changes without per-step restore can make the
+  original operating point ambiguous across the sweep.
+- 2026-06-12: Gate operating-contract production-readiness on measured
+  full-set run validation, not only the presence of a run report. Rationale:
+  issue #48 showed that summary existence can overclaim when plan, approval,
+  apply, load, restore, and health-check evidence do not correlate.
+- 2026-06-12: Treat mixed full-set validation artifacts as not measured for
+  operating-contract claims. Rationale: choosing the measured artifact by file
+  name, timestamp, or optimistic existence would recreate the artifact
+  selection failure mode; all full-set validation artifacts in scope must be
+  measured before the higher-level claim can advance.
+- 2026-06-12: Project run-validation governor results into run-report
+  operating-point summaries. Rationale: measured governor validation is useful
+  summary evidence only when it is explicit, while contaminated/refused/unknown
+  validation must remain a blocked operating point with next evidence.
+- 2026-06-12: Split `constraints check` with an explicit mode instead of
+  weakening the default scan. Rationale: downstream candidate content should
+  still fail on blocked positive claims, while generated constraints documents
+  must be allowed to contain their explanatory `Blocked claims` section.
+- 2026-06-12: Keep generated constraints self-check in the same
+  `report.constraints_check` artifact and record `payload.mode`. Rationale:
+  both modes are checks over the same constraints source; recording the mode
+  prevents consumers from confusing self-check evidence with candidate-content
+  lint evidence.
+- 2026-06-12: Add a docs-smoke guard for filename-order artifact heuristics.
+  Rationale: issue #48 was triggered by Agent-visible shell artifact
+  selection; documentation must not regress to teaching `find`, `sort`, `tail`,
+  or `ls -t` for plan/approval/control artifact selection.
 
 ## Handoff
 
-- Branch: `codex/issue48-agent-safe-fullset-plan`.
+- Branch: `codex/issue48-docs-heuristic-guard`, stacked on
+  `codex/issue48-constraints-check-split`.
 - Baseline: `27204c1` (`origin/main`, tagged `v0.2.1`).
-- Current status: Phase 0-2 implementation is in progress on this branch.
-  Added the core run validator, `report validate-run`, generated schema rows
-  for `report.run_validation` and `control.governor_sweep_policy`, load
-  causal-link fields, and a CLI reference skeleton. Phase 3 sweep execution is
-  not implemented in this PR scope.
+- Current status: Phase 0-6 implementation is in progress across stacked
+  branches. PR #49 contains Phase 0-2. PR #50 contains Phase 3. This branch
+  adds Phase 6 docs/examples cleanup and artifact-heuristic guard on top of
+  PR #52.
 - Untracked local files were present before this plan and were not staged:
   `.DS_Store`, `._.DS_Store`,
   `plans/._20260611-v21-kernel-completion.md`,
@@ -641,10 +816,11 @@ No named design deliverable is deferred.
   `reports/20260611-planning-skills-improvement-proposal.md`, and
   `reports/20260611-v2-evidence-kernel-outcome-review.md`.
 - Next steps:
-  1. Finish Phase 0-2 verification with `make verify`.
-  2. Open the Phase 0-2 PR for review.
-  3. Start Phase 3 only after the validator/report surface lands; first Phase
-     3 commit must add the non-dry-run sweep self-approval refusal invariant.
+  1. Run full Phase 6 verification with `make verify`.
+  2. Open a stacked Phase 6 PR targeting
+     `codex/issue48-constraints-check-split`.
+  3. After stacked PRs land, retarget each branch to `main` as needed and
+     rerun `make verify`.
 - Read first when resuming:
   - this plan,
   - issue #48,
@@ -683,5 +859,86 @@ Phase 0-2 implementation snapshot, 2026-06-12:
   - `make verify`: pass.
 - Deferred by decision:
   - generated constraints self-check characterization remains for Phase 5;
-  - sweep self-approval safety invariant remains for the first Phase 3 commit,
-    where the real command surface exists.
+  - Phase 4 summary/operating-contract consumption of validation state remains
+    for the next PR.
+
+Phase 3 implementation snapshot, 2026-06-12:
+
+- Added `control governor-sweep prepare`, `approve`, and `run`.
+- `prepare` writes a requested `control.governor_sweep_policy` artifact.
+- `approve` converts the requested policy into an approved, scope-digested
+  policy artifact.
+- `run` refuses real apply without an approved policy even if `--approved-by`
+  is supplied, validates target/governor/bounds/expiry/digest before creating
+  per-governor artifacts, and writes validation/gaps after the sweep.
+- Dry-run sweep uses the approved policy to create typed per-governor plan,
+  approval, dry-run result, audit, validation artifact, and gaps without
+  invoking the privileged helper.
+- Verification so far:
+  - `cargo test -p adc-lab --test safety_invariants contract_validation_governor_sweep_cannot_self_approve_real_apply -- --nocapture`: pass.
+  - `cargo test -p adc-lab --test cli governor_sweep -- --nocapture`: pass.
+  - `cargo test -p adc-lab-core run_validation -- --nocapture`: pass.
+  - `make schemas-check`: pass.
+  - `cargo clippy --workspace --all-targets -- -D warnings`: pass.
+  - `make verify`: pass.
+
+Phase 4 implementation snapshot, 2026-06-12:
+
+- Added a `RunValidationMeasured` rule predicate and changed
+  `operating.production_readiness_requires_run_report` so a run report alone
+  cannot advance production-readiness; measured full-set run validation is
+  also required.
+- The predicate fails closed for mixed validation evidence: if any in-scope
+  full-set validation artifact is contaminated/refused/insufficient/unknown,
+  the operating-contract claim remains blocked.
+- Run report operating-point summaries now project measured governor
+  validation into controlled governor points and non-measured governor
+  validation into blocked governor points with explicit next evidence.
+- Implementation economy actuals: one rules predicate plus local run-report
+  projection helpers; no new modules or generic query layer. Production code
+  grew more than the initial low estimate because run-report projection needs
+  evidence-ref dedupe, conservative conflict handling, and human-readable
+  blocked reasons. Accepted because the logic stays inside the existing report
+  summary boundary.
+- Verification so far:
+  - `cargo test -p adc-lab-core --test rules_engine operating_contract -- --nocapture`: pass.
+  - `cargo test -p adc-lab-core run_report_ -- --nocapture`: pass.
+  - `cargo clippy --workspace --all-targets -- -D warnings`: pass.
+  - `make schemas-check`: pass.
+  - `make verify`: pass.
+
+Phase 5 implementation snapshot, 2026-06-12:
+
+- Added `ConstraintCheckMode` with `candidate_content` and
+  `generated_constraints` modes and recorded the mode in
+  `report.constraints_check`.
+- Default `constraints check` remains the candidate-content lint and still
+  fails when blocked claim text appears in downstream content.
+- `--mode generated-constraints` validates generated constraints JSON identity
+  or generated markdown structure/blocked claim IDs without failing on the
+  expected `Blocked claims` section.
+- Updated the generated `lab.report.constraints_check.v2` schema and CLI
+  reference examples.
+- Implementation economy actuals: one enum, one CLI argument, and local
+  generated self-check helpers; no new command or linter framework.
+- Verification so far:
+  - `cargo test -p adc-lab --test cli constraints_check_ -- --nocapture`: pass.
+  - `make schemas-check`: pass.
+  - `cargo clippy --workspace --all-targets -- -D warnings`: pass.
+  - `make verify`: pass.
+
+Phase 6 implementation snapshot, 2026-06-12:
+
+- Added `scripts/docs/check-no-artifact-heuristics.py` and wired it into
+  `make docs-smoke`.
+- Updated README, Pi5/Pi4 getting-started guidance, and resource harness docs
+  so full-set governor evidence points to governor sweep plus
+  `report validate-run`, not manual artifact discovery.
+- Updated COMMANDS.md to register the docs artifact-heuristic guard under the
+  canonical docs smoke command.
+- Implementation economy actuals: one text-based docs guard script and docs
+  edits only; no Rust production code.
+- Verification so far:
+  - `python3 scripts/docs/check-no-artifact-heuristics.py`: pass.
+  - `make docs-smoke`: pass.
+  - `make verify`: pass.
