@@ -221,7 +221,9 @@
         "report.operating_contract",
         "report.suitability",
         "report.constraints",
-        "report.constraints_check"
+        "report.constraints_check",
+        "report.run_validation",
+        "control.governor_sweep_policy"
       ]
     },
     "LoadPayload": {
@@ -245,6 +247,12 @@
             "null"
           ]
         },
+        "control_result_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "duration_ms": {
           "type": "integer",
           "format": "uint64",
@@ -259,6 +267,16 @@
             "null"
           ],
           "format": "double"
+        },
+        "operating_point_snapshot": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/OperatingPointSnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "operator_abort_observed": {
           "type": "boolean"
@@ -315,6 +333,24 @@
         "value": {
           "type": "number",
           "format": "double"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OperatingPointSnapshot": {
+      "type": "object",
+      "properties": {
+        "control_result_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "governor": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "additionalProperties": false

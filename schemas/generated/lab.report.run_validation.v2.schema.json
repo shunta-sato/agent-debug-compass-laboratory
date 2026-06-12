@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Artifact_for_RunReportPayload",
+  "title": "Artifact_for_RunValidationPayload",
   "type": "object",
   "required": [
     "claims",
@@ -59,7 +59,7 @@
       }
     },
     "payload": {
-      "$ref": "#/definitions/RunReportPayload"
+      "$ref": "#/definitions/RunValidationPayload"
     },
     "run_id": {
       "type": "string"
@@ -207,6 +207,84 @@
       },
       "additionalProperties": false
     },
+    "GovernorValidation": {
+      "type": "object",
+      "required": [
+        "governor",
+        "messages",
+        "next_evidence",
+        "validity"
+      ],
+      "properties": {
+        "approval_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "control_result_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "governor": {
+          "type": "string"
+        },
+        "health_check_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "load_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "next_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "plan_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "restore_result_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "validity": {
+          "$ref": "#/definitions/GovernorValidity"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GovernorValidity": {
+      "type": "string",
+      "enum": [
+        "measured",
+        "measured_partial",
+        "insufficient",
+        "refused",
+        "contaminated",
+        "not_applicable",
+        "unknown"
+      ]
+    },
     "Kind": {
       "type": "string",
       "enum": [
@@ -249,23 +327,16 @@
       },
       "additionalProperties": false
     },
-    "RuleEvaluation": {
+    "RunValidationGap": {
       "type": "object",
       "required": [
-        "claim_id",
-        "decision",
+        "code",
         "evidence_refs",
-        "matched",
-        "missing",
-        "next_evidence",
-        "rule_id"
+        "message"
       ],
       "properties": {
-        "claim_id": {
+        "code": {
           "type": "string"
-        },
-        "decision": {
-          "$ref": "#/definitions/Decision"
         },
         "evidence_refs": {
           "type": "array",
@@ -273,222 +344,58 @@
             "type": "string"
           }
         },
-        "matched": {
-          "type": "boolean"
-        },
-        "missing": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "next_evidence": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "rule_id": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunOperatingPointBlocked": {
-      "type": "object",
-      "required": [
-        "coverage_status",
-        "factor_id",
-        "next_evidence",
-        "reason"
-      ],
-      "properties": {
-        "coverage_status": {
-          "type": "string"
-        },
-        "factor_id": {
-          "type": "string"
-        },
-        "next_evidence": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "reason": {
-          "type": "string"
-        },
-        "requested_level": {
+        "governor": {
           "type": [
             "string",
             "null"
           ]
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunOperatingPointControlled": {
-      "type": "object",
-      "required": [
-        "claim_boundary",
-        "evidence_refs",
-        "factor_id",
-        "level"
-      ],
-      "properties": {
-        "claim_boundary": {
-          "type": "string"
         },
-        "evidence_refs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "factor_id": {
-          "type": "string"
-        },
-        "level": {
+        "message": {
           "type": "string"
         }
       },
       "additionalProperties": false
     },
-    "RunOperatingPointObserved": {
+    "RunValidationPayload": {
       "type": "object",
       "required": [
-        "claim_boundary",
-        "evidence_refs",
-        "factor_id",
-        "level"
+        "audit_refs",
+        "gaps",
+        "governor_results",
+        "overall_validity",
+        "profile",
+        "requested_governors"
       ],
       "properties": {
-        "claim_boundary": {
-          "type": "string"
-        },
-        "evidence_refs": {
+        "audit_refs": {
           "type": "array",
           "items": {
             "type": "string"
           }
         },
-        "factor_id": {
-          "type": "string"
-        },
-        "level": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunOperatingPointSummary": {
-      "type": "object",
-      "required": [
-        "blocked_points",
-        "controlled_points",
-        "coverage_status",
-        "observed_points"
-      ],
-      "properties": {
-        "blocked_points": {
+        "gaps": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/RunOperatingPointBlocked"
+            "$ref": "#/definitions/RunValidationGap"
           }
         },
-        "controlled_points": {
+        "governor_results": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/RunOperatingPointControlled"
+            "$ref": "#/definitions/GovernorValidation"
           }
         },
-        "coverage_status": {
+        "overall_validity": {
+          "$ref": "#/definitions/GovernorValidity"
+        },
+        "profile": {
           "type": "string"
         },
-        "observed_points": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/RunOperatingPointObserved"
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunReportPayload": {
-      "type": "object",
-      "required": [
-        "artifact_refs",
-        "audit_event_count",
-        "blocked_claims",
-        "evaluations",
-        "indexed_v2_artifact_refs",
-        "next_evidence",
-        "operating_point",
-        "operation_audit_refs",
-        "operations_summary",
-        "report_status",
-        "restore_status",
-        "rule_set_id"
-      ],
-      "properties": {
-        "artifact_refs": {
+        "requested_governors": {
           "type": "array",
           "items": {
             "type": "string"
           }
-        },
-        "audit_event_count": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0.0
-        },
-        "blocked_claims": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "evaluations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/RuleEvaluation"
-          }
-        },
-        "indexed_v2_artifact_refs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "next_evidence": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "operating_point": {
-          "$ref": "#/definitions/RunOperatingPointSummary"
-        },
-        "operation_audit_refs": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "operations_summary": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "report_status": {
-          "type": "string"
-        },
-        "restore_status": {
-          "type": "string"
-        },
-        "rule_set_id": {
-          "type": "string"
         }
       },
       "additionalProperties": false

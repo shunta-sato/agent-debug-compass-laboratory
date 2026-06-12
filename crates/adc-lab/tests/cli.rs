@@ -737,6 +737,92 @@ fn control_approve_refuses_remote_target_plan() {
 }
 
 #[test]
+fn report_validate_run_writes_artifact_gaps_and_fails_closed_for_non_measured() {
+    let temp = tempfile::tempdir().unwrap();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "plan",
+            "--target",
+            "local",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "cpu.governor",
+            "--set",
+            "performance",
+        ])
+        .assert()
+        .success();
+    let plan_path = single_plan_path(temp.path());
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "approve",
+            "--plan",
+            plan_path.to_str().unwrap(),
+            "--approved-by",
+            "operator",
+        ])
+        .assert()
+        .success();
+    let approval_path = single_approval_path(temp.path());
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "apply",
+            "--plan",
+            plan_path.to_str().unwrap(),
+            "--approval",
+            approval_path.to_str().unwrap(),
+            "--dry-run",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "validate-run",
+            "--run",
+            temp.path().to_str().unwrap(),
+            "--expected-governors",
+            "performance",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stdout(contains("\"kind\": \"report.run_validation\""))
+        .stderr(contains("non-measured governor evidence"));
+
+    let validation_path = temp.path().join("reports/run_validation.v2.json");
+    let gaps_path = temp.path().join("reports/GAPS.md");
+    assert!(validation_path.exists());
+    assert!(gaps_path.exists());
+    let validation: serde_json::Value =
+        serde_json::from_slice(&fs::read(validation_path).unwrap()).unwrap();
+    assert_eq!(validation["kind"], "report.run_validation");
+    assert_eq!(
+        validation["payload"]["overall_validity"],
+        serde_json::json!("insufficient")
+    );
+    assert_eq!(
+        validation["payload"]["governor_results"][0]["validity"],
+        serde_json::json!("insufficient")
+    );
+    let gaps = fs::read_to_string(gaps_path).unwrap();
+    assert!(gaps.contains("performance"));
+    assert!(gaps.contains("insufficient"));
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"report.validate_run\""));
+}
+
+#[test]
 fn restore_dry_run_does_not_write_restore_health_check() {
     let temp = tempfile::tempdir().unwrap();
     let fixture = workspace_root().join("tests/golden/lab.restore_lease.v1.valid.json");
