@@ -210,6 +210,72 @@ fn workflow_recommend_run_dir_writes_artifact_and_audit() {
 }
 
 #[test]
+fn agent_instructions_generate_codex_prompt_from_workflow_registry() {
+    let temp = tempfile::tempdir().unwrap();
+    let out = temp.path().join("codex_target55_fullset.md");
+    let output = Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "agent",
+            "instructions",
+            "--goal",
+            "target-operating-contract-fullset",
+            "--target",
+            "ssh://target55",
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--format",
+            "codex",
+            "--out",
+            out.to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let summary: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        summary["workflow_id"],
+        "target-operating-contract-fullset.v0.2.3"
+    );
+    assert_eq!(
+        summary["next_step"],
+        "collect plan PR after it is available; stop before claim-producing full-set execution and report adc-lab version/capability mismatch"
+    );
+
+    let prompt = fs::read_to_string(out).unwrap();
+    assert!(prompt.contains("workflow_id: `target-operating-contract-fullset.v0.2.3`"));
+    assert!(prompt.contains("adc_lab_version: `"));
+    assert!(prompt.contains("reports/run_validation.v2.json"));
+    assert!(prompt.contains("reports/target_operating_contract.v2.json"));
+    assert!(prompt.contains("Do not fall back to a static prompt or hand-written shell harness"));
+    assert!(prompt.contains("stop and report adc-lab version/capability mismatch"));
+    assert!(prompt.contains("collect plan PR after it is available"));
+
+    for forbidden in [
+        "PLAN-*.json",
+        "APPROVAL-*.json",
+        "LEASE-*.json",
+        "tail -n 1",
+        "ls -t",
+        "find ",
+        "mtime",
+        "newest",
+        "latest plan",
+        "latest approval",
+        "latest lease",
+    ] {
+        assert!(
+            !prompt.contains(forbidden),
+            "generated prompt must not contain {forbidden}"
+        );
+    }
+}
+
+#[test]
 fn workload_run_refuses_ssh_target_with_structured_artifacts() {
     let temp = tempfile::tempdir().unwrap();
     let adc_lab_bin = assert_cmd::cargo::cargo_bin("adc-lab");

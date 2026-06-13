@@ -114,7 +114,7 @@ Key files:
 |---|---|---|---|
 | `adc_lab_core::workflow` | Own workflow registry DTOs and deterministic payload construction. | Workflow contract or registry changes. | Depends on stable build/evidence types; CLI depends on it. |
 | `commands::workflow` | Persist/print workflow recommendations and attach audit only for run-dir writes. | CLI persistence/output policy changes. | Depends on core workflow and common command helpers. |
-| future `commands::agent` | Render controller-Agent instructions from registry/plan data. | Prompt contract changes. | Depends on core workflow. |
+| `commands::agent` | Render controller-Agent instructions from registry data. | Prompt contract changes. | Depends on core workflow. |
 | future `commands::collect` | Persist argv-array collect plans and optional markdown handoff. | Collect handoff contract changes. | Depends on core workflow and CLI command catalog. |
 
 Layout decision: start with one core workflow module and one CLI command module.
@@ -177,7 +177,7 @@ Final v0.2.3:
 - [x] Phase 1: Add `workflow recommend` CLI.
 - [x] Phase 1: Add generated schema and schema ledger row.
 - [x] Phase 1: Add CLI/core tests proving recommendation shape and non-evidence semantics.
-- [ ] Phase 2: Add `agent instructions` command and deterministic Codex prompt fixture.
+- [x] Phase 2: Add `agent instructions` command and deterministic Codex prompt fixture.
 - [ ] Phase 3: Extend multi-run `report validate-run` and version-set policy.
 - [ ] Phase 4: Add `collect plan` artifact and argv-array step contract.
 - [ ] Phase 5: Add operating-contract `--validation` / `--strict-fullset` gate.
@@ -212,19 +212,25 @@ Final v0.2.3:
   Rationale: it is an authority artifact, not target measurement evidence.
 - 2026-06-13: Keep stdout-only recommendation audit-free. Rationale: offline
   recommendation should be usable before a run directory exists.
+- 2026-06-13: Make workflow/agent surfaces JSON-first for PR1/PR2. Rationale:
+  these are Agent-facing machine surfaces; `--json` remains accepted for CLI
+  consistency while the commands still produce machine-readable summaries.
+- 2026-06-13: Render agent instructions from `workflow.recommendation` without
+  copying literal forbidden shell snippets. Rationale: the prompt must prohibit
+  fragile artifact selection without teaching the pattern.
 
 ## Handoff
 
-Current branch: `codex/v023-workflow-recommendation`.
+Current branch: `codex/v023-agent-instructions`.
 
-PR1 status: implemented locally and verified.
+PR1 status: merged as PR #55.
+PR2 status: implemented locally and verified.
 
 Next steps:
 
-1. Commit and open PR1 against `main`.
-2. After PR1 merge, start Phase 2 on a fresh branch from updated `origin/main`.
-3. Implement `agent instructions` from the workflow registry without adding
-   shell fallback behavior.
+1. Commit and open PR2 against `main`.
+2. After PR2 merge, start Phase 3 on a fresh branch from updated `origin/main`.
+3. Extend multi-run `report validate-run` and version-set policy.
 
 ## Outcomes & Retrospective
 
@@ -248,4 +254,26 @@ Verification:
 - `cargo test -p adc-lab-core workflow -- --nocapture`: pass.
 - `cargo test -p adc-lab --test cli workflow_recommend -- --nocapture`: pass.
 - `make schemas-check`: pass.
+- `make verify`: pass.
+
+PR2 outcomes:
+
+- Added `adc-lab agent instructions`.
+- Rendered Codex instructions deterministically from `workflow.recommendation`.
+- Included installed adc-lab build info, workflow id, expected outputs,
+  fallback prohibition, and collect-plan deferred next step.
+- Added tests proving generated prompts do not contain fragile artifact
+  selection snippets.
+
+PR2 post-implementation economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `render_codex_agent_instructions` | Centralizes prompt rendering in the workflow registry so CLI does not invent a second prompt contract. | keep | Core test and CLI test. |
+| `commands::agent` | Keeps agent prompt file output separate from workflow recommendation persistence/audit policy. | keep | CLI test for `agent instructions`. |
+
+PR2 verification:
+
+- `cargo test -p adc-lab-core workflow -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli agent_instructions -- --nocapture`: pass.
 - `make verify`: pass.

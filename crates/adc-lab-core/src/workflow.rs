@@ -64,6 +64,9 @@ pub struct WorkflowRecommendationInput {
     pub recommendation_mode: WorkflowRecommendationMode,
 }
 
+pub const COLLECT_PLAN_DEFERRED_NEXT_STEP: &str =
+    "collect plan PR after it is available; stop before claim-producing full-set execution and report adc-lab version/capability mismatch";
+
 pub fn validate_workflow_goal(goal: &str) -> LabResult<()> {
     if goal == WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET {
         Ok(())
@@ -158,6 +161,66 @@ pub fn target_operating_contract_workflow_recommendation(
     Ok(artifact)
 }
 
+pub fn render_codex_agent_instructions(
+    recommendation: &Artifact<WorkflowRecommendationPayload>,
+    collect_plan_available: bool,
+) -> String {
+    let payload = &recommendation.payload;
+    let next_step = if collect_plan_available {
+        "run adc-lab collect plan, then follow the emitted argv-array steps"
+    } else {
+        COLLECT_PLAN_DEFERRED_NEXT_STEP
+    };
+    let mut out = String::new();
+    out.push_str("# adc-lab Controller Agent Instructions\n\n");
+    out.push_str("## Workflow Authority\n\n");
+    out.push_str("Use adc-lab workflow outputs as the source of truth for Target Operating Contract full-set collection.\n\n");
+    out.push_str(&format!("- goal: `{}`\n", payload.goal));
+    out.push_str(&format!("- workflow_id: `{}`\n", payload.workflow_id));
+    out.push_str(&format!(
+        "- adc_lab_version: `{}`\n",
+        payload.controller_adc_lab.version
+    ));
+    out.push_str(&format!(
+        "- adc_lab_git_sha: `{}`\n",
+        payload.controller_adc_lab.git_sha
+    ));
+    out.push_str(&format!("- target: `{}`\n", payload.target));
+    out.push_str(&format!("- target_id: `{}`\n", payload.target_id));
+    out.push_str(&format!("- target_class: `{}`\n\n", payload.target_class));
+
+    out.push_str("## Source Of Truth Chain\n\n");
+    for item in &payload.source_of_truth_chain {
+        out.push_str(&format!("- `{item}`\n"));
+    }
+    out.push('\n');
+
+    out.push_str("## Required Workflow\n\n");
+    for item in &payload.must_use {
+        out.push_str(&format!("- {item}\n"));
+    }
+    out.push_str(&format!("- next_step: {next_step}\n\n"));
+
+    out.push_str("## Forbidden Fallbacks\n\n");
+    out.push_str("- Do not fall back to a static prompt or hand-written shell harness when adc-lab workflow surfaces are available.\n");
+    out.push_str("- If a required workflow surface is missing, stop and report adc-lab version/capability mismatch.\n");
+    out.push_str("- Do not infer artifact relationships from filenames, timestamps, or directory co-presence.\n");
+    out.push_str("- Do not use raw primitive control artifacts for controlled-governor full-set claims without matching report.run_validation.\n\n");
+
+    out.push_str("## Expected Outputs\n\n");
+    for item in &payload.expected_outputs {
+        out.push_str(&format!("- `{item}`\n"));
+    }
+    out.push('\n');
+
+    out.push_str("## Claim Boundaries\n\n");
+    out.push_str("- This prompt is not target measurement evidence.\n");
+    out.push_str("- Insufficient, refused, contaminated, not applicable, and unknown outcomes remain valid evidence boundaries.\n");
+    out.push_str("- Version skew blocks full-set measured claims unless a later validation artifact explicitly records the allowed exploratory override, and even then full-set selection remains not ready.\n");
+    out.push_str("- No Agent root shell, arbitrary sysfs writes, remote privileged apply/restore, Pi4/Pi5 selection claim, or production-style claim is authorized by this prompt.\n");
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -190,5 +253,43 @@ mod tests {
                 .evidence_policy
                 .raw_primitives_are_claim_producing
         );
+    }
+
+    #[test]
+    fn codex_agent_instructions_are_registry_derived_without_artifact_selection_heuristics() {
+        let artifact =
+            target_operating_contract_workflow_recommendation(WorkflowRecommendationInput {
+                run_id: "LAB-RUN-test".to_string(),
+                goal: WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET.to_string(),
+                target: "ssh://target55".to_string(),
+                target_id: "target55".to_string(),
+                target_class: "raspberry_pi_4".to_string(),
+                recommendation_mode: WorkflowRecommendationMode::OfflineRecommendation,
+            })
+            .unwrap();
+        let text = render_codex_agent_instructions(&artifact, false);
+
+        assert!(text.contains(WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023));
+        assert!(text.contains("Do not fall back to a static prompt"));
+        assert!(text.contains("stop and report adc-lab version/capability mismatch"));
+        assert!(text.contains(COLLECT_PLAN_DEFERRED_NEXT_STEP));
+        for forbidden in [
+            "PLAN-*.json",
+            "APPROVAL-*.json",
+            "LEASE-*.json",
+            "tail -n 1",
+            "ls -t",
+            "find ",
+            "mtime",
+            "newest",
+            "latest plan",
+            "latest approval",
+            "latest lease",
+        ] {
+            assert!(
+                !text.contains(forbidden),
+                "generated prompt must not contain {forbidden}"
+            );
+        }
     }
 }
