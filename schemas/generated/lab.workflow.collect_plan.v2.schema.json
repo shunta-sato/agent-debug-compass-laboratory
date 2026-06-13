@@ -513,6 +513,7 @@
         "claim_gate",
         "command_argv",
         "continue_on",
+        "execution_location",
         "expected_artifact_kinds",
         "expected_artifact_paths_or_globs",
         "human_summary",
@@ -541,6 +542,9 @@
           "items": {
             "$ref": "#/definitions/GovernorValidity"
           }
+        },
+        "execution_location": {
+          "type": "string"
         },
         "expected_artifact_kinds": {
           "type": "array",

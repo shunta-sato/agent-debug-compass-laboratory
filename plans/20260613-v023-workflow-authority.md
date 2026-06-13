@@ -209,6 +209,11 @@ Final v0.2.3:
   - [x] Ensure generated plan steps are argv arrays with no shell fragments.
   - [x] Update Agent instructions to point at live `collect plan` surface.
   - [x] Add focused core/CLI tests and verify file budgets.
+  - [x] Review fix: prevent SSH controller plans from emitting local-only
+        governor-sweep commands against `ssh://...`.
+  - [x] Review fix: write handoff archives outside the planned run directory.
+  - [x] Review fix: add full-set coverage skeleton steps for read-only,
+        load, pressure, composite, and workload demand coverage.
 - [ ] Phase 5: Add operating-contract `--validation` / `--strict-fullset` gate.
 - [ ] Phase 6: Add `constraints check-candidate` / `constraints self-check`.
 - [ ] Phase 7: Update docs/examples and expand stale-pattern guards.
@@ -238,6 +243,13 @@ Final v0.2.3:
   `derivable_impls` for `VersionSkewPolicyResult::default()`, while local
   `make verify` passed under Rust 1.85. The enum now derives `Default` with
   `#[default]` on `NoSkewDetected`.
+- 2026-06-14: PR4 review found that `collect plan --target ssh://...`
+  emitted `control governor-sweep ... --target ssh://...`, but governor sweep
+  is local-target only in this phase. The plan now marks those steps as
+  `execution_location=target_local` and emits `--target local` for sweep argv.
+- 2026-06-14: PR4 review found that the archive handoff step wrote
+  `<run-dir>/handoff/adc-lab-run.tgz` while tarring `<run-dir>`. The handoff
+  archive now goes to a run-dir sibling `handoff/<run-id>.tgz`.
 
 ## Decision Log
 
@@ -286,6 +298,24 @@ Final v0.2.3:
   450-line target because the plan intentionally spells out each public argv
   step and continuation rule. Guardrail remains satisfied: `main.rs` is 748/800
   and `check-file-budgets.py --enforce` reports zero violations.
+- 2026-06-14: For SSH controller collect plans, keep governor sweep as typed
+  target-local argv rather than controller SSH argv. Rationale: Phase 4
+  defers `collect run` and remote privileged orchestration, but the handoff
+  contract must still avoid impossible local-only commands; controller
+  validation receives an explicit `--include-run` retrieval destination.
+- 2026-06-14: Add `execution_location` to collect-plan steps instead of
+  overloading `requires_target_local`. Rationale: Agents need to know where
+  each argv array executes, while requirements booleans only describe
+  capability prerequisites.
+- 2026-06-14: Keep `collect_step` as the controller-default wrapper and add
+  `collect_step_at` only for non-controller locations. Rationale: this is the
+  smallest function-boundary change that avoids duplicating every step builder
+  while making target-local handoff explicit.
+- 2026-06-14: Add full-set skeleton steps using existing public commands only.
+  Rationale: `target-operating-contract-fullset` should expose coverage for
+  inventory, toolchain, observation, load, pressure, composite, and workload
+  demand without inventing a new executor or claiming that seed steps prove the
+  full operating envelope.
 
 ## Handoff
 
@@ -295,11 +325,14 @@ PR1 status: merged as PR #55.
 PR2 status: merged as PR #56.
 PR3 status: merged as PR #57.
 PR4 status: implemented locally and verified; ready to commit/open PR.
+PR4 review-fix status: blocking review comments addressed locally; ready to
+commit and push to PR #58 after final diff review.
 
 Next steps:
 
-1. Commit and open PR4 against `main`.
-2. After PR4 merge, start Phase 5 from updated `origin/main`.
+1. Commit and push PR4 review fixes to `codex/v023-collect-plan`.
+2. Confirm PR #58 CI remains green.
+3. After PR4 merge, start Phase 5 from updated `origin/main`.
 
 ## Outcomes & Retrospective
 
@@ -408,6 +441,14 @@ PR4 outcomes:
 - Updated `agent instructions` so its next step points to live `collect plan`.
 - Moved Workflow/Agent Clap command types into command modules so `main.rs`
   stays below the enforced file budget while adding Collect.
+- Review fix: added `execution_location` to every step and made SSH
+  controller plans emit target-local governor-sweep argv with `--target local`,
+  plus an explicit controller `--include-run` retrieval destination.
+- Review fix: changed archive handoff output to a run-dir sibling
+  `handoff/<run-id>.tgz`, so the tar output is outside the tar input tree.
+- Review fix: added full-set skeleton coverage steps for inventory,
+  toolchain discovery, passive observation, bounded CPU load seed, pressure,
+  composite pressure, and workload demand.
 
 PR4 post-implementation economy audit:
 
@@ -416,6 +457,7 @@ PR4 post-implementation economy audit:
 | `WorkflowCollectPlanPayload` / `WorkflowCollectPlanStep` | Makes the executable handoff contract schema-visible and prevents shell harnesses from becoming the workflow surface. | keep | Generated schema and core argv-array test. |
 | `commands::collect` | Keeps collect-plan file output and markdown rendering separate from `main.rs` dispatch and workflow recommendation persistence. | keep | CLI collect-plan test and file-budget check. |
 | `render_collect_plan_agent_instructions` | Renders instructions from the plan artifact so markdown cannot drift from the machine-readable argv steps. | keep | CLI test checks markdown and forbidden-pattern absence. |
+| `collect_step_at` | Adds explicit non-controller execution location without duplicating every collect-plan step constructor. | keep | SSH collect-plan test proves target-local sweep location and controller-free requirement. |
 
 PR4 verification:
 
@@ -426,3 +468,8 @@ PR4 verification:
 - `python3 scripts/ci/check-file-budgets.py --enforce`: pass.
 - `cargo clippy --workspace --all-targets -- -D warnings`: pass.
 - `make verify`: pass.
+- Review fix: `cargo test -p adc-lab-core workflow -- --nocapture`: pass.
+- Review fix: `cargo test -p adc-lab --test cli collect_plan -- --nocapture`: pass.
+- Review fix: `make schemas-check`: pass.
+- Review fix: `python3 scripts/ci/check-file-budgets.py --enforce`: pass.
+- Review fix: `make verify`: pass.

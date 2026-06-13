@@ -328,6 +328,20 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
     let steps = plan.payload["steps"].as_array().unwrap();
     assert!(steps.iter().any(|step| step["step_id"] == "run_validation"));
     assert!(steps.iter().any(|step| step["step_id"] == "archive"));
+    for required_step in [
+        "read_only_inventory",
+        "toolchain_discover",
+        "observe_baseline",
+        "cpu_ladder",
+        "pressure_probe_set",
+        "composite_probe",
+        "workload_demand",
+    ] {
+        assert!(
+            steps.iter().any(|step| step["step_id"] == required_step),
+            "collect plan missing full-set skeleton step {required_step}"
+        );
+    }
     for step in steps {
         let argv = step["command_argv"].as_array().unwrap();
         assert!(!argv.is_empty());
@@ -342,6 +356,21 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
         }
     }
 
+    let governor_step = steps
+        .iter()
+        .find(|step| step["step_id"] == "governor_sweep_run")
+        .unwrap();
+    assert_eq!(governor_step["execution_location"], "target_local");
+    assert_eq!(governor_step["requires_controller"], false);
+    let governor_argv = governor_step["command_argv"].as_array().unwrap();
+    let target_index = governor_argv
+        .iter()
+        .position(|arg| arg == "--target")
+        .unwrap()
+        + 1;
+    assert_eq!(governor_argv[target_index], "local");
+    assert!(!governor_argv.iter().any(|arg| arg == "ssh://target55"));
+
     let validation_step = steps
         .iter()
         .find(|step| step["step_id"] == "run_validation")
@@ -351,15 +380,31 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
         .unwrap()
         .iter()
         .any(|arg| arg == "--collect-plan"));
+    assert!(validation_step["command_argv"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|arg| arg == "--include-run"));
     assert!(validation_step["expected_artifact_kinds"]
         .as_array()
         .unwrap()
         .iter()
         .any(|kind| kind == "report.run_validation"));
 
+    let archive_step = steps
+        .iter()
+        .find(|step| step["step_id"] == "archive")
+        .unwrap();
+    let archive_argv = archive_step["command_argv"].as_array().unwrap();
+    let archive_index = archive_argv.iter().position(|arg| arg == "-czf").unwrap() + 1;
+    let archive_path = archive_argv[archive_index].as_str().unwrap();
+    assert!(archive_path.ends_with("/handoff/run.tgz"));
+    assert!(!archive_path.starts_with(run_dir.to_str().unwrap()));
+
     let instructions = fs::read_to_string(instructions_out).unwrap();
     assert!(instructions.contains("workflow.collect_plan"));
     assert!(instructions.contains("argv: `["));
+    assert!(instructions.contains("execution_location: `target_local`"));
     assert!(instructions.contains("Packaging steps are handoff steps, not target evidence"));
     for forbidden in [
         "PLAN-*.json",

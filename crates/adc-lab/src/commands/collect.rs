@@ -53,8 +53,9 @@ fn command_collect_plan(args: CollectPlanCommand) -> Result<()> {
         .run_dir
         .clone()
         .unwrap_or_else(|| infer_planned_run_dir(&args.out));
+    let handoff_dir = default_handoff_dir(&planned_run_dir);
     let workflow_recommendation_path = planned_run_dir.join("workflows/recommendation.v2.json");
-    let workload_demand_path = planned_run_dir.join("inputs/workload_demand.json");
+    let workload_demand_path = planned_run_dir.join("reports/workload_demand_profile.json");
     let suitability_policy_path = planned_run_dir.join("inputs/suitability_policy.yaml");
     let plan = target_operating_contract_collect_plan(WorkflowCollectPlanInput {
         run_id: run_id_from_run_dir(&planned_run_dir),
@@ -65,6 +66,7 @@ fn command_collect_plan(args: CollectPlanCommand) -> Result<()> {
         planned_run_dir: path_ref(&planned_run_dir),
         collect_plan_path: path_ref(&args.out),
         agent_instructions_path: path_ref(&args.agent_instructions_out),
+        handoff_dir: path_ref(&handoff_dir),
         workflow_recommendation_path: path_ref(&workflow_recommendation_path),
         workflow_recommendation_ref: None,
         workflow_recommendation_digest: None,
@@ -106,4 +108,11 @@ fn infer_planned_run_dir(out: &Path) -> PathBuf {
     } else {
         parent.to_path_buf()
     }
+}
+
+fn default_handoff_dir(run_dir: &Path) -> PathBuf {
+    run_dir
+        .parent()
+        .map(|parent| parent.join("handoff"))
+        .unwrap_or_else(|| PathBuf::from("handoff"))
 }
