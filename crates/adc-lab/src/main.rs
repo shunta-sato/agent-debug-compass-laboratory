@@ -76,6 +76,10 @@ enum Commands {
         #[command(subcommand)]
         command: WorkflowCommand,
     },
+    Agent {
+        #[command(subcommand)]
+        command: AgentCommand,
+    },
 }
 
 #[derive(Debug, Args)]
@@ -109,6 +113,34 @@ struct WorkflowRecommendCommand {
     out: Option<PathBuf>,
     #[arg(long)]
     json: bool,
+}
+
+#[derive(Debug, Subcommand)]
+enum AgentCommand {
+    Instructions(AgentInstructionsCommand),
+}
+
+#[derive(Debug, Args)]
+struct AgentInstructionsCommand {
+    #[arg(long, default_value = "target-operating-contract-fullset")]
+    goal: String,
+    #[arg(long, default_value = "local")]
+    target: String,
+    #[arg(long, default_value = "local-target")]
+    target_id: String,
+    #[arg(long, default_value = "unknown-target-class")]
+    target_class: String,
+    #[arg(long, value_enum, default_value_t = AgentInstructionsFormatArg::Codex)]
+    format: AgentInstructionsFormatArg,
+    #[arg(long)]
+    out: PathBuf,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum AgentInstructionsFormatArg {
+    Codex,
 }
 
 #[derive(Debug, Subcommand)]
@@ -739,6 +771,9 @@ fn main() -> Result<()> {
             WorkflowCommand::Recommend(args) => {
                 commands::workflow::command_workflow_recommend(args)
             }
+        },
+        Commands::Agent { command } => match command {
+            AgentCommand::Instructions(args) => commands::agent::command_agent_instructions(args),
         },
     }
 }
