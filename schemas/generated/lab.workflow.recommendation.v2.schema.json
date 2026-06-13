@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Artifact_for_RunReportPayload",
+  "title": "Artifact_for_WorkflowRecommendationPayload",
   "type": "object",
   "required": [
     "claims",
@@ -59,7 +59,7 @@
       }
     },
     "payload": {
-      "$ref": "#/definitions/RunReportPayload"
+      "$ref": "#/definitions/WorkflowRecommendationPayload"
     },
     "run_id": {
       "type": "string"
@@ -100,6 +100,34 @@
           "items": {
             "type": "string"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "BuildInfo": {
+      "type": "object",
+      "required": [
+        "build_profile",
+        "git_sha",
+        "name",
+        "target_triple",
+        "version"
+      ],
+      "properties": {
+        "build_profile": {
+          "type": "string"
+        },
+        "git_sha": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "target_triple": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -250,250 +278,6 @@
       },
       "additionalProperties": false
     },
-    "RuleEvaluation": {
-      "type": "object",
-      "required": [
-        "claim_id",
-        "decision",
-        "evidence_refs",
-        "matched",
-        "missing",
-        "next_evidence",
-        "rule_id"
-      ],
-      "properties": {
-        "claim_id": {
-          "type": "string"
-        },
-        "decision": {
-          "$ref": "#/definitions/Decision"
-        },
-        "evidence_refs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "matched": {
-          "type": "boolean"
-        },
-        "missing": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "next_evidence": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "rule_id": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunOperatingPointBlocked": {
-      "type": "object",
-      "required": [
-        "coverage_status",
-        "factor_id",
-        "next_evidence",
-        "reason"
-      ],
-      "properties": {
-        "coverage_status": {
-          "type": "string"
-        },
-        "factor_id": {
-          "type": "string"
-        },
-        "next_evidence": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "reason": {
-          "type": "string"
-        },
-        "requested_level": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunOperatingPointControlled": {
-      "type": "object",
-      "required": [
-        "claim_boundary",
-        "evidence_refs",
-        "factor_id",
-        "level"
-      ],
-      "properties": {
-        "claim_boundary": {
-          "type": "string"
-        },
-        "evidence_refs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "factor_id": {
-          "type": "string"
-        },
-        "level": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunOperatingPointObserved": {
-      "type": "object",
-      "required": [
-        "claim_boundary",
-        "evidence_refs",
-        "factor_id",
-        "level"
-      ],
-      "properties": {
-        "claim_boundary": {
-          "type": "string"
-        },
-        "evidence_refs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "factor_id": {
-          "type": "string"
-        },
-        "level": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunOperatingPointSummary": {
-      "type": "object",
-      "required": [
-        "blocked_points",
-        "controlled_points",
-        "coverage_status",
-        "observed_points"
-      ],
-      "properties": {
-        "blocked_points": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/RunOperatingPointBlocked"
-          }
-        },
-        "controlled_points": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/RunOperatingPointControlled"
-          }
-        },
-        "coverage_status": {
-          "type": "string"
-        },
-        "observed_points": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/RunOperatingPointObserved"
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "RunReportPayload": {
-      "type": "object",
-      "required": [
-        "artifact_refs",
-        "audit_event_count",
-        "blocked_claims",
-        "evaluations",
-        "indexed_v2_artifact_refs",
-        "next_evidence",
-        "operating_point",
-        "operation_audit_refs",
-        "operations_summary",
-        "report_status",
-        "restore_status",
-        "rule_set_id"
-      ],
-      "properties": {
-        "artifact_refs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "audit_event_count": {
-          "type": "integer",
-          "format": "uint",
-          "minimum": 0.0
-        },
-        "blocked_claims": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "evaluations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/RuleEvaluation"
-          }
-        },
-        "indexed_v2_artifact_refs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "next_evidence": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "operating_point": {
-          "$ref": "#/definitions/RunOperatingPointSummary"
-        },
-        "operation_audit_refs": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "operations_summary": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "report_status": {
-          "type": "string"
-        },
-        "restore_status": {
-          "type": "string"
-        },
-        "rule_set_id": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
-    },
     "Status": {
       "oneOf": [
         {
@@ -621,6 +405,143 @@
           }
         }
       ]
+    },
+    "WorkflowEvidencePolicy": {
+      "type": "object",
+      "required": [
+        "causal_linkage_required",
+        "forbidden_linkage_sources",
+        "raw_primitives_are_claim_producing",
+        "recommendation_is_target_measurement_evidence"
+      ],
+      "properties": {
+        "causal_linkage_required": {
+          "type": "boolean"
+        },
+        "forbidden_linkage_sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "raw_primitives_are_claim_producing": {
+          "type": "boolean"
+        },
+        "recommendation_is_target_measurement_evidence": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkflowRecommendationMode": {
+      "type": "string",
+      "enum": [
+        "offline_recommendation",
+        "capability_checked_recommendation"
+      ]
+    },
+    "WorkflowRecommendationPayload": {
+      "type": "object",
+      "required": [
+        "controller_adc_lab",
+        "evidence_policy",
+        "expected_outputs",
+        "forbidden_patterns",
+        "goal",
+        "must_not_use_for_claims",
+        "must_use",
+        "next_step",
+        "recommendation_mode",
+        "source_of_truth_chain",
+        "target",
+        "target_class",
+        "target_id",
+        "version_policy",
+        "workflow_id"
+      ],
+      "properties": {
+        "controller_adc_lab": {
+          "$ref": "#/definitions/BuildInfo"
+        },
+        "evidence_policy": {
+          "$ref": "#/definitions/WorkflowEvidencePolicy"
+        },
+        "expected_outputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "forbidden_patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "goal": {
+          "type": "string"
+        },
+        "must_not_use_for_claims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "must_use": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "next_step": {
+          "type": "string"
+        },
+        "recommendation_mode": {
+          "$ref": "#/definitions/WorkflowRecommendationMode"
+        },
+        "source_of_truth_chain": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "target": {
+          "type": "string"
+        },
+        "target_class": {
+          "type": "string"
+        },
+        "target_id": {
+          "type": "string"
+        },
+        "version_policy": {
+          "$ref": "#/definitions/WorkflowVersionPolicy"
+        },
+        "workflow_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkflowVersionPolicy": {
+      "type": "object",
+      "required": [
+        "allow_skew_override_records_gap",
+        "claim_producing_run_requires_no_skew",
+        "skew_blocks_fullset_measured_claims"
+      ],
+      "properties": {
+        "allow_skew_override_records_gap": {
+          "type": "boolean"
+        },
+        "claim_producing_run_requires_no_skew": {
+          "type": "boolean"
+        },
+        "skew_blocks_fullset_measured_claims": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

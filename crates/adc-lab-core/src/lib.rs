@@ -22,6 +22,7 @@ pub mod runfs;
 pub mod suitability;
 pub mod target;
 pub mod toolchain;
+pub mod workflow;
 pub mod workload;
 
 pub use audit::*;
@@ -47,4 +48,5 @@ pub use runfs::*;
 pub use suitability::*;
 pub use target::*;
 pub use toolchain::*;
+pub use workflow::*;
 pub use workload::*;

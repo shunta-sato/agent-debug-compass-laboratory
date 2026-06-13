@@ -23,6 +23,7 @@ lab.resource_pressure_result.v1	generated/lab.resource_pressure_result.v1.schema
 lab.restore_lease.v1	generated/lab.restore_lease.v1.schema.json	generated_snapshot	generated_checked	phase5-control	control	safety-critical restore lease contract generated from Rust DTO
 lab.run_manifest.v1	generated/lab.run_manifest.v1.schema.json	generated_snapshot	generated_checked	phase5-infra	runfs	dedicated identity artifact generated from Rust DTO
 lab.report.run_validation.v2	generated/lab.report.run_validation.v2.schema.json	generated_snapshot	generated_checked	issue48-phase0	reporting	full-set run validation artifact for issue #48 measured/refused/contaminated evidence states
+lab.workflow.recommendation.v2	generated/lab.workflow.recommendation.v2.schema.json	generated_snapshot	generated_checked	v023-phase1	workflow	workflow authority artifact for target-operating-contract full-set collection; not target measurement evidence
 lab.suitability_decision.v1	lab.suitability_decision.v1.schema.json	deleted	delete	phase3-suitability-constraints	suitability	public suitability output is v2 artifact
 lab.suitability_policy.v1	generated/lab.suitability_policy.v1.schema.json	generated_snapshot	generated_checked	phase3-suitability-constraints	suitability	active input policy remains v1 wire but generated from Rust DTO
 lab.target_inventory.v1	generated/lab.target_inventory.v1.schema.json	generated_snapshot	generated_checked	phase5-inventory	inventory	active inventory contract generated from Rust DTO

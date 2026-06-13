@@ -72,6 +72,10 @@ enum Commands {
         #[command(subcommand)]
         command: ToolCommand,
     },
+    Workflow {
+        #[command(subcommand)]
+        command: WorkflowCommand,
+    },
 }
 
 #[derive(Debug, Args)]
@@ -80,6 +84,29 @@ struct TargetCommand {
     target: String,
     #[arg(long)]
     run_dir: Option<PathBuf>,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Subcommand)]
+enum WorkflowCommand {
+    Recommend(WorkflowRecommendCommand),
+}
+
+#[derive(Debug, Args)]
+struct WorkflowRecommendCommand {
+    #[arg(long, default_value = "target-operating-contract-fullset")]
+    goal: String,
+    #[arg(long, default_value = "local")]
+    target: String,
+    #[arg(long, default_value = "local-target")]
+    target_id: String,
+    #[arg(long, default_value = "unknown-target-class")]
+    target_class: String,
+    #[arg(long)]
+    run_dir: Option<PathBuf>,
+    #[arg(long)]
+    out: Option<PathBuf>,
     #[arg(long)]
     json: bool,
 }
@@ -706,6 +733,11 @@ fn main() -> Result<()> {
             ToolCommand::Qualify(args) => commands::tool::command_tool_qualify(args),
             ToolCommand::QualifyInventory(args) => {
                 commands::tool::command_tool_qualify_inventory(args)
+            }
+        },
+        Commands::Workflow { command } => match command {
+            WorkflowCommand::Recommend(args) => {
+                commands::workflow::command_workflow_recommend(args)
             }
         },
     }

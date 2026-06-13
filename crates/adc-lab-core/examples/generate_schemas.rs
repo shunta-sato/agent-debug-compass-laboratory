@@ -21,6 +21,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &out_dir,
         "lab.report.run_validation.v2.schema.json",
     )?;
+    write_schema::<Artifact<WorkflowRecommendationPayload>>(
+        &out_dir,
+        "lab.workflow.recommendation.v2.schema.json",
+    )?;
     write_schema::<Artifact<SuitabilityPayload>>(
         &out_dir,
         "lab.report.suitability.v2.schema.json",
