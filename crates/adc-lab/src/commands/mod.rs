@@ -10,4 +10,5 @@ pub(super) mod privilege;
 pub(super) mod report;
 pub(super) mod target;
 pub(super) mod tool;
+pub(super) mod workflow;
 pub(super) mod workload;

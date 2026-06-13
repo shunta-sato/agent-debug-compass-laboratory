@@ -1,6 +1,6 @@
 use adc_lab_core::{
     canonical_plan_digest, governor_sweep_policy_digest, Actor, ActorKind, ApprovalBounds,
-    ApprovalRecord, Artifact, ControlPlan, GovernorSweepPolicyPayload, RiskTier,
+    ApprovalRecord, Artifact, ControlPlan, GovernorSweepPolicyPayload, Kind, RiskTier,
 };
 use assert_cmd::Command;
 use predicates::str::contains;
@@ -127,6 +127,86 @@ fn cli_help_mentions_adc_lab() {
         .assert()
         .success()
         .stdout(contains("adc-lab"));
+}
+
+#[test]
+fn workflow_recommend_stdout_is_authority_not_measurement_evidence() {
+    let output = Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "workflow",
+            "recommend",
+            "--goal",
+            "target-operating-contract-fullset",
+            "--target",
+            "ssh://target55",
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(value["schema"], "lab.artifact.v2");
+    assert_eq!(value["kind"], "workflow.recommendation");
+    assert_eq!(value["status"]["state"], "not_applicable");
+    assert_eq!(value["claims"].as_array().unwrap().len(), 0);
+    assert_eq!(
+        value["payload"]["workflow_id"],
+        "target-operating-contract-fullset.v0.2.3"
+    );
+    assert_eq!(
+        value["payload"]["evidence_policy"]["recommendation_is_target_measurement_evidence"],
+        false
+    );
+    assert_eq!(
+        value["payload"]["evidence_policy"]["raw_primitives_are_claim_producing"],
+        false
+    );
+    assert!(value["payload"]["must_not_use_for_claims"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|entry| entry.as_str().unwrap().contains("filename order")));
+}
+
+#[test]
+fn workflow_recommend_run_dir_writes_artifact_and_audit() {
+    let temp = tempfile::tempdir().unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "workflow",
+            "recommend",
+            "--goal",
+            "target-operating-contract-fullset",
+            "--target",
+            "ssh://target55",
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("artifact://lab/runs/"));
+
+    let path = temp.path().join("workflows/recommendation.v2.json");
+    let recommendation: Artifact<serde_json::Value> =
+        serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+    assert_eq!(recommendation.kind, Kind::WorkflowRecommendation);
+    assert!(recommendation.claims.is_empty());
+
+    let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"operation\":\"workflow.recommend\""));
 }
 
 #[test]

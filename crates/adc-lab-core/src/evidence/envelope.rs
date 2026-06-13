@@ -27,6 +27,8 @@ pub enum Kind {
     ReportRunValidation,
     #[serde(rename = "control.governor_sweep_policy")]
     ControlGovernorSweepPolicy,
+    #[serde(rename = "workflow.recommendation")]
+    WorkflowRecommendation,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
