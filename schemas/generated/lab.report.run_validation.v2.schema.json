@@ -374,6 +374,27 @@
             "type": "string"
           }
         },
+        "collect_plan_digest": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "collect_plan_ref": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expected_governors": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "gaps": {
           "type": "array",
           "items": {
@@ -386,6 +407,13 @@
             "$ref": "#/definitions/GovernorValidation"
           }
         },
+        "included_run_refs": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "overall_validity": {
           "$ref": "#/definitions/GovernorValidity"
         },
@@ -393,6 +421,79 @@
           "type": "string"
         },
         "requested_governors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "subject_run_set_id": {
+          "default": "legacy_run_validation_missing_run_set_identity",
+          "type": "string"
+        },
+        "target_class": {
+          "default": "unknown-target-class",
+          "type": "string"
+        },
+        "target_id": {
+          "default": "unknown-target",
+          "type": "string"
+        },
+        "validation_profile": {
+          "default": "target-operating-contract-fullset",
+          "type": "string"
+        },
+        "version_set": {
+          "default": {
+            "records": [],
+            "skew_detected": false,
+            "skew_reasons": []
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/RunValidationVersionSet"
+            }
+          ]
+        },
+        "version_skew_override": {
+          "default": false,
+          "type": "boolean"
+        },
+        "version_skew_policy": {
+          "default": "no_skew_detected",
+          "allOf": [
+            {
+              "$ref": "#/definitions/VersionSkewPolicyResult"
+            }
+          ]
+        },
+        "workflow_recommendation_ref": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "RunValidationVersionSet": {
+      "type": "object",
+      "required": [
+        "records",
+        "skew_detected",
+        "skew_reasons"
+      ],
+      "properties": {
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ToolVersionRecord"
+          }
+        },
+        "skew_detected": {
+          "type": "boolean"
+        },
+        "skew_reasons": {
           "type": "array",
           "items": {
             "type": "string"
@@ -527,6 +628,60 @@
             }
           }
         }
+      ]
+    },
+    "ToolVersionRecord": {
+      "type": "object",
+      "required": [
+        "artifact_ref",
+        "build_profile",
+        "git_sha",
+        "role",
+        "target_triple",
+        "tool_name",
+        "version"
+      ],
+      "properties": {
+        "artifact_ref": {
+          "type": "string"
+        },
+        "build_profile": {
+          "type": "string"
+        },
+        "git_sha": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/definitions/ToolVersionRole"
+        },
+        "target_triple": {
+          "type": "string"
+        },
+        "tool_name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolVersionRole": {
+      "type": "string",
+      "enum": [
+        "controller_adc_lab",
+        "target_local_adc_lab",
+        "target_runner",
+        "privileged_helper",
+        "release_manifest"
+      ]
+    },
+    "VersionSkewPolicyResult": {
+      "type": "string",
+      "enum": [
+        "no_skew_detected",
+        "blocked_by_version_skew",
+        "override_recorded_still_blocked"
       ]
     }
   }

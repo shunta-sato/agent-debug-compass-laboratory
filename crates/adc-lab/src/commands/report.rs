@@ -12,7 +12,37 @@ pub(crate) fn command_report_validate_run(args: ValidateRunCommand) -> Result<()
         );
     }
     let run = existing_run_context(args.run);
-    let validation = validate_fullset_run(&run, args.expected_governors.clone())?;
+    let include_runs = args
+        .include_runs
+        .into_iter()
+        .map(existing_run_context)
+        .collect::<Vec<_>>();
+    let workflow_recommendation_ref = args
+        .workflow_recommendation
+        .as_deref()
+        .map(|path| artifact_ref_for_optional_path(&run, path))
+        .transpose()?;
+    let collect_plan_ref = args
+        .collect_plan
+        .as_deref()
+        .map(|path| artifact_ref_for_optional_path(&run, path))
+        .transpose()?;
+    let collect_plan_digest = args
+        .collect_plan
+        .as_deref()
+        .map(digest_file_sha256)
+        .transpose()?;
+    let validation = validate_fullset_run_set(RunValidationInput {
+        subject_run: run.clone(),
+        include_runs,
+        requested_governors: args.expected_governors.clone(),
+        workflow_recommendation_ref,
+        collect_plan_ref,
+        collect_plan_digest,
+        target_id: Some(args.target_id.clone()),
+        target_class: Some(args.target_class.clone()),
+        allow_version_skew: args.allow_version_skew,
+    })?;
     let validation_path = args
         .out
         .unwrap_or_else(|| run.run_dir.join("reports/run_validation.v2.json"));
@@ -53,6 +83,14 @@ pub(crate) fn command_report_validate_run(args: ValidateRunCommand) -> Result<()
         );
     }
     Ok(())
+}
+
+fn artifact_ref_for_optional_path(run: &RunContext, path: &std::path::Path) -> Result<String> {
+    if path.starts_with(&run.run_dir) {
+        Ok(run.artifact_uri(path)?)
+    } else {
+        Ok(path_ref(path))
+    }
 }
 
 pub(crate) fn command_report_operating_contract(args: OperatingContractCommand) -> Result<()> {

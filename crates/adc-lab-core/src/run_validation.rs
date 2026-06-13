@@ -1,6 +1,6 @@
 use crate::contracts::{
-    Actor, ApprovalRecord, ControlPlan, ControlResult, ControlResultStatus, HealthCheck,
-    RefusalCode,
+    Actor, ApprovalRecord, BuildInfo, ControlPlan, ControlResult, ControlResultStatus, HealthCheck,
+    PrivilegeDoctorReport, RefusalCode, ReleaseManifest,
 };
 use crate::control::canonical_plan_digest;
 use crate::evidence::{Artifact, DataQuality, DataQualityLevel, Kind, Status};
@@ -11,10 +11,13 @@ use crate::{LabError, LabResult, RunContext};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub const FULLSET_PROFILE: &str = "target-operating-contract-fullset";
+pub const LEGACY_RUN_VALIDATION_MISSING_RUN_SET_ID: &str =
+    "legacy_run_validation_missing_run_set_identity";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -57,12 +60,89 @@ pub struct RunValidationGap {
 pub struct RunValidationPayload {
     pub profile: String,
     pub requested_governors: Vec<String>,
+    #[serde(default)]
+    pub workflow_recommendation_ref: Option<String>,
+    #[serde(default)]
+    pub collect_plan_ref: Option<String>,
+    #[serde(default)]
+    pub collect_plan_digest: Option<String>,
+    #[serde(default = "legacy_run_set_id")]
+    pub subject_run_set_id: String,
+    #[serde(default)]
+    pub included_run_refs: Vec<String>,
+    #[serde(default = "default_validation_profile")]
+    pub validation_profile: String,
+    #[serde(default)]
+    pub expected_governors: Vec<String>,
+    #[serde(default = "unknown_target_id")]
+    pub target_id: String,
+    #[serde(default = "unknown_target_class")]
+    pub target_class: String,
+    #[serde(default)]
+    pub version_set: RunValidationVersionSet,
+    #[serde(default)]
+    pub version_skew_policy: VersionSkewPolicyResult,
+    #[serde(default)]
+    pub version_skew_override: bool,
     pub governor_results: Vec<GovernorValidation>,
     pub overall_validity: GovernorValidity,
     pub gaps: Vec<RunValidationGap>,
     pub audit_refs: Vec<String>,
 }
-
+impl RunValidationPayload {
+    pub fn has_run_set_identity(&self) -> bool {
+        self.subject_run_set_id != LEGACY_RUN_VALIDATION_MISSING_RUN_SET_ID
+            && !self.subject_run_set_id.trim().is_empty()
+            && !self.included_run_refs.is_empty()
+    }
+}
+#[derive(Debug, Clone)]
+pub struct RunValidationInput {
+    pub subject_run: RunContext,
+    pub include_runs: Vec<RunContext>,
+    pub requested_governors: Vec<String>,
+    pub workflow_recommendation_ref: Option<String>,
+    pub collect_plan_ref: Option<String>,
+    pub collect_plan_digest: Option<String>,
+    pub target_id: Option<String>,
+    pub target_class: Option<String>,
+    pub allow_version_skew: bool,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolVersionRole {
+    ControllerAdcLab,
+    TargetLocalAdcLab,
+    TargetRunner,
+    PrivilegedHelper,
+    ReleaseManifest,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ToolVersionRecord {
+    pub role: ToolVersionRole,
+    pub tool_name: String,
+    pub version: String,
+    pub git_sha: String,
+    pub target_triple: String,
+    pub build_profile: String,
+    pub artifact_ref: String,
+}
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RunValidationVersionSet {
+    pub records: Vec<ToolVersionRecord>,
+    pub skew_detected: bool,
+    pub skew_reasons: Vec<String>,
+}
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum VersionSkewPolicyResult {
+    #[default]
+    NoSkewDetected,
+    BlockedByVersionSkew,
+    OverrideRecordedStillBlocked,
+}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GovernorSweepPolicyPayload {
@@ -124,15 +204,33 @@ struct ValidationIndex {
     loads: Vec<LoadEntry>,
     health_check_ref: Option<String>,
     health_check_ok: bool,
-    audit_ref: Option<String>,
+    audit_refs: Vec<String>,
 }
 
 pub fn validate_fullset_run(
     run: &RunContext,
     requested_governors: Vec<String>,
 ) -> LabResult<Artifact<RunValidationPayload>> {
-    let index = ValidationIndex::load(run)?;
-    let requested_governors = normalize_governors(requested_governors);
+    validate_fullset_run_set(RunValidationInput {
+        subject_run: run.clone(),
+        include_runs: Vec::new(),
+        requested_governors,
+        workflow_recommendation_ref: None,
+        collect_plan_ref: None,
+        collect_plan_digest: None,
+        target_id: None,
+        target_class: None,
+        allow_version_skew: false,
+    })
+}
+
+pub fn validate_fullset_run_set(
+    input: RunValidationInput,
+) -> LabResult<Artifact<RunValidationPayload>> {
+    let mut runs = vec![input.subject_run.clone()];
+    runs.extend(input.include_runs.clone());
+    let index = ValidationIndex::load_runs(&runs)?;
+    let requested_governors = normalize_governors(input.requested_governors);
     let mut governor_results = Vec::new();
     let mut gaps = Vec::new();
 
@@ -142,20 +240,50 @@ pub fn validate_fullset_run(
         governor_results.push(result);
     }
 
+    let version_set = version_set_for_runs(&runs)?;
+    let version_skew_policy = version_skew_policy(&version_set, input.allow_version_skew);
+    apply_version_skew_policy(
+        &mut governor_results,
+        &mut gaps,
+        &version_skew_policy,
+        &version_set,
+    );
     let overall_validity = overall_validity(&governor_results);
+    let target_id = input
+        .target_id
+        .filter(|value| value != "unknown-target")
+        .unwrap_or_else(|| target_id_from_index(&index));
+    let target_class = input
+        .target_class
+        .unwrap_or_else(|| "unknown-target-class".to_string());
+    let subject_run_set_id = run_set_id(&runs);
+    let included_run_refs = run_refs(&runs)?;
+    let audit_refs = index.audit_refs.clone();
     let mut artifact = Artifact::new(
         Kind::ReportRunValidation,
         new_id("RUN-VALIDATION"),
-        run.run_id.clone(),
-        target_id_from_index(&index),
+        input.subject_run.run_id.clone(),
+        target_id.clone(),
         envelope_status(&overall_validity),
         RunValidationPayload {
             profile: FULLSET_PROFILE.to_string(),
-            requested_governors,
+            requested_governors: requested_governors.clone(),
+            workflow_recommendation_ref: input.workflow_recommendation_ref,
+            collect_plan_ref: input.collect_plan_ref,
+            collect_plan_digest: input.collect_plan_digest,
+            subject_run_set_id,
+            included_run_refs,
+            validation_profile: FULLSET_PROFILE.to_string(),
+            expected_governors: requested_governors,
+            target_id,
+            target_class,
+            version_set,
+            version_skew_policy,
+            version_skew_override: input.allow_version_skew,
             governor_results,
             overall_validity,
             gaps,
-            audit_refs: index.audit_ref.into_iter().collect(),
+            audit_refs,
         },
         now_unix_ms(),
     );
@@ -391,7 +519,7 @@ fn linked_load<'a>(
                     && snapshot_governor
                         .is_none_or(|recorded_governor| recorded_governor == governor)
             }
-            None => snapshot_governor == Some(governor),
+            None => false,
         }
     })
 }
@@ -487,6 +615,71 @@ fn overall_validity(results: &[GovernorValidation]) -> GovernorValidity {
     }
 }
 
+fn version_skew_policy(
+    version_set: &RunValidationVersionSet,
+    allow_version_skew: bool,
+) -> VersionSkewPolicyResult {
+    if !version_set.skew_detected {
+        VersionSkewPolicyResult::NoSkewDetected
+    } else if allow_version_skew {
+        VersionSkewPolicyResult::OverrideRecordedStillBlocked
+    } else {
+        VersionSkewPolicyResult::BlockedByVersionSkew
+    }
+}
+
+fn apply_version_skew_policy(
+    results: &mut [GovernorValidation],
+    gaps: &mut Vec<RunValidationGap>,
+    policy: &VersionSkewPolicyResult,
+    version_set: &RunValidationVersionSet,
+) {
+    if matches!(policy, VersionSkewPolicyResult::NoSkewDetected) {
+        return;
+    }
+
+    let code = match policy {
+        VersionSkewPolicyResult::BlockedByVersionSkew => "blocked_by_version_skew",
+        VersionSkewPolicyResult::OverrideRecordedStillBlocked => {
+            "version_skew_override_still_blocked"
+        }
+        VersionSkewPolicyResult::NoSkewDetected => unreachable!(),
+    };
+    let message = match policy {
+        VersionSkewPolicyResult::BlockedByVersionSkew => {
+            "version skew blocks full-set measured claims by default"
+        }
+        VersionSkewPolicyResult::OverrideRecordedStillBlocked => {
+            "version skew override was recorded, but full-set measured claims remain blocked"
+        }
+        VersionSkewPolicyResult::NoSkewDetected => unreachable!(),
+    };
+    let version_refs = version_set
+        .records
+        .iter()
+        .map(|record| record.artifact_ref.clone())
+        .collect::<Vec<_>>();
+
+    for result in results {
+        if result.validity != GovernorValidity::Contaminated
+            && result.validity != GovernorValidity::Refused
+            && result.validity != GovernorValidity::NotApplicable
+        {
+            result.validity = GovernorValidity::Insufficient;
+        }
+        result.messages.push(message.to_string());
+        result.next_evidence.push(
+            "rerun controller and target-local workflow with matching adc-lab versions".to_string(),
+        );
+        gaps.push(RunValidationGap {
+            code: code.to_string(),
+            governor: Some(result.governor.clone()),
+            message: format!("{}: {}", message, version_set.skew_reasons.join("; ")),
+            evidence_refs: version_refs.clone(),
+        });
+    }
+}
+
 fn envelope_status(validity: &GovernorValidity) -> Status {
     match validity {
         GovernorValidity::Measured => Status::Measured,
@@ -521,26 +714,50 @@ fn normalize_governors(governors: Vec<String>) -> Vec<String> {
     governors
 }
 
+fn legacy_run_set_id() -> String {
+    LEGACY_RUN_VALIDATION_MISSING_RUN_SET_ID.to_string()
+}
+
+fn default_validation_profile() -> String {
+    FULLSET_PROFILE.to_string()
+}
+
+fn unknown_target_id() -> String {
+    "unknown-target".to_string()
+}
+
+fn unknown_target_class() -> String {
+    "unknown-target-class".to_string()
+}
+
 impl ValidationIndex {
-    fn load(run: &RunContext) -> LabResult<Self> {
-        let mut index = Self {
-            plans: read_plan_entries(run)?,
-            approvals: read_approval_entries(run)?,
-            results: read_result_entries(run)?,
-            loads: read_load_entries(run)?,
-            ..Self::default()
-        };
+    fn load_runs(runs: &[RunContext]) -> LabResult<Self> {
+        let mut index = Self::default();
+        for run in runs {
+            index.plans.extend(read_plan_entries(run)?);
+            index.approvals.extend(read_approval_entries(run)?);
+            index.results.extend(read_result_entries(run)?);
+            index.loads.extend(read_load_entries(run)?);
+            index.load_health_and_audit(run)?;
+        }
+        Ok(index)
+    }
+
+    fn load_health_and_audit(&mut self, run: &RunContext) -> LabResult<()> {
         let health_path = run.run_dir.join("health/restore_health_check.json");
         if health_path.exists() {
-            index.health_check_ref = Some(run.artifact_uri(&health_path)?);
+            let health_ref = run.artifact_uri(&health_path)?;
             let health: HealthCheck = read_json(&health_path)?;
-            index.health_check_ok = health.status == "ok";
+            if health.status == "ok" || self.health_check_ref.is_none() {
+                self.health_check_ref = Some(health_ref);
+                self.health_check_ok = health.status == "ok";
+            }
         }
         let audit_path = run.run_dir.join("audit.jsonl");
         if audit_path.exists() {
-            index.audit_ref = Some(run.artifact_uri(&audit_path)?);
+            self.audit_refs.push(run.artifact_uri(&audit_path)?);
         }
-        Ok(index)
+        Ok(())
     }
 }
 
@@ -678,6 +895,148 @@ fn target_id_from_index(index: &ValidationIndex) -> String {
         .unwrap_or_else(|| "unknown-target".to_string())
 }
 
+pub fn digest_file_sha256(path: &Path) -> LabResult<String> {
+    let bytes = fs::read(path).map_err(|source| LabError::IoWithPath {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let digest = Sha256::digest(bytes);
+    Ok(format!("sha256:{digest:x}"))
+}
+
+fn run_set_id(runs: &[RunContext]) -> String {
+    let mut values = runs
+        .iter()
+        .map(|run| format!("{}:{}", run.run_id, run.run_dir.display()))
+        .collect::<Vec<_>>();
+    values.sort();
+    values.dedup();
+    let digest = Sha256::digest(values.join("\n").as_bytes());
+    format!("RUN-SET-{digest:x}").chars().take(24).collect()
+}
+
+fn run_refs(runs: &[RunContext]) -> LabResult<Vec<String>> {
+    runs.iter()
+        .map(|run| {
+            let context_path = run.run_dir.join("run_context.json");
+            if context_path.exists() {
+                run.artifact_uri(context_path)
+            } else {
+                Ok(format!("run-dir:{}", run.run_dir.display()))
+            }
+        })
+        .collect()
+}
+
+fn version_set_for_runs(runs: &[RunContext]) -> LabResult<RunValidationVersionSet> {
+    let mut records = Vec::new();
+    for (index, run) in runs.iter().enumerate() {
+        let controller_path = run.run_dir.join("tools/adc-lab.version.json");
+        if controller_path.exists() {
+            let role = if index == 0 {
+                ToolVersionRole::ControllerAdcLab
+            } else {
+                ToolVersionRole::TargetLocalAdcLab
+            };
+            records.push(build_info_record(run, &controller_path, role)?);
+        }
+        let target_path = run.run_dir.join("tools/adc-lab-target.version.json");
+        if target_path.exists() {
+            records.push(build_info_record(
+                run,
+                &target_path,
+                ToolVersionRole::TargetRunner,
+            )?);
+        }
+        let manifest_path = run.run_dir.join("release-manifest.json");
+        if manifest_path.exists() {
+            records.push(release_manifest_record(run, &manifest_path)?);
+        }
+        let doctor_path = run.run_dir.join("privilege/privilege_doctor.json");
+        if doctor_path.exists() {
+            if let Some(record) = privilege_helper_record(run, &doctor_path)? {
+                records.push(record);
+            }
+        }
+    }
+
+    let mut versions = BTreeSet::new();
+    let mut git_shas = BTreeSet::new();
+    for record in &records {
+        if record.version != "unknown" {
+            versions.insert(record.version.clone());
+        }
+        if record.git_sha != "unknown" {
+            git_shas.insert(record.git_sha.clone());
+        }
+    }
+    let mut skew_reasons = Vec::new();
+    if versions.len() > 1 {
+        skew_reasons.push(format!(
+            "version mismatch across workflow tools: {}",
+            versions.into_iter().collect::<Vec<_>>().join(", ")
+        ));
+    }
+    if git_shas.len() > 1 {
+        skew_reasons.push(format!(
+            "git_sha mismatch across workflow tools: {}",
+            git_shas.into_iter().collect::<Vec<_>>().join(", ")
+        ));
+    }
+
+    Ok(RunValidationVersionSet {
+        records,
+        skew_detected: !skew_reasons.is_empty(),
+        skew_reasons,
+    })
+}
+
+fn build_info_record(
+    run: &RunContext,
+    path: &Path,
+    role: ToolVersionRole,
+) -> LabResult<ToolVersionRecord> {
+    let info: BuildInfo = read_json(path)?;
+    Ok(ToolVersionRecord {
+        role,
+        tool_name: info.name,
+        version: info.version,
+        git_sha: info.git_sha,
+        target_triple: info.target_triple,
+        build_profile: info.build_profile,
+        artifact_ref: run.artifact_uri(path)?,
+    })
+}
+
+fn release_manifest_record(run: &RunContext, path: &Path) -> LabResult<ToolVersionRecord> {
+    let manifest: ReleaseManifest = read_json(path)?;
+    Ok(ToolVersionRecord {
+        role: ToolVersionRole::ReleaseManifest,
+        tool_name: "release-manifest".to_string(),
+        version: manifest.version,
+        git_sha: manifest.git_sha,
+        target_triple: manifest.target_triple,
+        build_profile: "release".to_string(),
+        artifact_ref: run.artifact_uri(path)?,
+    })
+}
+
+fn privilege_helper_record(run: &RunContext, path: &Path) -> LabResult<Option<ToolVersionRecord>> {
+    let report: PrivilegeDoctorReport = read_json(path)?;
+    let Some(version) = report.helper_version else {
+        return Ok(None);
+    };
+    Ok(Some(ToolVersionRecord {
+        role: ToolVersionRole::PrivilegedHelper,
+        tool_name: "adc-lab-priv-helper".to_string(),
+        version,
+        git_sha: "unknown".to_string(),
+        target_triple: "unknown".to_string(),
+        build_profile: "unknown".to_string(),
+        artifact_ref: run.artifact_uri(path)?,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -737,7 +1096,6 @@ mod tests {
         assert!(result.messages[0].contains("approval mismatch"));
         assert!(matches!(validation.status, Status::UnsafeBlocked { .. }));
     }
-
     #[test]
     fn fullset_validation_marks_unlinked_load_contaminated() {
         let temp = tempfile::tempdir().unwrap();
@@ -789,7 +1147,6 @@ mod tests {
         assert_eq!(result.validity, GovernorValidity::Contaminated);
         assert!(result.messages[0].contains("explicit control-result"));
     }
-
     #[test]
     fn fullset_validation_rejects_load_with_wrong_control_ref() {
         let temp = tempfile::tempdir().unwrap();
@@ -845,7 +1202,6 @@ mod tests {
         let result = &validation.payload.governor_results[0];
         assert_eq!(result.validity, GovernorValidity::Contaminated);
     }
-
     #[test]
     fn fullset_validation_accepts_linked_load_with_restore_and_health() {
         let temp = tempfile::tempdir().unwrap();

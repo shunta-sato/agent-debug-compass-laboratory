@@ -3,7 +3,8 @@ use adc_lab_core::{
     generate_constraints_artifact_v2, operating_contract_from_rules_v2,
     render_agent_constraints_markdown, Artifact, CompositePayload, Decision, EvidenceStore,
     GovernorValidation, GovernorValidity, Kind, Pred, PressurePayload, Rule, RunValidationPayload,
-    Status, SuitabilityDecisionValue, SuitabilityPayload, FULLSET_PROFILE,
+    RunValidationVersionSet, Status, SuitabilityDecisionValue, SuitabilityPayload,
+    VersionSkewPolicyResult, FULLSET_PROFILE,
 };
 use std::path::Path;
 
@@ -450,6 +451,22 @@ fn write_run_validation(
         RunValidationPayload {
             profile: FULLSET_PROFILE.to_string(),
             requested_governors: vec!["performance".to_string()],
+            workflow_recommendation_ref: None,
+            collect_plan_ref: None,
+            collect_plan_digest: None,
+            subject_run_set_id: "RUN-SET-test".to_string(),
+            included_run_refs: vec!["artifact://lab/runs/LAB-RUN-001/".to_string()],
+            validation_profile: FULLSET_PROFILE.to_string(),
+            expected_governors: vec!["performance".to_string()],
+            target_id: "target55".to_string(),
+            target_class: "raspberry_pi_4".to_string(),
+            version_set: RunValidationVersionSet {
+                records: Vec::new(),
+                skew_detected: false,
+                skew_reasons: Vec::new(),
+            },
+            version_skew_policy: VersionSkewPolicyResult::NoSkewDetected,
+            version_skew_override: false,
             governor_results: vec![GovernorValidation {
                 governor: "performance".to_string(),
                 validity: validity.clone(),

@@ -1086,6 +1086,109 @@ fn report_validate_run_writes_artifact_gaps_and_fails_closed_for_non_measured() 
 }
 
 #[test]
+fn report_validate_run_accepts_include_run_and_records_run_set_identity() {
+    let primary = tempfile::tempdir().unwrap();
+    let included = tempfile::tempdir().unwrap();
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "plan",
+            "--target",
+            "local",
+            "--run-dir",
+            included.path().to_str().unwrap(),
+            "cpu.governor",
+            "--set",
+            "performance",
+        ])
+        .assert()
+        .success();
+    let plan_path = single_plan_path(included.path());
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "approve",
+            "--plan",
+            plan_path.to_str().unwrap(),
+            "--approved-by",
+            "operator",
+        ])
+        .assert()
+        .success();
+    let approval_path = single_approval_path(included.path());
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "control",
+            "apply",
+            "--plan",
+            plan_path.to_str().unwrap(),
+            "--approval",
+            approval_path.to_str().unwrap(),
+            "--dry-run",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "validate-run",
+            "--run",
+            primary.path().to_str().unwrap(),
+            "--include-run",
+            included.path().to_str().unwrap(),
+            "--expected-governors",
+            "performance",
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--allow-non-measured",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"kind\": \"report.run_validation\""));
+
+    let validation_path = primary.path().join("reports/run_validation.v2.json");
+    let validation: serde_json::Value =
+        serde_json::from_slice(&fs::read(validation_path).unwrap()).unwrap();
+    assert_eq!(
+        validation["payload"]["target_id"],
+        serde_json::json!("target55")
+    );
+    assert_eq!(
+        validation["payload"]["target_class"],
+        serde_json::json!("raspberry_pi_4")
+    );
+    assert_eq!(
+        validation["payload"]["included_run_refs"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(validation["payload"]["subject_run_set_id"]
+        .as_str()
+        .unwrap()
+        .starts_with("RUN-SET-"));
+    assert!(validation["payload"]["governor_results"][0]["plan_ref"]
+        .as_str()
+        .unwrap()
+        .contains("artifact://lab/runs/"));
+    assert_eq!(
+        validation["payload"]["governor_results"][0]["validity"],
+        serde_json::json!("insufficient")
+    );
+}
+
+#[test]
 fn governor_sweep_prepare_approve_and_dry_run_writes_validation() {
     let temp = tempfile::tempdir().unwrap();
     let request_path = temp.path().join("approvals/governor_sweep_request.v2.json");
