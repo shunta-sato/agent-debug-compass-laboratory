@@ -115,11 +115,24 @@ Key files:
 | `adc_lab_core::workflow` | Own workflow registry DTOs and deterministic payload construction. | Workflow contract or registry changes. | Depends on stable build/evidence types; CLI depends on it. |
 | `commands::workflow` | Persist/print workflow recommendations and attach audit only for run-dir writes. | CLI persistence/output policy changes. | Depends on core workflow and common command helpers. |
 | `commands::agent` | Render controller-Agent instructions from registry data. | Prompt contract changes. | Depends on core workflow. |
-| future `commands::collect` | Persist argv-array collect plans and optional markdown handoff. | Collect handoff contract changes. | Depends on core workflow and CLI command catalog. |
+| `commands::collect` | Persist argv-array collect plans and optional markdown handoff. | Collect handoff contract changes. | Depends on core workflow and CLI command catalog. |
 
 Layout decision: start with one core workflow module and one CLI command module.
 Do not create a generic workflow engine in PR1; add only the registry and
 payload builder needed by `workflow recommend`.
+
+Phase 4 route:
+
+- Risk route: high, because `collect plan` adds a public CLI, a new public v2
+  artifact kind, generated schema, and command choreography for claim-producing
+  downstream workflows.
+- Test list: core payload tests for argv-array/no-shell plan shape; CLI tests
+  for artifact writing, markdown generation, schema kind, and absence of
+  filename-order heuristics; full `make verify`.
+- Responsibility layout decision: keep collect-plan payload construction in
+  `adc_lab_core::workflow`, keep file output/audit-free handoff behavior in
+  `commands::collect`, and move existing Workflow/Agent Clap subcommands into
+  their command modules to keep `main.rs` below the enforced 800-line budget.
 
 ### Complexity Budget
 
@@ -128,6 +141,17 @@ payload builder needed by `workflow recommend`.
 - New helper target: <= 4 focused helpers for payload construction/persistence.
 - Production lines target: <= 350; test lines target: <= 120.
 - Indirection target: no plugin or trait layer; direct registry functions only.
+
+Phase 4 complexity budget:
+
+- Changed files target: <= 9 tracked files, including generated schema and
+  ledger.
+- New modules target: 1 (`commands::collect`).
+- New helpers target: <= 5, centered on collect-plan step construction and
+  markdown rendering.
+- Production lines target: <= 450; test lines target: <= 120.
+- Indirection target: no generic workflow executor and no shell runner layer;
+  collect plan remains data plus argv arrays.
 
 ### Source-of-Truth Chain
 
@@ -179,7 +203,12 @@ Final v0.2.3:
 - [x] Phase 1: Add CLI/core tests proving recommendation shape and non-evidence semantics.
 - [x] Phase 2: Add `agent instructions` command and deterministic Codex prompt fixture.
 - [x] Phase 3: Extend multi-run `report validate-run` and version-set policy.
-- [ ] Phase 4: Add `collect plan` artifact and argv-array step contract.
+- [x] Phase 4: Add `collect plan` artifact and argv-array step contract.
+  - [x] Add `workflow.collect_plan` kind, payload, schema, and ledger row.
+  - [x] Add `adc-lab collect plan` CLI and optional generated markdown.
+  - [x] Ensure generated plan steps are argv arrays with no shell fragments.
+  - [x] Update Agent instructions to point at live `collect plan` surface.
+  - [x] Add focused core/CLI tests and verify file budgets.
 - [ ] Phase 5: Add operating-contract `--validation` / `--strict-fullset` gate.
 - [ ] Phase 6: Add `constraints check-candidate` / `constraints self-check`.
 - [ ] Phase 7: Update docs/examples and expand stale-pattern guards.
@@ -242,20 +271,35 @@ Final v0.2.3:
   of bumping to v3. Rationale: old v0.2.2 validation artifacts should remain
   parseable for review/reporting, but missing run-set identity must block
   controlled-governor measured projection.
+- 2026-06-13: For Phase 4, emit suitability and constraints steps with
+  explicit operator-provided input paths instead of omitting them from the
+  source-of-truth chain. Rationale: the current public CLI requires workload
+  demand and suitability policy inputs; collect plan can specify those paths
+  without inventing a shell harness or guessing files by time/name order.
+- 2026-06-13: Move existing Workflow/Agent Clap command types into their
+  command modules while adding Collect. Rationale: `main.rs` is exactly at the
+  enforced 800-line budget after Phase 3, and command modules are the intended
+  owners for command-specific IO contracts.
+- 2026-06-13: Accept Phase 4 complexity-budget miss. Actual tracked-file
+  change count is 24 rather than <=9 because adding a `Kind` variant updates
+  all generated v2 artifact schemas, and production line growth is above the
+  450-line target because the plan intentionally spells out each public argv
+  step and continuation rule. Guardrail remains satisfied: `main.rs` is 748/800
+  and `check-file-budgets.py --enforce` reports zero violations.
 
 ## Handoff
 
-Current branch: `codex/v023-multirun-validation`.
+Current branch: `codex/v023-collect-plan`.
 
 PR1 status: merged as PR #55.
 PR2 status: merged as PR #56.
-PR3 status: implemented locally and verified.
-PR3 review fix status: implemented locally and verified.
+PR3 status: merged as PR #57.
+PR4 status: implemented locally and verified; ready to commit/open PR.
 
 Next steps:
 
-1. Commit and open PR3 against `main`.
-2. After PR3 merge, start Phase 4 from updated `origin/main`.
+1. Commit and open PR4 against `main`.
+2. After PR4 merge, start Phase 5 from updated `origin/main`.
 
 ## Outcomes & Retrospective
 
@@ -354,3 +398,31 @@ PR3 verification:
   `cargo clippy --workspace --all-targets -- -D warnings` with
   `clippy::derivable_impls` at `crates/adc-lab-core/src/run_validation.rs:145`.
   The fix replaces the hand-written `Default` impl with a derive.
+
+PR4 outcomes:
+
+- Added `workflow.collect_plan` as a v2 handoff artifact and generated schema.
+- Added `adc-lab collect plan` with required argv-array step contract fields.
+- Generated collect-plan markdown instructions from the artifact without
+  file-order or timestamp selection patterns.
+- Updated `agent instructions` so its next step points to live `collect plan`.
+- Moved Workflow/Agent Clap command types into command modules so `main.rs`
+  stays below the enforced file budget while adding Collect.
+
+PR4 post-implementation economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `WorkflowCollectPlanPayload` / `WorkflowCollectPlanStep` | Makes the executable handoff contract schema-visible and prevents shell harnesses from becoming the workflow surface. | keep | Generated schema and core argv-array test. |
+| `commands::collect` | Keeps collect-plan file output and markdown rendering separate from `main.rs` dispatch and workflow recommendation persistence. | keep | CLI collect-plan test and file-budget check. |
+| `render_collect_plan_agent_instructions` | Renders instructions from the plan artifact so markdown cannot drift from the machine-readable argv steps. | keep | CLI test checks markdown and forbidden-pattern absence. |
+
+PR4 verification:
+
+- `cargo test -p adc-lab-core workflow -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli collect_plan -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli agent_instructions -- --nocapture`: pass.
+- `make schemas-check`: pass.
+- `python3 scripts/ci/check-file-budgets.py --enforce`: pass.
+- `cargo clippy --workspace --all-targets -- -D warnings`: pass.
+- `make verify`: pass.

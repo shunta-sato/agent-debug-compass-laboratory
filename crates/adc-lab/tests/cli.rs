@@ -243,7 +243,7 @@ fn agent_instructions_generate_codex_prompt_from_workflow_registry() {
     );
     assert_eq!(
         summary["next_step"],
-        "collect plan PR after it is available; stop before claim-producing full-set execution and report adc-lab version/capability mismatch"
+        "run adc-lab collect plan, then follow the emitted argv-array steps"
     );
 
     let prompt = fs::read_to_string(out).unwrap();
@@ -253,7 +253,7 @@ fn agent_instructions_generate_codex_prompt_from_workflow_registry() {
     assert!(prompt.contains("reports/target_operating_contract.v2.json"));
     assert!(prompt.contains("Do not fall back to a static prompt or hand-written shell harness"));
     assert!(prompt.contains("stop and report adc-lab version/capability mismatch"));
-    assert!(prompt.contains("collect plan PR after it is available"));
+    assert!(prompt.contains("run adc-lab collect plan"));
 
     for forbidden in [
         "PLAN-*.json",
@@ -271,6 +271,112 @@ fn agent_instructions_generate_codex_prompt_from_workflow_registry() {
         assert!(
             !prompt.contains(forbidden),
             "generated prompt must not contain {forbidden}"
+        );
+    }
+}
+
+#[test]
+fn collect_plan_writes_v2_argv_steps_and_markdown() {
+    let temp = tempfile::tempdir().unwrap();
+    let run_dir = temp.path().join("run");
+    let out = run_dir.join("workflows/collect_plan.v2.json");
+    let instructions_out = run_dir.join("workflows/collect_plan.md");
+    let output = Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "collect",
+            "plan",
+            "--goal",
+            "target-operating-contract-fullset",
+            "--target",
+            "ssh://target55",
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--expected-governors",
+            "ondemand,performance",
+            "--run-dir",
+            run_dir.to_str().unwrap(),
+            "--out",
+            out.to_str().unwrap(),
+            "--agent-instructions-out",
+            instructions_out.to_str().unwrap(),
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let summary: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(summary["artifact_ref"], out.display().to_string());
+    assert_eq!(summary["value"]["kind"], "workflow.collect_plan");
+    assert_eq!(summary["value"]["status"]["state"], "not_applicable");
+    assert_eq!(summary["value"]["claims"].as_array().unwrap().len(), 0);
+    assert_eq!(
+        summary["value"]["payload"]["workflow_id"],
+        "target-operating-contract-fullset.v0.2.3"
+    );
+    assert_eq!(
+        summary["value"]["payload"]["packaging_is_target_evidence"],
+        false
+    );
+
+    let plan: Artifact<serde_json::Value> =
+        serde_json::from_slice(&fs::read(&out).unwrap()).unwrap();
+    assert_eq!(plan.kind, Kind::WorkflowCollectPlan);
+    let steps = plan.payload["steps"].as_array().unwrap();
+    assert!(steps.iter().any(|step| step["step_id"] == "run_validation"));
+    assert!(steps.iter().any(|step| step["step_id"] == "archive"));
+    for step in steps {
+        let argv = step["command_argv"].as_array().unwrap();
+        assert!(!argv.is_empty());
+        for arg in argv {
+            let arg = arg.as_str().unwrap();
+            for forbidden in ["|", "&&", "$(", "`"] {
+                assert!(
+                    !arg.contains(forbidden),
+                    "argv item must not contain shell fragment {forbidden}: {arg}"
+                );
+            }
+        }
+    }
+
+    let validation_step = steps
+        .iter()
+        .find(|step| step["step_id"] == "run_validation")
+        .unwrap();
+    assert!(validation_step["command_argv"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|arg| arg == "--collect-plan"));
+    assert!(validation_step["expected_artifact_kinds"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|kind| kind == "report.run_validation"));
+
+    let instructions = fs::read_to_string(instructions_out).unwrap();
+    assert!(instructions.contains("workflow.collect_plan"));
+    assert!(instructions.contains("argv: `["));
+    assert!(instructions.contains("Packaging steps are handoff steps, not target evidence"));
+    for forbidden in [
+        "PLAN-*.json",
+        "APPROVAL-*.json",
+        "LEASE-*.json",
+        "tail -n 1",
+        "ls -t",
+        "find ",
+        "mtime",
+        "newest",
+        "latest plan",
+        "latest approval",
+        "latest lease",
+    ] {
+        assert!(
+            !instructions.contains(forbidden),
+            "collect instructions must not contain {forbidden}"
         );
     }
 }

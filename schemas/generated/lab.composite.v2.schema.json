@@ -256,7 +256,8 @@
         "report.constraints_check",
         "report.run_validation",
         "control.governor_sweep_policy",
-        "workflow.recommendation"
+        "workflow.recommendation",
+        "workflow.collect_plan"
       ]
     },
     "Metric": {

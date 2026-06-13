@@ -29,6 +29,8 @@ pub enum Kind {
     ControlGovernorSweepPolicy,
     #[serde(rename = "workflow.recommendation")]
     WorkflowRecommendation,
+    #[serde(rename = "workflow.collect_plan")]
+    WorkflowCollectPlan,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]

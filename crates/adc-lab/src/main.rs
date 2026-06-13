@@ -74,11 +74,15 @@ enum Commands {
     },
     Workflow {
         #[command(subcommand)]
-        command: WorkflowCommand,
+        command: commands::workflow::WorkflowCommand,
     },
     Agent {
         #[command(subcommand)]
-        command: AgentCommand,
+        command: commands::agent::AgentCommand,
+    },
+    Collect {
+        #[command(subcommand)]
+        command: commands::collect::CollectCommand,
     },
 }
 
@@ -90,57 +94,6 @@ struct TargetCommand {
     run_dir: Option<PathBuf>,
     #[arg(long)]
     json: bool,
-}
-
-#[derive(Debug, Subcommand)]
-enum WorkflowCommand {
-    Recommend(WorkflowRecommendCommand),
-}
-
-#[derive(Debug, Args)]
-struct WorkflowRecommendCommand {
-    #[arg(long, default_value = "target-operating-contract-fullset")]
-    goal: String,
-    #[arg(long, default_value = "local")]
-    target: String,
-    #[arg(long, default_value = "local-target")]
-    target_id: String,
-    #[arg(long, default_value = "unknown-target-class")]
-    target_class: String,
-    #[arg(long)]
-    run_dir: Option<PathBuf>,
-    #[arg(long)]
-    out: Option<PathBuf>,
-    #[arg(long)]
-    json: bool,
-}
-
-#[derive(Debug, Subcommand)]
-enum AgentCommand {
-    Instructions(AgentInstructionsCommand),
-}
-
-#[derive(Debug, Args)]
-struct AgentInstructionsCommand {
-    #[arg(long, default_value = "target-operating-contract-fullset")]
-    goal: String,
-    #[arg(long, default_value = "local")]
-    target: String,
-    #[arg(long, default_value = "local-target")]
-    target_id: String,
-    #[arg(long, default_value = "unknown-target-class")]
-    target_class: String,
-    #[arg(long, value_enum, default_value_t = AgentInstructionsFormatArg::Codex)]
-    format: AgentInstructionsFormatArg,
-    #[arg(long)]
-    out: PathBuf,
-    #[arg(long)]
-    json: bool,
-}
-
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum AgentInstructionsFormatArg {
-    Codex,
 }
 
 #[derive(Debug, Subcommand)]
@@ -776,14 +729,9 @@ fn main() -> Result<()> {
                 commands::tool::command_tool_qualify_inventory(args)
             }
         },
-        Commands::Workflow { command } => match command {
-            WorkflowCommand::Recommend(args) => {
-                commands::workflow::command_workflow_recommend(args)
-            }
-        },
-        Commands::Agent { command } => match command {
-            AgentCommand::Instructions(args) => commands::agent::command_agent_instructions(args),
-        },
+        Commands::Workflow { command } => commands::workflow::command_workflow(command),
+        Commands::Agent { command } => commands::agent::command_agent(command),
+        Commands::Collect { command } => commands::collect::command_collect(command),
     }
 }
 

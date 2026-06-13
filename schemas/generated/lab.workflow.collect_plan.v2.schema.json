@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Artifact_for_SuitabilityPayload",
+  "title": "Artifact_for_WorkflowCollectPlanPayload",
   "type": "object",
   "required": [
     "claims",
@@ -59,7 +59,7 @@
       }
     },
     "payload": {
-      "$ref": "#/definitions/SuitabilityPayload"
+      "$ref": "#/definitions/WorkflowCollectPlanPayload"
     },
     "run_id": {
       "type": "string"
@@ -100,6 +100,34 @@
           "items": {
             "type": "string"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "BuildInfo": {
+      "type": "object",
+      "required": [
+        "build_profile",
+        "git_sha",
+        "name",
+        "target_triple",
+        "version"
+      ],
+      "properties": {
+        "build_profile": {
+          "type": "string"
+        },
+        "git_sha": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "target_triple": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -207,6 +235,18 @@
       },
       "additionalProperties": false
     },
+    "GovernorValidity": {
+      "type": "string",
+      "enum": [
+        "measured",
+        "measured_partial",
+        "insufficient",
+        "refused",
+        "contaminated",
+        "not_applicable",
+        "unknown"
+      ]
+    },
     "Kind": {
       "type": "string",
       "enum": [
@@ -247,51 +287,6 @@
         "value": {
           "type": "number",
           "format": "double"
-        }
-      },
-      "additionalProperties": false
-    },
-    "RuleEvaluation": {
-      "type": "object",
-      "required": [
-        "claim_id",
-        "decision",
-        "evidence_refs",
-        "matched",
-        "missing",
-        "next_evidence",
-        "rule_id"
-      ],
-      "properties": {
-        "claim_id": {
-          "type": "string"
-        },
-        "decision": {
-          "$ref": "#/definitions/Decision"
-        },
-        "evidence_refs": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "matched": {
-          "type": "boolean"
-        },
-        "missing": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "next_evidence": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "rule_id": {
-          "type": "string"
         }
       },
       "additionalProperties": false
@@ -424,85 +419,86 @@
         }
       ]
     },
-    "SuitabilityConfidence": {
-      "type": "string",
-      "enum": [
-        "low",
-        "medium",
-        "high"
-      ]
-    },
-    "SuitabilityDecisionValue": {
-      "type": "string",
-      "enum": [
-        "meet",
-        "marginal",
-        "fail",
-        "unknown"
-      ]
-    },
-    "SuitabilityDimensionDecision": {
+    "WorkflowCollectPlanPayload": {
       "type": "object",
       "required": [
-        "confidence",
-        "decision",
-        "dimension",
-        "evidence_refs",
-        "next_evidence_needed",
-        "portable_between_targets",
-        "requirement",
-        "target_conditioned"
+        "continuation_semantics",
+        "controller_adc_lab",
+        "expected_final_artifacts",
+        "goal",
+        "packaging_failure_blocks_handoff",
+        "packaging_is_target_evidence",
+        "planned_run_dir",
+        "recommendation_mode",
+        "source_of_truth_chain",
+        "steps",
+        "target",
+        "target_class",
+        "target_id",
+        "workflow_id"
       ],
       "properties": {
-        "confidence": {
-          "$ref": "#/definitions/SuitabilityConfidence"
+        "continuation_semantics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkflowContinuationRule"
+          }
         },
-        "decision": {
-          "$ref": "#/definitions/SuitabilityDecisionValue"
+        "controller_adc_lab": {
+          "$ref": "#/definitions/BuildInfo"
         },
-        "dimension": {
-          "$ref": "#/definitions/SuitabilityDimensionKind"
-        },
-        "evidence_refs": {
+        "expected_final_artifacts": {
           "type": "array",
           "items": {
             "type": "string"
           }
         },
-        "margin": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "next_evidence_needed": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "observed_demand": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "portable_between_targets": {
-          "type": "boolean"
-        },
-        "requirement": {
+        "goal": {
           "type": "string"
         },
-        "target_conditioned": {
+        "packaging_failure_blocks_handoff": {
           "type": "boolean"
         },
-        "target_envelope": {
+        "packaging_is_target_evidence": {
+          "type": "boolean"
+        },
+        "planned_run_dir": {
+          "type": "string"
+        },
+        "recommendation_mode": {
+          "$ref": "#/definitions/WorkflowRecommendationMode"
+        },
+        "source_of_truth_chain": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkflowCollectPlanStep"
+          }
+        },
+        "target": {
+          "type": "string"
+        },
+        "target_class": {
+          "type": "string"
+        },
+        "target_id": {
+          "type": "string"
+        },
+        "workflow_id": {
+          "type": "string"
+        },
+        "workflow_recommendation_digest": {
           "type": [
             "string",
             "null"
           ]
         },
-        "unknown_reason": {
+        "workflow_recommendation_ref": {
           "type": [
             "string",
             "null"
@@ -511,83 +507,114 @@
       },
       "additionalProperties": false
     },
-    "SuitabilityDimensionKind": {
-      "type": "string",
-      "enum": [
-        "cpu",
-        "thermal",
-        "memory",
-        "storage_io",
-        "network_io",
-        "latency_jitter",
-        "observer"
-      ]
-    },
-    "SuitabilityPayload": {
+    "WorkflowCollectPlanStep": {
       "type": "object",
       "required": [
-        "blocked_claims",
-        "dimensions",
-        "evaluations",
-        "next_evidence",
-        "rule_set_id",
-        "selection_ready"
+        "claim_gate",
+        "command_argv",
+        "continue_on",
+        "expected_artifact_kinds",
+        "expected_artifact_paths_or_globs",
+        "human_summary",
+        "phase",
+        "requires_approval_policy",
+        "requires_controller",
+        "requires_privileged_helper",
+        "requires_target_local",
+        "step_id",
+        "stop_on",
+        "validation_after_step",
+        "working_directory_policy"
       ],
       "properties": {
-        "blocked_claims": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "dimensions": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/SuitabilityDimensionDecision"
-          }
-        },
-        "evaluations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/RuleEvaluation"
-          }
-        },
-        "next_evidence": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "overall_decision": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/SuitabilityDecisionValue"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "policy_id": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "rule_set_id": {
+        "claim_gate": {
           "type": "string"
         },
-        "selection_ready": {
+        "command_argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "continue_on": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/GovernorValidity"
+          }
+        },
+        "expected_artifact_kinds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expected_artifact_paths_or_globs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "human_summary": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "requires_approval_policy": {
           "type": "boolean"
         },
-        "workload_id": {
-          "type": [
-            "string",
-            "null"
-          ]
+        "requires_controller": {
+          "type": "boolean"
+        },
+        "requires_privileged_helper": {
+          "type": "boolean"
+        },
+        "requires_target_local": {
+          "type": "boolean"
+        },
+        "step_id": {
+          "type": "string"
+        },
+        "stop_on": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/GovernorValidity"
+          }
+        },
+        "validation_after_step": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "working_directory_policy": {
+          "type": "string"
         }
       },
       "additionalProperties": false
+    },
+    "WorkflowContinuationRule": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "semantics"
+      ],
+      "properties": {
+        "outcome": {
+          "$ref": "#/definitions/GovernorValidity"
+        },
+        "semantics": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkflowRecommendationMode": {
+      "type": "string",
+      "enum": [
+        "offline_recommendation",
+        "capability_checked_recommendation"
+      ]
     }
   }
 }
