@@ -135,17 +135,13 @@ pub struct RunValidationVersionSet {
     pub skew_detected: bool,
     pub skew_reasons: Vec<String>,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum VersionSkewPolicyResult {
+    #[default]
     NoSkewDetected,
     BlockedByVersionSkew,
     OverrideRecordedStillBlocked,
-}
-impl Default for VersionSkewPolicyResult {
-    fn default() -> Self {
-        Self::NoSkewDetected
-    }
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

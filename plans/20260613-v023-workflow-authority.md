@@ -205,6 +205,10 @@ Final v0.2.3:
   `lab.report.run_validation.v2` made old v0.2.2 validation artifacts fail
   deserialization. The schema now keeps the old six required payload fields and
   defaults new run-set fields to a legacy marker.
+- 2026-06-13: GitHub CI for PR3 head `dc2df50` failed on Rust 1.96 clippy
+  `derivable_impls` for `VersionSkewPolicyResult::default()`, while local
+  `make verify` passed under Rust 1.85. The enum now derives `Default` with
+  `#[default]` on `NoSkewDetected`.
 
 ## Decision Log
 
@@ -346,3 +350,7 @@ PR3 verification:
 - Review fix: `cargo test -p adc-lab-core run_report_blocks_legacy_validation_missing_run_set_identity -- --nocapture`: pass.
 - Review fix: `make schemas-check`: pass; generated payload required fields are back to `audit_refs`, `gaps`, `governor_results`, `overall_validity`, `profile`, `requested_governors`.
 - Review fix: `make verify`: pass.
+- CI fix: GitHub Actions run `27469114484`, job `81196682953`, failed in
+  `cargo clippy --workspace --all-targets -- -D warnings` with
+  `clippy::derivable_impls` at `crates/adc-lab-core/src/run_validation.rs:145`.
+  The fix replaces the hand-written `Default` impl with a derive.
