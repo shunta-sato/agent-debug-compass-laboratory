@@ -285,9 +285,10 @@ fn add_validation_operating_points(
         if artifact.payload.profile != FULLSET_PROFILE {
             continue;
         }
+        let legacy_identity = !artifact.payload.has_run_set_identity();
         for result in &artifact.payload.governor_results {
             let evidence_refs = validation_evidence_refs(&meta.artifact_ref, result);
-            if result.validity == GovernorValidity::Measured {
+            if result.validity == GovernorValidity::Measured && !legacy_identity {
                 measured_governors
                     .entry(result.governor.clone())
                     .or_insert_with(Vec::new)
@@ -298,9 +299,9 @@ fn add_validation_operating_points(
                     .or_insert_with(|| RunOperatingPointBlocked {
                         factor_id: "governor".to_string(),
                         requested_level: Some(result.governor.clone()),
-                        coverage_status: validation_status_label(&result.validity).to_string(),
-                        reason: validation_reason(result),
-                        next_evidence: validation_next_evidence(result),
+                        coverage_status: validation_coverage_status(result, legacy_identity),
+                        reason: validation_reason(result, legacy_identity),
+                        next_evidence: validation_next_evidence(result, legacy_identity),
                     });
             }
         }
@@ -364,7 +365,23 @@ fn validation_status_label(validity: &GovernorValidity) -> &'static str {
     }
 }
 
-fn validation_reason(result: &crate::run_validation::GovernorValidation) -> String {
+fn validation_coverage_status(
+    result: &crate::run_validation::GovernorValidation,
+    legacy_identity: bool,
+) -> String {
+    if legacy_identity {
+        return "insufficient".to_string();
+    }
+    validation_status_label(&result.validity).to_string()
+}
+
+fn validation_reason(
+    result: &crate::run_validation::GovernorValidation,
+    legacy_identity: bool,
+) -> String {
+    if legacy_identity {
+        return crate::run_validation::LEGACY_RUN_VALIDATION_MISSING_RUN_SET_ID.to_string();
+    }
     if result.messages.is_empty() {
         return format!(
             "run validation classified governor evidence as {}",
@@ -374,7 +391,13 @@ fn validation_reason(result: &crate::run_validation::GovernorValidation) -> Stri
     result.messages.join("; ")
 }
 
-fn validation_next_evidence(result: &crate::run_validation::GovernorValidation) -> Vec<String> {
+fn validation_next_evidence(
+    result: &crate::run_validation::GovernorValidation,
+    legacy_identity: bool,
+) -> Vec<String> {
+    if legacy_identity {
+        return vec!["rerun report validate-run with v0.2.3+ run-set identity".to_string()];
+    }
     if result.next_evidence.is_empty() {
         return vec![
             "rerun governor sweep so plan, approval, apply, load, restore, and health-check evidence are linked"
@@ -860,6 +883,36 @@ mod tests {
             }));
     }
 
+    #[test]
+    fn run_report_blocks_legacy_validation_missing_run_set_identity() {
+        let temp = tempfile::tempdir().unwrap();
+        let run_dir = temp.path().join("LAB-RUN-001");
+        create_completed_core_artifacts(&run_dir);
+        write_legacy_v022_validation_artifact(&run_dir);
+        let store = EvidenceStore::open(std::slice::from_ref(&run_dir)).unwrap();
+
+        let report = evaluate_run_report_v2(&store, &run_dir, "local-target").unwrap();
+
+        assert!(!report
+            .payload
+            .operating_point
+            .controlled_points
+            .iter()
+            .any(|point| point.factor_id == "governor"));
+        assert!(report
+            .payload
+            .operating_point
+            .blocked_points
+            .iter()
+            .any(|point| {
+                point.factor_id == "governor"
+                    && point.requested_level.as_deref() == Some("performance")
+                    && point.coverage_status == "insufficient"
+                    && point.reason
+                        == crate::run_validation::LEGACY_RUN_VALIDATION_MISSING_RUN_SET_ID
+            }));
+    }
+
     fn create_completed_core_artifacts(run_dir: &Path) {
         fs::create_dir_all(run_dir.join("inventory")).unwrap();
         fs::create_dir_all(run_dir.join("toolchain")).unwrap();
@@ -902,6 +955,49 @@ mod tests {
             "time_unix_ms": 1
         })
         .to_string()
+    }
+
+    fn write_legacy_v022_validation_artifact(run_dir: &Path) {
+        fs::create_dir_all(run_dir.join("reports")).unwrap();
+        fs::write(
+            run_dir.join("reports/run_validation.v2.json"),
+            serde_json::json!({
+                "schema": "lab.artifact.v2",
+                "kind": "report.run_validation",
+                "id": "RUN-VALIDATION-LEGACY",
+                "run_id": "LAB-RUN-001",
+                "target_id": "local-target",
+                "status": {"state": "measured"},
+                "bounds": null,
+                "factors": {"controlled": [], "observed": [], "confounders": []},
+                "metrics": [],
+                "claims": [],
+                "evidence_refs": [],
+                "data_quality": {"level": "complete", "notes": []},
+                "payload": {
+                    "profile": FULLSET_PROFILE,
+                    "requested_governors": ["performance"],
+                    "governor_results": [{
+                        "governor": "performance",
+                        "validity": "measured",
+                        "plan_ref": "artifact://lab/runs/LAB-RUN-001/plans/performance.json",
+                        "approval_ref": "artifact://lab/runs/LAB-RUN-001/approvals/performance.json",
+                        "control_result_ref": "artifact://lab/runs/LAB-RUN-001/plans/performance.result.json",
+                        "load_ref": "artifact://lab/runs/LAB-RUN-001/load/performance.v2.json",
+                        "restore_result_ref": "artifact://lab/runs/LAB-RUN-001/restore/performance.result.json",
+                        "health_check_ref": "artifact://lab/runs/LAB-RUN-001/health/restore_health_check.json",
+                        "messages": ["legacy v0.2.2 validation"],
+                        "next_evidence": []
+                    }],
+                    "overall_validity": "measured",
+                    "gaps": [],
+                    "audit_refs": ["artifact://lab/runs/LAB-RUN-001/audit.jsonl"]
+                },
+                "time_unix_ms": 1
+            })
+            .to_string(),
+        )
+        .unwrap();
     }
 
     fn write_validation_artifact(

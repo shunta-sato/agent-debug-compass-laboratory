@@ -135,6 +135,7 @@ fn run_validation_measured(store: &EvidenceStore) -> bool {
         }
         saw_fullset_validation = true;
         all_fullset_validations_measured &= is_measured_status(&artifact.status)
+            && artifact.payload.has_run_set_identity()
             && artifact.payload.overall_validity == GovernorValidity::Measured
             && artifact
                 .payload

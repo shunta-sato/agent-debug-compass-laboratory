@@ -361,20 +361,11 @@
       "type": "object",
       "required": [
         "audit_refs",
-        "expected_governors",
         "gaps",
         "governor_results",
-        "included_run_refs",
         "overall_validity",
         "profile",
-        "requested_governors",
-        "subject_run_set_id",
-        "target_class",
-        "target_id",
-        "validation_profile",
-        "version_set",
-        "version_skew_override",
-        "version_skew_policy"
+        "requested_governors"
       ],
       "properties": {
         "audit_refs": {
@@ -384,18 +375,21 @@
           }
         },
         "collect_plan_digest": {
+          "default": null,
           "type": [
             "string",
             "null"
           ]
         },
         "collect_plan_ref": {
+          "default": null,
           "type": [
             "string",
             "null"
           ]
         },
         "expected_governors": {
+          "default": [],
           "type": "array",
           "items": {
             "type": "string"
@@ -414,6 +408,7 @@
           }
         },
         "included_run_refs": {
+          "default": [],
           "type": "array",
           "items": {
             "type": "string"
@@ -432,27 +427,47 @@
           }
         },
         "subject_run_set_id": {
+          "default": "legacy_run_validation_missing_run_set_identity",
           "type": "string"
         },
         "target_class": {
+          "default": "unknown-target-class",
           "type": "string"
         },
         "target_id": {
+          "default": "unknown-target",
           "type": "string"
         },
         "validation_profile": {
+          "default": "target-operating-contract-fullset",
           "type": "string"
         },
         "version_set": {
-          "$ref": "#/definitions/RunValidationVersionSet"
+          "default": {
+            "records": [],
+            "skew_detected": false,
+            "skew_reasons": []
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/RunValidationVersionSet"
+            }
+          ]
         },
         "version_skew_override": {
+          "default": false,
           "type": "boolean"
         },
         "version_skew_policy": {
-          "$ref": "#/definitions/VersionSkewPolicyResult"
+          "default": "no_skew_detected",
+          "allOf": [
+            {
+              "$ref": "#/definitions/VersionSkewPolicyResult"
+            }
+          ]
         },
         "workflow_recommendation_ref": {
+          "default": null,
           "type": [
             "string",
             "null"

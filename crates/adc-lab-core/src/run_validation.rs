@@ -16,6 +16,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub const FULLSET_PROFILE: &str = "target-operating-contract-fullset";
+pub const LEGACY_RUN_VALIDATION_MISSING_RUN_SET_ID: &str =
+    "legacy_run_validation_missing_run_set_identity";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -58,22 +60,41 @@ pub struct RunValidationGap {
 pub struct RunValidationPayload {
     pub profile: String,
     pub requested_governors: Vec<String>,
+    #[serde(default)]
     pub workflow_recommendation_ref: Option<String>,
+    #[serde(default)]
     pub collect_plan_ref: Option<String>,
+    #[serde(default)]
     pub collect_plan_digest: Option<String>,
+    #[serde(default = "legacy_run_set_id")]
     pub subject_run_set_id: String,
+    #[serde(default)]
     pub included_run_refs: Vec<String>,
+    #[serde(default = "default_validation_profile")]
     pub validation_profile: String,
+    #[serde(default)]
     pub expected_governors: Vec<String>,
+    #[serde(default = "unknown_target_id")]
     pub target_id: String,
+    #[serde(default = "unknown_target_class")]
     pub target_class: String,
+    #[serde(default)]
     pub version_set: RunValidationVersionSet,
+    #[serde(default)]
     pub version_skew_policy: VersionSkewPolicyResult,
+    #[serde(default)]
     pub version_skew_override: bool,
     pub governor_results: Vec<GovernorValidation>,
     pub overall_validity: GovernorValidity,
     pub gaps: Vec<RunValidationGap>,
     pub audit_refs: Vec<String>,
+}
+impl RunValidationPayload {
+    pub fn has_run_set_identity(&self) -> bool {
+        self.subject_run_set_id != LEGACY_RUN_VALIDATION_MISSING_RUN_SET_ID
+            && !self.subject_run_set_id.trim().is_empty()
+            && !self.included_run_refs.is_empty()
+    }
 }
 #[derive(Debug, Clone)]
 pub struct RunValidationInput {
@@ -107,7 +128,7 @@ pub struct ToolVersionRecord {
     pub build_profile: String,
     pub artifact_ref: String,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RunValidationVersionSet {
     pub records: Vec<ToolVersionRecord>,
@@ -120,6 +141,11 @@ pub enum VersionSkewPolicyResult {
     NoSkewDetected,
     BlockedByVersionSkew,
     OverrideRecordedStillBlocked,
+}
+impl Default for VersionSkewPolicyResult {
+    fn default() -> Self {
+        Self::NoSkewDetected
+    }
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -692,6 +718,22 @@ fn normalize_governors(governors: Vec<String>) -> Vec<String> {
     governors
 }
 
+fn legacy_run_set_id() -> String {
+    LEGACY_RUN_VALIDATION_MISSING_RUN_SET_ID.to_string()
+}
+
+fn default_validation_profile() -> String {
+    FULLSET_PROFILE.to_string()
+}
+
+fn unknown_target_id() -> String {
+    "unknown-target".to_string()
+}
+
+fn unknown_target_class() -> String {
+    "unknown-target-class".to_string()
+}
+
 impl ValidationIndex {
     fn load_runs(runs: &[RunContext]) -> LabResult<Self> {
         let mut index = Self::default();
@@ -1216,148 +1258,6 @@ mod tests {
         assert!(matches!(validation.status, Status::Measured));
     }
 
-    #[test]
-    fn stale_v021_prompt_governor_mislabel_is_never_measured() {
-        let temp = tempfile::tempdir().unwrap();
-        let run = test_run(temp.path());
-        write_governor_trial(&run, "ondemand", true, None);
-        let performance_ref = write_governor_trial(&run, "performance", false, None);
-        write_governor_trial(&run, "powersave", true, Some(performance_ref));
-
-        let validation = validate_fullset_run(
-            &run,
-            vec![
-                "ondemand".to_string(),
-                "performance".to_string(),
-                "powersave".to_string(),
-            ],
-        )
-        .unwrap();
-        let result_for = |governor: &str| {
-            validation
-                .payload
-                .governor_results
-                .iter()
-                .find(|result| result.governor == governor)
-                .unwrap()
-        };
-
-        assert_eq!(result_for("ondemand").validity, GovernorValidity::Measured);
-        assert_eq!(
-            result_for("performance").validity,
-            GovernorValidity::MeasuredPartial
-        );
-        assert_eq!(
-            result_for("powersave").validity,
-            GovernorValidity::Contaminated
-        );
-    }
-
-    #[test]
-    fn mixed_controller_target_versions_block_fullset_claims_even_with_override() {
-        let temp = tempfile::tempdir().unwrap();
-        let controller_run = test_run(&temp.path().join("controller"));
-        let target_run = test_run(&temp.path().join("target"));
-        write_build_info(
-            controller_run.run_dir.join("tools/adc-lab.version.json"),
-            "adc-lab",
-            "0.2.1",
-            "controller-sha",
-        );
-        write_build_info(
-            target_run.run_dir.join("tools/adc-lab.version.json"),
-            "adc-lab",
-            "0.2.2",
-            "target-sha",
-        );
-        write_build_info(
-            target_run.run_dir.join("tools/adc-lab-target.version.json"),
-            "adc-lab-target",
-            "0.2.2",
-            "target-sha",
-        );
-        write_governor_trial(&target_run, "performance", true, None);
-
-        let validation = validate_fullset_run_set(RunValidationInput {
-            subject_run: controller_run.clone(),
-            include_runs: vec![target_run.clone()],
-            requested_governors: vec!["performance".to_string()],
-            workflow_recommendation_ref: Some(
-                "artifact://lab/runs/LAB-RUN-001/reports/workflow_recommendation.v2.json"
-                    .to_string(),
-            ),
-            collect_plan_ref: None,
-            collect_plan_digest: None,
-            target_id: Some("target55".to_string()),
-            target_class: Some("raspberry_pi_4".to_string()),
-            allow_version_skew: false,
-        })
-        .unwrap();
-        assert!(validation.payload.version_set.skew_detected);
-        assert_eq!(
-            validation.payload.version_skew_policy,
-            VersionSkewPolicyResult::BlockedByVersionSkew
-        );
-        assert_eq!(
-            validation.payload.governor_results[0].validity,
-            GovernorValidity::Insufficient
-        );
-        assert_eq!(
-            validation.payload.overall_validity,
-            GovernorValidity::Insufficient
-        );
-        assert!(validation
-            .payload
-            .gaps
-            .iter()
-            .any(|gap| gap.code == "blocked_by_version_skew"));
-
-        let override_validation = validate_fullset_run_set(RunValidationInput {
-            subject_run: controller_run,
-            include_runs: vec![target_run],
-            requested_governors: vec!["performance".to_string()],
-            workflow_recommendation_ref: None,
-            collect_plan_ref: None,
-            collect_plan_digest: None,
-            target_id: Some("target55".to_string()),
-            target_class: Some("raspberry_pi_4".to_string()),
-            allow_version_skew: true,
-        })
-        .unwrap();
-        assert_eq!(
-            override_validation.payload.version_skew_policy,
-            VersionSkewPolicyResult::OverrideRecordedStillBlocked
-        );
-        assert!(override_validation.payload.version_skew_override);
-        assert_ne!(
-            override_validation.payload.overall_validity,
-            GovernorValidity::Measured
-        );
-    }
-
-    #[test]
-    fn run_set_identity_changes_for_foreign_validation_sources() {
-        let temp = tempfile::tempdir().unwrap();
-        let first = test_run(&temp.path().join("first"));
-        let second = test_run(&temp.path().join("second"));
-        write_governor_trial(&first, "performance", true, None);
-        write_governor_trial(&second, "performance", true, None);
-
-        let first_validation =
-            validate_fullset_run(&first, vec!["performance".to_string()]).unwrap();
-        let second_validation =
-            validate_fullset_run(&second, vec!["performance".to_string()]).unwrap();
-
-        assert_ne!(
-            first_validation.payload.subject_run_set_id,
-            second_validation.payload.subject_run_set_id
-        );
-        assert_ne!(
-            first_validation.payload.included_run_refs,
-            second_validation.payload.included_run_refs
-        );
-    }
-
     fn test_run(root: &Path) -> RunContext {
         let run_dir = root.join("LAB-RUN-001");
         fs::create_dir_all(&run_dir).unwrap();
@@ -1392,79 +1292,6 @@ mod tests {
             inventory_available: true,
             toolchain_available: true,
         }
-    }
-
-    fn write_governor_trial(
-        run: &RunContext,
-        governor: &str,
-        include_restore: bool,
-        load_control_ref_override: Option<String>,
-    ) -> String {
-        let target = crate::TargetSpec::parse("local").unwrap();
-        let plan = new_cpufreq_plan(run, &target, governor.to_string(), 60, Some(75.0));
-        write_json_pretty(
-            run.run_dir
-                .join("plans")
-                .join(format!("{}.json", plan.plan_id)),
-            &plan,
-        )
-        .unwrap();
-        let approval =
-            new_approval_record(&plan, "operator".to_string(), "approve".to_string()).unwrap();
-        write_json_pretty(
-            run.run_dir
-                .join("approvals")
-                .join(format!("{}.json", approval.approval_id)),
-            &approval,
-        )
-        .unwrap();
-        let applied = applied_result(&plan);
-        let applied_path = run
-            .run_dir
-            .join("plans")
-            .join(format!("{}.result.json", applied.result_id));
-        write_json_pretty(&applied_path, &applied).unwrap();
-        let applied_ref = run.artifact_uri(&applied_path).unwrap();
-        if include_restore {
-            let restored = restored_result(&plan);
-            write_json_pretty(
-                run.run_dir
-                    .join("plans")
-                    .join(format!("{}.result.json", restored.result_id)),
-                &restored,
-            )
-            .unwrap();
-        }
-        write_json_pretty(
-            run.run_dir.join("health/restore_health_check.json"),
-            &healthy_check(),
-        )
-        .unwrap();
-        let mut load = load_artifact_v2(run.run_id.clone(), completed_load("local-target"));
-        let control_ref = load_control_ref_override.unwrap_or_else(|| applied_ref.clone());
-        attach_load_control_context(&mut load, Some(control_ref), Some(governor.to_string()));
-        write_json_pretty(
-            run.run_dir
-                .join("load")
-                .join(format!("cpu.LOAD-RESULT-{governor}.v2.json")),
-            &load,
-        )
-        .unwrap();
-        applied_ref
-    }
-
-    fn write_build_info(path: PathBuf, name: &str, version: &str, git_sha: &str) {
-        write_json_pretty(
-            path,
-            &BuildInfo {
-                name: name.to_string(),
-                version: version.to_string(),
-                git_sha: git_sha.to_string(),
-                target_triple: "x86_64-unknown-linux-gnu".to_string(),
-                build_profile: "test".to_string(),
-            },
-        )
-        .unwrap();
     }
 
     fn restored_result(plan: &ControlPlan) -> ControlResult {

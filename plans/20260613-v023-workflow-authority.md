@@ -201,6 +201,10 @@ Final v0.2.3:
 - 2026-06-13: `plans/_template_execplan.md` is referenced by the skill docs but
   is absent in the repository. This plan follows the established structure of
   `plans/20260612-issue48-agent-safe-fullset.md` instead.
+- 2026-06-13: PR3 review found that adding required fields to
+  `lab.report.run_validation.v2` made old v0.2.2 validation artifacts fail
+  deserialization. The schema now keeps the old six required payload fields and
+  defaults new run-set fields to a legacy marker.
 
 ## Decision Log
 
@@ -230,6 +234,10 @@ Final v0.2.3:
   governor linkage; `operating_point_snapshot.governor` alone is insufficient.
   Rationale: snapshot-only linkage repeats the stale prompt failure mode by
   allowing co-present primitive artifacts to imply causality.
+- 2026-06-13: Keep `lab.report.run_validation.v2` backward-compatible instead
+  of bumping to v3. Rationale: old v0.2.2 validation artifacts should remain
+  parseable for review/reporting, but missing run-set identity must block
+  controlled-governor measured projection.
 
 ## Handoff
 
@@ -238,6 +246,7 @@ Current branch: `codex/v023-multirun-validation`.
 PR1 status: merged as PR #55.
 PR2 status: merged as PR #56.
 PR3 status: implemented locally and verified.
+PR3 review fix status: implemented locally and verified.
 
 Next steps:
 
@@ -302,6 +311,21 @@ PR3 outcomes:
 - Tightened governor load linkage so raw primitive artifacts and
   snapshot-only governor labels cannot produce measured full-set evidence.
 - Added stale v0.2.1-style mislabel and mixed-version fixtures.
+- Review fix: legacy v0.2.2 `report.run_validation.v2` payloads now deserialize
+  through serde defaults, and missing run-set identity is projected as blocked
+  rather than controlled/measured.
+
+PR3 review-fix RCA:
+
+- Symptom: old v0.2.2 `report.run_validation.v2` payloads without run-set
+  fields could fail to deserialize after PR3.
+- Root cause: new payload fields were added as required fields under the same
+  schema name.
+- Fix: add defaults for new fields, mark missing run-set identity with
+  `legacy_run_validation_missing_run_set_identity`, and require run-set identity
+  before measured validation can support controlled-governor claims.
+- Prevention: fixture test writes old-shape raw JSON and verifies run-report
+  loading does not crash and blocks governor projection.
 
 PR3 post-implementation economy audit:
 
@@ -310,6 +334,7 @@ PR3 post-implementation economy audit:
 | `RunValidationInput` | Keeps CLI-only flags out of the public artifact payload while allowing run-set validation options to travel as one typed value. | keep | Core and CLI validate-run tests. |
 | `RunValidationVersionSet` / `ToolVersionRecord` | Makes controller/target/helper version skew explicit and schema-visible for downstream gates. | keep | Mixed-version fixture and generated schema. |
 | `validate_fullset_run_set` | Extends the existing validator to multiple run dirs without creating a second validator. | keep | CLI `--include-run` test and existing single-run wrapper tests. |
+| `RunValidationPayload::has_run_set_identity` | Centralizes the legacy/default identity guard so rules and run-report projection share the same compatibility boundary. | keep | Legacy v0.2.2 fixture test and rules predicate guard. |
 
 PR3 verification:
 
@@ -317,3 +342,7 @@ PR3 verification:
 - `cargo test -p adc-lab --test cli report_validate_run -- --nocapture`: pass.
 - `make schemas-check`: pass.
 - `make verify`: pass.
+- Review fix: `cargo test -p adc-lab-core --test run_validation -- --nocapture`: pass.
+- Review fix: `cargo test -p adc-lab-core run_report_blocks_legacy_validation_missing_run_set_identity -- --nocapture`: pass.
+- Review fix: `make schemas-check`: pass; generated payload required fields are back to `audit_refs`, `gaps`, `governor_results`, `overall_validity`, `profile`, `requested_governors`.
+- Review fix: `make verify`: pass.
