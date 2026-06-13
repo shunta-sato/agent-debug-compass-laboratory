@@ -728,7 +728,8 @@ fn next_evidence(evaluations: &[RuleEvaluation]) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::run_validation::{
-        GovernorValidation, GovernorValidity, RunValidationPayload, FULLSET_PROFILE,
+        GovernorValidation, GovernorValidity, RunValidationPayload, RunValidationVersionSet,
+        VersionSkewPolicyResult, FULLSET_PROFILE,
     };
     use std::fs;
 
@@ -932,6 +933,22 @@ mod tests {
             RunValidationPayload {
                 profile: FULLSET_PROFILE.to_string(),
                 requested_governors: vec!["performance".to_string()],
+                workflow_recommendation_ref: None,
+                collect_plan_ref: None,
+                collect_plan_digest: None,
+                subject_run_set_id: "RUN-SET-test".to_string(),
+                included_run_refs: vec!["artifact://lab/runs/LAB-RUN-001/".to_string()],
+                validation_profile: FULLSET_PROFILE.to_string(),
+                expected_governors: vec!["performance".to_string()],
+                target_id: "local-target".to_string(),
+                target_class: "raspberry_pi_4".to_string(),
+                version_set: RunValidationVersionSet {
+                    records: Vec::new(),
+                    skew_detected: false,
+                    skew_reasons: Vec::new(),
+                },
+                version_skew_policy: VersionSkewPolicyResult::NoSkewDetected,
+                version_skew_override: false,
                 governor_results: vec![GovernorValidation {
                     governor: "performance".to_string(),
                     validity: validity.clone(),

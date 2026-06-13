@@ -361,14 +361,41 @@
       "type": "object",
       "required": [
         "audit_refs",
+        "expected_governors",
         "gaps",
         "governor_results",
+        "included_run_refs",
         "overall_validity",
         "profile",
-        "requested_governors"
+        "requested_governors",
+        "subject_run_set_id",
+        "target_class",
+        "target_id",
+        "validation_profile",
+        "version_set",
+        "version_skew_override",
+        "version_skew_policy"
       ],
       "properties": {
         "audit_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "collect_plan_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "collect_plan_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expected_governors": {
           "type": "array",
           "items": {
             "type": "string"
@@ -386,6 +413,12 @@
             "$ref": "#/definitions/GovernorValidation"
           }
         },
+        "included_run_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "overall_validity": {
           "$ref": "#/definitions/GovernorValidity"
         },
@@ -393,6 +426,59 @@
           "type": "string"
         },
         "requested_governors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "subject_run_set_id": {
+          "type": "string"
+        },
+        "target_class": {
+          "type": "string"
+        },
+        "target_id": {
+          "type": "string"
+        },
+        "validation_profile": {
+          "type": "string"
+        },
+        "version_set": {
+          "$ref": "#/definitions/RunValidationVersionSet"
+        },
+        "version_skew_override": {
+          "type": "boolean"
+        },
+        "version_skew_policy": {
+          "$ref": "#/definitions/VersionSkewPolicyResult"
+        },
+        "workflow_recommendation_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "RunValidationVersionSet": {
+      "type": "object",
+      "required": [
+        "records",
+        "skew_detected",
+        "skew_reasons"
+      ],
+      "properties": {
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ToolVersionRecord"
+          }
+        },
+        "skew_detected": {
+          "type": "boolean"
+        },
+        "skew_reasons": {
           "type": "array",
           "items": {
             "type": "string"
@@ -527,6 +613,60 @@
             }
           }
         }
+      ]
+    },
+    "ToolVersionRecord": {
+      "type": "object",
+      "required": [
+        "artifact_ref",
+        "build_profile",
+        "git_sha",
+        "role",
+        "target_triple",
+        "tool_name",
+        "version"
+      ],
+      "properties": {
+        "artifact_ref": {
+          "type": "string"
+        },
+        "build_profile": {
+          "type": "string"
+        },
+        "git_sha": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/definitions/ToolVersionRole"
+        },
+        "target_triple": {
+          "type": "string"
+        },
+        "tool_name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolVersionRole": {
+      "type": "string",
+      "enum": [
+        "controller_adc_lab",
+        "target_local_adc_lab",
+        "target_runner",
+        "privileged_helper",
+        "release_manifest"
+      ]
+    },
+    "VersionSkewPolicyResult": {
+      "type": "string",
+      "enum": [
+        "no_skew_detected",
+        "blocked_by_version_skew",
+        "override_recorded_still_blocked"
       ]
     }
   }

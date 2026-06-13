@@ -178,7 +178,7 @@ Final v0.2.3:
 - [x] Phase 1: Add generated schema and schema ledger row.
 - [x] Phase 1: Add CLI/core tests proving recommendation shape and non-evidence semantics.
 - [x] Phase 2: Add `agent instructions` command and deterministic Codex prompt fixture.
-- [ ] Phase 3: Extend multi-run `report validate-run` and version-set policy.
+- [x] Phase 3: Extend multi-run `report validate-run` and version-set policy.
 - [ ] Phase 4: Add `collect plan` artifact and argv-array step contract.
 - [ ] Phase 5: Add operating-contract `--validation` / `--strict-fullset` gate.
 - [ ] Phase 6: Add `constraints check-candidate` / `constraints self-check`.
@@ -218,19 +218,31 @@ Final v0.2.3:
 - 2026-06-13: Render agent instructions from `workflow.recommendation` without
   copying literal forbidden shell snippets. Rationale: the prompt must prohibit
   fragile artifact selection without teaching the pattern.
+- 2026-06-13: Make `report validate-run` index the subject run plus explicit
+  `--include-run` directories and record `subject_run_set_id` /
+  `included_run_refs`. Rationale: later operating-contract validation must be
+  able to reject validation artifacts copied from another run set.
+- 2026-06-13: Treat controller/target/helper version skew as a full-set claim
+  blocker even when `--allow-version-skew` is set. Rationale: the override is
+  useful for archive/exploratory review but must not convert mixed-version
+  evidence into measured full-set claims.
+- 2026-06-13: Require `LoadPayload.control_result_ref` for claim-producing
+  governor linkage; `operating_point_snapshot.governor` alone is insufficient.
+  Rationale: snapshot-only linkage repeats the stale prompt failure mode by
+  allowing co-present primitive artifacts to imply causality.
 
 ## Handoff
 
-Current branch: `codex/v023-agent-instructions`.
+Current branch: `codex/v023-multirun-validation`.
 
 PR1 status: merged as PR #55.
-PR2 status: implemented locally and verified.
+PR2 status: merged as PR #56.
+PR3 status: implemented locally and verified.
 
 Next steps:
 
-1. Commit and open PR2 against `main`.
-2. After PR2 merge, start Phase 3 on a fresh branch from updated `origin/main`.
-3. Extend multi-run `report validate-run` and version-set policy.
+1. Commit and open PR3 against `main`.
+2. After PR3 merge, start Phase 4 from updated `origin/main`.
 
 ## Outcomes & Retrospective
 
@@ -276,4 +288,32 @@ PR2 verification:
 
 - `cargo test -p adc-lab-core workflow -- --nocapture`: pass.
 - `cargo test -p adc-lab --test cli agent_instructions -- --nocapture`: pass.
+- `make verify`: pass.
+
+PR3 outcomes:
+
+- Added `--include-run`, workflow recommendation ref, collect plan ref/digest,
+  target id/class, and `--allow-version-skew` to `report validate-run`.
+- Extended `report.run_validation` with run-set identity, included run refs,
+  workflow/collect-plan refs, target metadata, version-set records, and
+  version-skew policy result.
+- Added version-set detection for controller adc-lab, target-local adc-lab,
+  adc-lab-target, release manifests, and privilege doctor helper versions.
+- Tightened governor load linkage so raw primitive artifacts and
+  snapshot-only governor labels cannot produce measured full-set evidence.
+- Added stale v0.2.1-style mislabel and mixed-version fixtures.
+
+PR3 post-implementation economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `RunValidationInput` | Keeps CLI-only flags out of the public artifact payload while allowing run-set validation options to travel as one typed value. | keep | Core and CLI validate-run tests. |
+| `RunValidationVersionSet` / `ToolVersionRecord` | Makes controller/target/helper version skew explicit and schema-visible for downstream gates. | keep | Mixed-version fixture and generated schema. |
+| `validate_fullset_run_set` | Extends the existing validator to multiple run dirs without creating a second validator. | keep | CLI `--include-run` test and existing single-run wrapper tests. |
+
+PR3 verification:
+
+- `cargo test -p adc-lab-core run_validation -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli report_validate_run -- --nocapture`: pass.
+- `make schemas-check`: pass.
 - `make verify`: pass.

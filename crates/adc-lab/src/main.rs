@@ -579,7 +579,6 @@ enum ReportCommand {
     OperatingContract(OperatingContractCommand),
     ValidateRun(ValidateRunCommand),
 }
-
 #[derive(Debug, Args)]
 struct ReportPackCommand {
     #[arg(long)]
@@ -591,7 +590,6 @@ struct ReportPackCommand {
     #[arg(long)]
     json: bool,
 }
-
 #[derive(Debug, Args)]
 struct OperatingContractCommand {
     #[arg(long)]
@@ -605,15 +603,26 @@ struct OperatingContractCommand {
     #[arg(long)]
     json: bool,
 }
-
 #[derive(Debug, Args)]
 struct ValidateRunCommand {
     #[arg(long)]
     run: PathBuf,
+    #[arg(long = "include-run")]
+    include_runs: Vec<PathBuf>,
     #[arg(long, default_value = "target-operating-contract-fullset")]
     profile: String,
     #[arg(long = "expected-governors", value_delimiter = ',')]
     expected_governors: Vec<String>,
+    #[arg(long = "workflow-recommendation")]
+    workflow_recommendation: Option<PathBuf>,
+    #[arg(long = "collect-plan")]
+    collect_plan: Option<PathBuf>,
+    #[arg(long, default_value = "unknown-target")]
+    target_id: String,
+    #[arg(long, default_value = "unknown-target-class")]
+    target_class: String,
+    #[arg(long)]
+    allow_version_skew: bool,
     #[arg(long)]
     out: Option<PathBuf>,
     #[arg(long = "gaps-out")]
