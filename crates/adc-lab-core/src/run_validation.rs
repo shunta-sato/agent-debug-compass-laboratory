@@ -7,6 +7,7 @@ use crate::evidence::{Artifact, DataQuality, DataQualityLevel, Kind, Status};
 use crate::fsutil::read_json;
 use crate::ids::{new_id, now_unix_ms};
 use crate::probe::LoadPayload;
+use crate::workflow::WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023;
 use crate::{LabError, LabResult, RunContext};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -72,6 +73,8 @@ pub struct RunValidationPayload {
     pub included_run_refs: Vec<String>,
     #[serde(default = "default_validation_profile")]
     pub validation_profile: String,
+    #[serde(default = "legacy_unknown_workflow_id")]
+    pub workflow_id: String,
     #[serde(default)]
     pub expected_governors: Vec<String>,
     #[serde(default = "unknown_target_id")]
@@ -95,6 +98,12 @@ impl RunValidationPayload {
             && !self.subject_run_set_id.trim().is_empty()
             && !self.included_run_refs.is_empty()
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunSetIdentity {
+    pub subject_run_set_id: String,
+    pub included_run_refs: Vec<String>,
 }
 #[derive(Debug, Clone)]
 pub struct RunValidationInput {
@@ -274,6 +283,7 @@ pub fn validate_fullset_run_set(
             subject_run_set_id,
             included_run_refs,
             validation_profile: FULLSET_PROFILE.to_string(),
+            workflow_id: WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023.to_string(),
             expected_governors: requested_governors,
             target_id,
             target_class,
@@ -722,6 +732,10 @@ fn default_validation_profile() -> String {
     FULLSET_PROFILE.to_string()
 }
 
+fn legacy_unknown_workflow_id() -> String {
+    "legacy_unknown_workflow".to_string()
+}
+
 fn unknown_target_id() -> String {
     "unknown-target".to_string()
 }
@@ -902,6 +916,27 @@ pub fn digest_file_sha256(path: &Path) -> LabResult<String> {
     })?;
     let digest = Sha256::digest(bytes);
     Ok(format!("sha256:{digest:x}"))
+}
+
+pub fn run_set_identity_for_runs(runs: &[RunContext]) -> LabResult<RunSetIdentity> {
+    Ok(RunSetIdentity {
+        subject_run_set_id: run_set_id(runs),
+        included_run_refs: run_refs(runs)?,
+    })
+}
+
+pub fn is_measured_fullset_validation(artifact: &Artifact<RunValidationPayload>) -> bool {
+    matches!(artifact.status, Status::Measured)
+        && artifact.payload.profile == FULLSET_PROFILE
+        && artifact.payload.validation_profile == FULLSET_PROFILE
+        && artifact.payload.workflow_id == WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023
+        && artifact.payload.has_run_set_identity()
+        && artifact.payload.overall_validity == GovernorValidity::Measured
+        && artifact
+            .payload
+            .governor_results
+            .iter()
+            .all(|result| result.validity == GovernorValidity::Measured)
 }
 
 fn run_set_id(runs: &[RunContext]) -> String {

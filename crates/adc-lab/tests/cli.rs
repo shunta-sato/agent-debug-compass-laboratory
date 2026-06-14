@@ -391,6 +391,23 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
         .iter()
         .any(|kind| kind == "report.run_validation"));
 
+    let operating_contract_step = steps
+        .iter()
+        .find(|step| step["step_id"] == "operating_contract")
+        .unwrap();
+    let operating_contract_argv = operating_contract_step["command_argv"].as_array().unwrap();
+    assert!(operating_contract_argv
+        .iter()
+        .any(|arg| arg == "--validation"));
+    assert!(operating_contract_argv
+        .iter()
+        .any(|arg| arg == "--strict-fullset"));
+    assert!(operating_contract_step["expected_artifact_kinds"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|kind| kind == "report.operating_contract"));
+
     let archive_step = steps
         .iter()
         .find(|step| step["step_id"] == "archive")
@@ -1841,6 +1858,7 @@ fn report_operating_contract_writes_contract_artifacts() {
         .assert()
         .success()
         .stdout(contains("target_operating_contract_ref"))
+        .stdout(contains("\"validation_gate\""))
         .stdout(contains("\"schema\": \"lab.artifact.v2\""))
         .stdout(contains("\"kind\": \"report.operating_contract\""));
 
@@ -1848,8 +1866,136 @@ fn report_operating_contract_writes_contract_artifacts() {
         .path()
         .join("reports/target_operating_contract.v2.json")
         .exists());
+    let contract: serde_json::Value = serde_json::from_slice(
+        &fs::read(
+            temp.path()
+                .join("reports/target_operating_contract.v2.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let production_ready = contract["payload"]["evaluations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|evaluation| {
+            evaluation["rule_id"] == "operating.production_readiness_requires_run_report"
+        })
+        .unwrap();
+    assert_eq!(production_ready["decision"], "blocked");
+    assert!(production_ready["missing"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item == "matching_report.run_validation"));
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"report.target_operating_contract\""));
+}
+
+#[test]
+fn report_operating_contract_strict_fullset_fails_after_writing_when_validation_missing() {
+    let temp = tempfile::tempdir().unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "operating-contract",
+            "--run",
+            temp.path().to_str().unwrap(),
+            "--target-id",
+            "local-target",
+            "--target-class",
+            "raspberry_pi_4",
+            "--strict-fullset",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stdout(contains("\"validation_gate\""))
+        .stdout(contains("target_operating_contract_ref"))
+        .stderr(contains("no --validation artifact was provided"));
+
+    assert!(temp
+        .path()
+        .join("reports/target_operating_contract.v2.json")
+        .exists());
+}
+
+#[test]
+fn report_operating_contract_rejects_validation_copied_from_another_run_set() {
+    let source = tempfile::tempdir().unwrap();
+    let target = tempfile::tempdir().unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "validate-run",
+            "--run",
+            source.path().to_str().unwrap(),
+            "--expected-governors",
+            "performance",
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--allow-non-measured",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"kind\": \"report.run_validation\""));
+
+    let copied_validation = target.path().join("reports/copied_run_validation.v2.json");
+    fs::create_dir_all(copied_validation.parent().unwrap()).unwrap();
+    fs::copy(
+        source.path().join("reports/run_validation.v2.json"),
+        &copied_validation,
+    )
+    .unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "operating-contract",
+            "--run",
+            target.path().to_str().unwrap(),
+            "--validation",
+            copied_validation.to_str().unwrap(),
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--strict-fullset",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stdout(contains("\"validation_gate\""))
+        .stderr(contains(
+            "subject_run_set_id does not match current run set",
+        ));
+
+    let contract: serde_json::Value = serde_json::from_slice(
+        &fs::read(
+            target
+                .path()
+                .join("reports/target_operating_contract.v2.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let production_ready = contract["payload"]["evaluations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|evaluation| {
+            evaluation["rule_id"] == "operating.production_readiness_requires_run_report"
+        })
+        .unwrap();
+    assert_eq!(production_ready["decision"], "blocked");
 }
 
 #[test]

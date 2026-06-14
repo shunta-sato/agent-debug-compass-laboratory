@@ -1,7 +1,13 @@
 use super::super::*;
 use super::common::*;
 use adc_lab_core::ids::now_unix_ms;
-use anyhow::bail;
+use anyhow::{bail, Context};
+
+struct OperatingContractGateResult {
+    gate: OperatingContractValidationGate,
+    strict_failure: Option<String>,
+    summary: serde_json::Value,
+}
 
 pub(crate) fn command_report_validate_run(args: ValidateRunCommand) -> Result<()> {
     if args.profile != FULLSET_PROFILE {
@@ -94,12 +100,29 @@ fn artifact_ref_for_optional_path(run: &RunContext, path: &std::path::Path) -> R
 }
 
 pub(crate) fn command_report_operating_contract(args: OperatingContractCommand) -> Result<()> {
-    let run = existing_run_context(args.run);
-    let mut run_dirs = vec![run.run_dir.clone()];
-    run_dirs.extend(args.include_runs.clone());
+    let run = existing_run_context(args.run.clone());
+    let include_runs = args
+        .include_runs
+        .iter()
+        .cloned()
+        .map(existing_run_context)
+        .collect::<Vec<_>>();
+    let mut run_contexts = vec![run.clone()];
+    run_contexts.extend(include_runs.clone());
+    let run_dirs = run_contexts
+        .iter()
+        .map(|run| run.run_dir.clone())
+        .collect::<Vec<_>>();
     let store = EvidenceStore::open(&run_dirs)?;
-    let v2_contract =
+    let gate_result = operating_contract_validation_gate(&args, &run, &run_contexts, &store)?;
+    let report_run_present = store.iter(Kind::ReportRun).next().is_some();
+    let mut v2_contract =
         evaluate_operating_contract_v2(&store, run.run_id.clone(), args.target_id.clone());
+    apply_operating_contract_validation_gate(
+        &mut v2_contract,
+        &gate_result.gate,
+        report_run_present,
+    );
     let v2_contract_path = run
         .run_dir
         .join("reports/target_operating_contract.v2.json");
@@ -124,8 +147,129 @@ pub(crate) fn command_report_operating_contract(args: OperatingContractCommand) 
     print_json(&serde_json::json!({
         "target_operating_contract_ref": v2_contract_ref,
         "included_run_count": args.include_runs.len(),
+        "validation_gate": gate_result.summary,
         "target_operating_contract": v2_contract
-    }))
+    }))?;
+    if let Some(reason) = gate_result.strict_failure {
+        bail!("strict full-set operating-contract validation failed: {reason}");
+    }
+    Ok(())
+}
+
+fn operating_contract_validation_gate(
+    args: &OperatingContractCommand,
+    subject_run: &RunContext,
+    run_contexts: &[RunContext],
+    store: &EvidenceStore,
+) -> Result<OperatingContractGateResult> {
+    let Some(validation_path) = &args.validation else {
+        return Ok(operating_contract_gate_result(
+            None,
+            false,
+            "missing_validation",
+            "no --validation artifact was provided",
+            args.strict_fullset,
+        ));
+    };
+
+    let validation_ref = artifact_ref_for_optional_path(subject_run, validation_path)?;
+    let validation: Artifact<RunValidationPayload> = read_json(validation_path)
+        .with_context(|| format!("failed to read validation {}", validation_path.display()))?;
+    if validation.kind != Kind::ReportRunValidation {
+        return Ok(operating_contract_gate_result(
+            Some(validation_ref),
+            false,
+            "invalid_validation_kind",
+            "validation artifact kind is not report.run_validation",
+            args.strict_fullset,
+        ));
+    }
+
+    let expected_identity = run_set_identity_for_runs(run_contexts)?;
+    let mut reasons = Vec::new();
+    if validation.payload.subject_run_set_id != expected_identity.subject_run_set_id {
+        reasons.push("subject_run_set_id does not match current run set".to_string());
+    }
+    if validation.payload.included_run_refs != expected_identity.included_run_refs {
+        reasons.push("included_run_refs do not match current run set".to_string());
+    }
+    if validation.payload.profile != FULLSET_PROFILE
+        || validation.payload.validation_profile != FULLSET_PROFILE
+    {
+        reasons.push(
+            "validation profile does not match target-operating-contract-fullset".to_string(),
+        );
+    }
+    if validation.payload.workflow_id != WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023 {
+        reasons.push(format!(
+            "workflow_id is {}, expected {}",
+            validation.payload.workflow_id, WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023
+        ));
+    }
+    if validation.payload.target_id != args.target_id {
+        reasons.push(format!(
+            "target_id is {}, expected {}",
+            validation.payload.target_id, args.target_id
+        ));
+    }
+    if validation.payload.target_class != args.target_class {
+        reasons.push(format!(
+            "target_class is {}, expected {}",
+            validation.payload.target_class, args.target_class
+        ));
+    }
+    if !is_measured_fullset_validation(&validation) {
+        reasons.push("validation artifact is not measured full-set evidence".to_string());
+    }
+    let indexed_ref_matches = store
+        .iter(Kind::ReportRunValidation)
+        .any(|meta| meta.artifact_ref == validation_ref);
+    if !indexed_ref_matches {
+        reasons.push("validation artifact is not indexed in the current run set".to_string());
+    }
+
+    if reasons.is_empty() {
+        Ok(operating_contract_gate_result(
+            Some(validation_ref),
+            true,
+            "measured",
+            "validation artifact matches the current run set and is measured",
+            false,
+        ))
+    } else {
+        let reason = reasons.join("; ");
+        Ok(operating_contract_gate_result(
+            Some(validation_ref),
+            false,
+            "blocked",
+            &reason,
+            args.strict_fullset,
+        ))
+    }
+}
+
+fn operating_contract_gate_result(
+    validation_ref: Option<String>,
+    measured: bool,
+    state: &str,
+    reason: &str,
+    strict: bool,
+) -> OperatingContractGateResult {
+    let gate = OperatingContractValidationGate {
+        validation_ref: validation_ref.clone(),
+        measured,
+        reason: reason.to_string(),
+    };
+    OperatingContractGateResult {
+        gate,
+        strict_failure: strict.then_some(reason.to_string()).filter(|_| !measured),
+        summary: serde_json::json!({
+            "state": state,
+            "measured": measured,
+            "validation_ref": validation_ref,
+            "reason": reason,
+        }),
+    }
 }
 
 pub(crate) fn command_report_pack(args: ReportPackCommand) -> Result<()> {

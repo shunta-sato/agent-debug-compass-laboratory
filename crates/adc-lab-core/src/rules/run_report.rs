@@ -754,6 +754,7 @@ mod tests {
         GovernorValidation, GovernorValidity, RunValidationPayload, RunValidationVersionSet,
         VersionSkewPolicyResult, FULLSET_PROFILE,
     };
+    use crate::workflow::WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023;
     use std::fs;
 
     #[test]
@@ -1035,6 +1036,7 @@ mod tests {
                 subject_run_set_id: "RUN-SET-test".to_string(),
                 included_run_refs: vec!["artifact://lab/runs/LAB-RUN-001/".to_string()],
                 validation_profile: FULLSET_PROFILE.to_string(),
+                workflow_id: WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023.to_string(),
                 expected_governors: vec!["performance".to_string()],
                 target_id: "local-target".to_string(),
                 target_class: "raspberry_pi_4".to_string(),

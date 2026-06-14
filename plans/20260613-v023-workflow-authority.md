@@ -134,6 +134,19 @@ Phase 4 route:
   `commands::collect`, and move existing Workflow/Agent Clap subcommands into
   their command modules to keep `main.rs` below the enforced 800-line budget.
 
+Phase 5 route:
+
+- Risk route: high, because `report operating-contract` now gates a
+  claim-producing contract on explicit run-validation identity rather than
+  accepting raw primitive artifact co-presence.
+- Test list: core rules tests for explicit validation gating; CLI tests for
+  missing validation, copied validation from another run set, strict-mode
+  write-then-fail behavior, and collect-plan argv wiring; full `make verify`.
+- Responsibility layout decision: keep run-set identity helpers in
+  `adc_lab_core::run_validation`, keep operating-contract claim mutation in
+  `adc_lab_core::rules::operating_contract`, and keep CLI path/index checks in
+  `commands::report`.
+
 ### Complexity Budget
 
 - PR1 changed files target: <= 8 tracked files.
@@ -152,6 +165,17 @@ Phase 4 complexity budget:
 - Production lines target: <= 450; test lines target: <= 120.
 - Indirection target: no generic workflow executor and no shell runner layer;
   collect plan remains data plus argv arrays.
+
+Phase 5 complexity budget:
+
+- Changed files target: <= 10 tracked files, including generated schema and
+  tests.
+- New modules target: 0.
+- New helper/struct target: <= 5, centered on validation gate summarization,
+  run-set identity reuse, and claim downgrade application.
+- Production lines target: <= 250; test lines target: <= 180.
+- Indirection target: no generic gate framework; add one explicit
+  operating-contract gate for `target-operating-contract-fullset`.
 
 ### Source-of-Truth Chain
 
@@ -214,7 +238,15 @@ Final v0.2.3:
   - [x] Review fix: write handoff archives outside the planned run directory.
   - [x] Review fix: add full-set coverage skeleton steps for read-only,
         load, pressure, composite, and workload demand coverage.
-- [ ] Phase 5: Add operating-contract `--validation` / `--strict-fullset` gate.
+- [x] Phase 5: Add operating-contract `--validation` / `--strict-fullset` gate.
+  - [x] Add explicit `--validation` and `--strict-fullset` CLI flags.
+  - [x] Reject validation artifacts copied from a different run set.
+  - [x] Downgrade controlled-governor production claims when validation is
+        missing, non-matching, or non-measured.
+  - [x] Keep default mode write-and-downgrade with exit zero for validation
+        gaps; make strict mode write the contract and then exit non-zero.
+  - [x] Update collect-plan operating-contract step to pass `--validation`
+        and `--strict-fullset`.
 - [ ] Phase 6: Add `constraints check-candidate` / `constraints self-check`.
 - [ ] Phase 7: Update docs/examples and expand stale-pattern guards.
 
@@ -250,6 +282,10 @@ Final v0.2.3:
 - 2026-06-14: PR4 review found that the archive handoff step wrote
   `<run-dir>/handoff/adc-lab-run.tgz` while tarring `<run-dir>`. The handoff
   archive now goes to a run-dir sibling `handoff/<run-id>.tgz`.
+- 2026-06-14: Phase 5 exposed that `report.run_validation` needed a stable
+  workflow id in the payload, not only workflow/collect-plan refs. The schema
+  keeps this new field defaulted so legacy v0.2.2 artifacts remain readable,
+  but legacy/default workflow ids cannot satisfy measured full-set gating.
 
 ## Decision Log
 
@@ -316,23 +352,43 @@ Final v0.2.3:
   inventory, toolchain, observation, load, pressure, composite, and workload
   demand without inventing a new executor or claiming that seed steps prove the
   full operating envelope.
+- 2026-06-14: Require `report operating-contract --validation` to name a
+  measured `report.run_validation` artifact matching the current run set,
+  workflow id, target id, and target class before controlled-governor
+  production claims can be upgraded. Rationale: raw primitive artifacts and
+  copied validation files must not recreate the directory co-presence failure
+  mode from issue #48.
+- 2026-06-14: Keep non-strict `report operating-contract` write-and-downgrade
+  with exit zero when validation is missing or non-matching; `--strict-fullset`
+  writes the contract, appends audit, prints the validation gate, then exits
+  non-zero. Rationale: default reporting remains useful for diagnosis, while
+  strict mode is the automation gate.
+- 2026-06-14: Require the supplied validation artifact ref to be indexed in the
+  current `EvidenceStore` run set. Rationale: matching JSON copied beside a
+  different run is not causal evidence for that run set.
+- 2026-06-14: Accept Phase 5 complexity-budget miss. Actual tracked-file
+  change count is 11 rather than <=10 because the ExecPlan and generated
+  schema both changed alongside core, CLI, and tests; production line growth is
+  above the 250-line target because the gate prints a structured summary and
+  tests cover default, strict, copied-validation, and collect-plan wiring.
+  Guardrail remains satisfied: `check-file-budgets.py --enforce` reports zero
+  violations.
 
 ## Handoff
 
-Current branch: `codex/v023-collect-plan`.
+Current branch: `codex/v023-operating-contract-validation`.
 
 PR1 status: merged as PR #55.
 PR2 status: merged as PR #56.
 PR3 status: merged as PR #57.
-PR4 status: implemented locally and verified; ready to commit/open PR.
-PR4 review-fix status: blocking review comments addressed locally; ready to
-commit and push to PR #58 after final diff review.
+PR4 status: merged as PR #58.
+PR5 status: implemented locally and verified; ready to commit and open PR.
 
 Next steps:
 
-1. Commit and push PR4 review fixes to `codex/v023-collect-plan`.
-2. Confirm PR #58 CI remains green.
-3. After PR4 merge, start Phase 5 from updated `origin/main`.
+1. Commit and push Phase 5.
+2. Open the Phase 5 PR against `main`.
+3. After PR5 merge, start Phase 6 from updated `origin/main`.
 
 ## Outcomes & Retrospective
 
@@ -473,3 +529,36 @@ PR4 verification:
 - Review fix: `make schemas-check`: pass.
 - Review fix: `python3 scripts/ci/check-file-budgets.py --enforce`: pass.
 - Review fix: `make verify`: pass.
+
+PR5 outcomes:
+
+- Added `report operating-contract --validation` and `--strict-fullset`.
+- Added a validation gate summary to operating-contract CLI output.
+- Downgraded controlled-governor production readiness unless the supplied
+  validation artifact is measured, matches workflow/target/run-set identity,
+  and is indexed by the current run set.
+- Added `workflow_id` to `lab.report.run_validation.v2` with a legacy default
+  so older artifacts remain readable but cannot satisfy the measured gate.
+- Updated `collect plan` so the operating-contract step passes the validation
+  artifact and enables strict full-set gating.
+
+PR5 post-implementation economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `RunSetIdentity` / `run_set_identity_for_runs` | Reuses the same subject run-set id and included-run refs in validation production and operating-contract consumption. | keep | CLI copied-validation rejection test. |
+| `is_measured_fullset_validation` | Centralizes the full-set measured predicate, including workflow id and version-skew blocker semantics. | keep | Rules-engine and validate-run tests. |
+| `OperatingContractValidationGate` | Keeps claim mutation independent from CLI path parsing while making the gate reason visible in data quality notes. | keep | Core rules test for explicit gate downgrade. |
+| `OperatingContractGateResult` | CLI-only helper tying human-visible summary and strict-mode exit behavior to the same gate decision. | keep | CLI missing-validation strict-mode test. |
+
+PR5 verification:
+
+- `cargo test -p adc-lab --test cli collect_plan -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli report_operating_contract -- --nocapture`: pass.
+- `cargo test -p adc-lab-core operating_contract_validation_gate -- --nocapture`: pass.
+- `cargo test -p adc-lab-core --test rules_engine -- --nocapture`: pass.
+- `cargo test -p adc-lab-core --test run_validation -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli report_validate_run -- --nocapture`: pass.
+- `make schemas`: pass.
+- `make schemas-check`: pass.
+- `make verify`: pass.
