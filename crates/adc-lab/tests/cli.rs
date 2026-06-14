@@ -1923,6 +1923,120 @@ fn report_operating_contract_strict_fullset_fails_after_writing_when_validation_
 }
 
 #[test]
+fn report_operating_contract_keeps_production_ready_blocked_after_measured_validation() {
+    let temp = tempfile::tempdir().unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "pack",
+            "--run",
+            temp.path().to_str().unwrap(),
+            "--target-id",
+            "target55",
+            "--target",
+            "local",
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "validate-run",
+            "--run",
+            temp.path().to_str().unwrap(),
+            "--expected-governors",
+            "performance",
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--allow-non-measured",
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    let validation_path = temp.path().join("reports/run_validation.v2.json");
+    let mut validation: serde_json::Value =
+        serde_json::from_slice(&fs::read(&validation_path).unwrap()).unwrap();
+    validation["status"] = serde_json::json!({"state": "measured"});
+    validation["data_quality"]["level"] = serde_json::json!("complete");
+    validation["payload"]["overall_validity"] = serde_json::json!("measured");
+    validation["payload"]["governor_results"][0]["validity"] = serde_json::json!("measured");
+    validation["payload"]["governor_results"][0]["messages"] = serde_json::json!([]);
+    validation["payload"]["governor_results"][0]["next_evidence"] = serde_json::json!([]);
+    validation["payload"]["gaps"] = serde_json::json!([]);
+    fs::write(
+        &validation_path,
+        serde_json::to_vec_pretty(&validation).unwrap(),
+    )
+    .unwrap();
+
+    let output = Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "operating-contract",
+            "--run",
+            temp.path().to_str().unwrap(),
+            "--validation",
+            validation_path.to_str().unwrap(),
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--strict-fullset",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"validation_gate\""))
+        .get_output()
+        .stdout
+        .clone();
+
+    let summary: serde_json::Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(summary["validation_gate"]["measured"], true);
+    let contract: serde_json::Value = serde_json::from_slice(
+        &fs::read(
+            temp.path()
+                .join("reports/target_operating_contract.v2.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let production_ready = contract["payload"]["evaluations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|evaluation| {
+            evaluation["rule_id"] == "operating.production_readiness_requires_run_report"
+        })
+        .unwrap();
+    assert_eq!(production_ready["decision"], "blocked");
+    let missing = production_ready["missing"].as_array().unwrap();
+    assert!(!missing
+        .iter()
+        .any(|item| item == "matching_report.run_validation"));
+    assert!(missing
+        .iter()
+        .any(|item| item == "production_operating_envelope"));
+    assert!(production_ready["evidence_refs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item
+            .as_str()
+            .unwrap()
+            .ends_with("reports/run_validation.v2.json")));
+}
+
+#[test]
 fn report_operating_contract_rejects_validation_copied_from_another_run_set() {
     let source = tempfile::tempdir().unwrap();
     let target = tempfile::tempdir().unwrap();

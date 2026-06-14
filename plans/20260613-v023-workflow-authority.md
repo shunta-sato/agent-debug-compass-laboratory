@@ -286,6 +286,10 @@ Final v0.2.3:
   workflow id in the payload, not only workflow/collect-plan refs. The schema
   keeps this new field defaulted so legacy v0.2.2 artifacts remain readable,
   but legacy/default workflow ids cannot satisfy measured full-set gating.
+- 2026-06-14: PR5 review found that measured full-set validation was being
+  interpreted too broadly by raising `target.selection.production_ready` to
+  `Provisional`. Full-set governor validation is evidence of typed/linked
+  control workflow validity, not production readiness.
 
 ## Decision Log
 
@@ -373,6 +377,11 @@ Final v0.2.3:
   tests cover default, strict, copied-validation, and collect-plan wiring.
   Guardrail remains satisfied: `check-file-budgets.py --enforce` reports zero
   violations.
+- 2026-06-14: Keep `target.selection.production_ready` blocked even when
+  `report operating-contract --validation` succeeds. Rationale: validation
+  gate success proves the full-set workflow validation gate, while production
+  readiness still requires production envelope, workload validation, long-run
+  recovery/degradation evidence, and deployment constraints.
 
 ## Handoff
 
@@ -382,12 +391,13 @@ PR1 status: merged as PR #55.
 PR2 status: merged as PR #56.
 PR3 status: merged as PR #57.
 PR4 status: merged as PR #58.
-PR5 status: implemented locally and verified; ready to commit and open PR.
+PR5 status: PR #59 open; review blocker addressed locally and verified,
+ready to commit and push.
 
 Next steps:
 
-1. Commit and push Phase 5.
-2. Open the Phase 5 PR against `main`.
+1. Commit and push PR #59 review fix.
+2. Confirm PR #59 CI remains green.
 3. After PR5 merge, start Phase 6 from updated `origin/main`.
 
 ## Outcomes & Retrospective
@@ -537,6 +547,9 @@ PR5 outcomes:
 - Downgraded controlled-governor production readiness unless the supplied
   validation artifact is measured, matches workflow/target/run-set identity,
   and is indexed by the current run set.
+- Review fix: kept `target.selection.production_ready` blocked even when the
+  validation gate is measured; gate success now removes only the
+  `matching_report.run_validation` gap and leaves production-readiness gaps.
 - Added `workflow_id` to `lab.report.run_validation.v2` with a legacy default
   so older artifacts remain readable but cannot satisfy the measured gate.
 - Updated `collect plan` so the operating-contract step passes the validation
@@ -562,3 +575,6 @@ PR5 verification:
 - `make schemas`: pass.
 - `make schemas-check`: pass.
 - `make verify`: pass.
+- Review fix: `cargo test -p adc-lab --test cli report_operating_contract -- --nocapture`: pass.
+- Review fix: `cargo test -p adc-lab-core --test rules_engine -- --nocapture`: pass.
+- Review fix: `make verify`: pass.

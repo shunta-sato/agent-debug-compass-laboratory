@@ -97,7 +97,7 @@ pub fn operating_contract_rules() -> Vec<Rule> {
                 Pred::Present(Kind::ReportRun),
                 Pred::RunValidationMeasured,
             ]),
-            on_match: Decision::Provisional,
+            on_match: Decision::Blocked,
             on_miss: Decision::Blocked,
             evidence_kinds: &[Kind::ReportRun, Kind::ReportRunValidation],
             next_evidence: &[
@@ -185,10 +185,25 @@ pub fn apply_operating_contract_validation_gate(
     };
 
     if gate.measured && report_run_present {
-        evaluation.matched = true;
-        evaluation.decision = Decision::Provisional;
-        evaluation.missing.clear();
-        evaluation.next_evidence.clear();
+        evaluation.matched = false;
+        evaluation.decision = Decision::Blocked;
+        evaluation
+            .missing
+            .retain(|item| item != "report.run" && item != "matching_report.run_validation");
+        for item in [
+            "production_operating_envelope",
+            "production_workload_validation",
+            "long_duration_recovery_evidence",
+        ] {
+            if !evaluation.missing.iter().any(|existing| existing == item) {
+                evaluation.missing.push(item.to_string());
+            }
+        }
+        evaluation.next_evidence = vec![
+            "define production operating envelope".to_string(),
+            "run production workload validation under the measured operating contract".to_string(),
+            "record long-duration recovery and degradation behavior".to_string(),
+        ];
         if let Some(validation_ref) = &gate.validation_ref {
             if !evaluation.evidence_refs.contains(validation_ref) {
                 evaluation.evidence_refs.push(validation_ref.clone());

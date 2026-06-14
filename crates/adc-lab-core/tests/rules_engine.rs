@@ -258,7 +258,7 @@ fn operating_contract_blocks_contaminated_run_validation_for_production_readines
 }
 
 #[test]
-fn operating_contract_allows_production_readiness_only_with_measured_run_validation() {
+fn operating_contract_blocks_production_readiness_even_with_measured_run_validation() {
     let temp = tempfile::tempdir().unwrap();
     let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
     write_marker(
@@ -283,8 +283,8 @@ fn operating_contract_allows_production_readiness_only_with_measured_run_validat
         .unwrap();
 
     assert!(production_ready.matched);
-    assert_eq!(production_ready.decision, Decision::Provisional);
-    assert!(!contract
+    assert_eq!(production_ready.decision, Decision::Blocked);
+    assert!(contract
         .payload
         .blocked_claims
         .contains(&claim::PRODUCTION_READY.to_string()));
