@@ -1,4 +1,5 @@
 pub(super) mod agent;
+pub(super) mod collect;
 pub(super) mod common;
 pub(super) mod constraints;
 pub(super) mod control;

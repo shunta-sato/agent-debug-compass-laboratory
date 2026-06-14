@@ -1,8 +1,38 @@
 use super::super::*;
 use super::common::*;
 use adc_lab_core::ids::new_id;
+use clap::{Args, Subcommand};
 
-pub(crate) fn command_workflow_recommend(args: WorkflowRecommendCommand) -> Result<()> {
+#[derive(Debug, Subcommand)]
+pub(crate) enum WorkflowCommand {
+    Recommend(WorkflowRecommendCommand),
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct WorkflowRecommendCommand {
+    #[arg(long, default_value = "target-operating-contract-fullset")]
+    goal: String,
+    #[arg(long, default_value = "local")]
+    target: String,
+    #[arg(long, default_value = "local-target")]
+    target_id: String,
+    #[arg(long, default_value = "unknown-target-class")]
+    target_class: String,
+    #[arg(long)]
+    run_dir: Option<PathBuf>,
+    #[arg(long)]
+    out: Option<PathBuf>,
+    #[arg(long)]
+    json: bool,
+}
+
+pub(crate) fn command_workflow(command: WorkflowCommand) -> Result<()> {
+    match command {
+        WorkflowCommand::Recommend(args) => command_workflow_recommend(args),
+    }
+}
+
+fn command_workflow_recommend(args: WorkflowRecommendCommand) -> Result<()> {
     validate_workflow_goal(&args.goal)?;
     let run = match args.run_dir.clone() {
         Some(path) => Some(create_or_open_run(Some(path))?),
