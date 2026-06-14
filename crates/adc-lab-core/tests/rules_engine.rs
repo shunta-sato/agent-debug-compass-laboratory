@@ -1,10 +1,11 @@
 use adc_lab_core::{
-    claim, evaluate_operating_contract_v2, evaluate_rules, evaluate_suitability_v2,
-    generate_constraints_artifact_v2, operating_contract_from_rules_v2,
-    render_agent_constraints_markdown, Artifact, CompositePayload, Decision, EvidenceStore,
-    GovernorValidation, GovernorValidity, Kind, Pred, PressurePayload, Rule, RunValidationPayload,
+    apply_operating_contract_validation_gate, claim, evaluate_operating_contract_v2,
+    evaluate_rules, evaluate_suitability_v2, generate_constraints_artifact_v2,
+    operating_contract_from_rules_v2, render_agent_constraints_markdown, Artifact,
+    CompositePayload, Decision, EvidenceStore, GovernorValidation, GovernorValidity, Kind,
+    OperatingContractValidationGate, Pred, PressurePayload, Rule, RunValidationPayload,
     RunValidationVersionSet, Status, SuitabilityDecisionValue, SuitabilityPayload,
-    VersionSkewPolicyResult, FULLSET_PROFILE,
+    VersionSkewPolicyResult, FULLSET_PROFILE, WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023,
 };
 use std::path::Path;
 
@@ -257,7 +258,7 @@ fn operating_contract_blocks_contaminated_run_validation_for_production_readines
 }
 
 #[test]
-fn operating_contract_allows_production_readiness_only_with_measured_run_validation() {
+fn operating_contract_blocks_production_readiness_even_with_measured_run_validation() {
     let temp = tempfile::tempdir().unwrap();
     let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
     write_marker(
@@ -282,8 +283,53 @@ fn operating_contract_allows_production_readiness_only_with_measured_run_validat
         .unwrap();
 
     assert!(production_ready.matched);
-    assert_eq!(production_ready.decision, Decision::Provisional);
-    assert!(!contract
+    assert_eq!(production_ready.decision, Decision::Blocked);
+    assert!(contract
+        .payload
+        .blocked_claims
+        .contains(&claim::PRODUCTION_READY.to_string()));
+}
+
+#[test]
+fn operating_contract_validation_gate_blocks_without_explicit_matching_validation() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+    write_marker(
+        &mut store,
+        temp.path(),
+        Kind::ReportRun,
+        "reports/run_report.v2.json",
+    );
+    write_run_validation(
+        &mut store,
+        temp.path(),
+        "reports/run_validation.v2.json",
+        GovernorValidity::Measured,
+    );
+
+    let mut contract = evaluate_operating_contract_v2(&store, "LAB-RUN-001", "target55");
+    apply_operating_contract_validation_gate(
+        &mut contract,
+        &OperatingContractValidationGate {
+            validation_ref: None,
+            measured: false,
+            reason: "no --validation artifact was provided".to_string(),
+        },
+        true,
+    );
+    let production_ready = contract
+        .payload
+        .evaluations
+        .iter()
+        .find(|entry| entry.rule_id == "operating.production_readiness_requires_run_report")
+        .unwrap();
+
+    assert!(!production_ready.matched);
+    assert_eq!(production_ready.decision, Decision::Blocked);
+    assert!(production_ready
+        .missing
+        .contains(&"matching_report.run_validation".to_string()));
+    assert!(contract
         .payload
         .blocked_claims
         .contains(&claim::PRODUCTION_READY.to_string()));
@@ -457,6 +503,7 @@ fn write_run_validation(
             subject_run_set_id: "RUN-SET-test".to_string(),
             included_run_refs: vec!["artifact://lab/runs/LAB-RUN-001/".to_string()],
             validation_profile: FULLSET_PROFILE.to_string(),
+            workflow_id: WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023.to_string(),
             expected_governors: vec!["performance".to_string()],
             target_id: "target55".to_string(),
             target_class: "raspberry_pi_4".to_string(),

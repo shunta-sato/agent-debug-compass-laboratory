@@ -15,6 +15,13 @@ pub struct OperatingContractPayload {
     pub next_evidence: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OperatingContractValidationGate {
+    pub validation_ref: Option<String>,
+    pub measured: bool,
+    pub reason: String,
+}
+
 pub fn operating_contract_rules() -> Vec<Rule> {
     vec![
         Rule {
@@ -90,7 +97,7 @@ pub fn operating_contract_rules() -> Vec<Rule> {
                 Pred::Present(Kind::ReportRun),
                 Pred::RunValidationMeasured,
             ]),
-            on_match: Decision::Provisional,
+            on_match: Decision::Blocked,
             on_miss: Decision::Blocked,
             evidence_kinds: &[Kind::ReportRun, Kind::ReportRunValidation],
             next_evidence: &[
@@ -161,6 +168,83 @@ pub fn operating_contract_from_rules_v2(
         notes: vec!["v2 operating contract evaluated from rule table".to_string()],
     };
     artifact
+}
+
+pub fn apply_operating_contract_validation_gate(
+    artifact: &mut Artifact<OperatingContractPayload>,
+    gate: &OperatingContractValidationGate,
+    report_run_present: bool,
+) {
+    let Some(evaluation) = artifact
+        .payload
+        .evaluations
+        .iter_mut()
+        .find(|evaluation| evaluation.claim_id == claim::PRODUCTION_READY)
+    else {
+        return;
+    };
+
+    if gate.measured && report_run_present {
+        evaluation.matched = false;
+        evaluation.decision = Decision::Blocked;
+        evaluation
+            .missing
+            .retain(|item| item != "report.run" && item != "matching_report.run_validation");
+        for item in [
+            "production_operating_envelope",
+            "production_workload_validation",
+            "long_duration_recovery_evidence",
+        ] {
+            if !evaluation.missing.iter().any(|existing| existing == item) {
+                evaluation.missing.push(item.to_string());
+            }
+        }
+        evaluation.next_evidence = vec![
+            "define production operating envelope".to_string(),
+            "run production workload validation under the measured operating contract".to_string(),
+            "record long-duration recovery and degradation behavior".to_string(),
+        ];
+        if let Some(validation_ref) = &gate.validation_ref {
+            if !evaluation.evidence_refs.contains(validation_ref) {
+                evaluation.evidence_refs.push(validation_ref.clone());
+                evaluation.evidence_refs.sort();
+                evaluation.evidence_refs.dedup();
+            }
+        }
+    } else {
+        evaluation.matched = false;
+        evaluation.decision = Decision::Blocked;
+        if !report_run_present && !evaluation.missing.iter().any(|item| item == "report.run") {
+            evaluation.missing.push("report.run".to_string());
+        }
+        if !evaluation
+            .missing
+            .iter()
+            .any(|item| item == "matching_report.run_validation")
+        {
+            evaluation
+                .missing
+                .push("matching_report.run_validation".to_string());
+        }
+        evaluation.next_evidence = vec![
+            "pass --validation with matching measured report.run_validation".to_string(),
+            gate.reason.clone(),
+        ];
+    }
+
+    artifact.payload.blocked_claims = blocked_claims(&artifact.payload.evaluations);
+    artifact.payload.next_evidence = next_evidence(&artifact.payload.evaluations);
+    artifact.status = status_for_evaluations(&artifact.payload.evaluations);
+    artifact.claims = artifact
+        .payload
+        .evaluations
+        .iter()
+        .map(claim_for_evaluation)
+        .collect();
+    artifact.data_quality.notes.push(format!(
+        "controlled-governor validation gate: {}",
+        gate.reason
+    ));
 }
 
 fn status_for_evaluations(evaluations: &[RuleEvaluation]) -> Status {

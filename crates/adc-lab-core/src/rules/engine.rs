@@ -2,7 +2,9 @@ use crate::evidence::{
     claim_definition, ArtifactMeta, Claim, Decision, EvidenceStore, Kind, Status,
 };
 use crate::probe::{CompositePayload, LoadPayload, ObservationPayload, PressurePayload};
-use crate::run_validation::{GovernorValidity, RunValidationPayload, FULLSET_PROFILE};
+use crate::run_validation::{
+    is_measured_fullset_validation, RunValidationPayload, FULLSET_PROFILE,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -134,14 +136,7 @@ fn run_validation_measured(store: &EvidenceStore) -> bool {
             continue;
         }
         saw_fullset_validation = true;
-        all_fullset_validations_measured &= is_measured_status(&artifact.status)
-            && artifact.payload.has_run_set_identity()
-            && artifact.payload.overall_validity == GovernorValidity::Measured
-            && artifact
-                .payload
-                .governor_results
-                .iter()
-                .all(|result| result.validity == GovernorValidity::Measured);
+        all_fullset_validations_measured &= is_measured_fullset_validation(&artifact);
     }
     saw_fullset_validation && all_fullset_validations_measured
 }

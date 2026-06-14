@@ -554,6 +554,10 @@ struct OperatingContractCommand {
     #[arg(long, default_value = "unknown-target-class")]
     target_class: String,
     #[arg(long)]
+    validation: Option<PathBuf>,
+    #[arg(long = "strict-fullset")]
+    strict_fullset: bool,
+    #[arg(long)]
     json: bool,
 }
 #[derive(Debug, Args)]

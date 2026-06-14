@@ -467,6 +467,10 @@
             }
           ]
         },
+        "workflow_id": {
+          "default": "legacy_unknown_workflow",
+          "type": "string"
+        },
         "workflow_recommendation_ref": {
           "default": null,
           "type": [
