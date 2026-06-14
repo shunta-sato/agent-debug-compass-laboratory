@@ -350,6 +350,8 @@ struct SuitabilityCommand {
 enum ConstraintsCommand {
     Generate(ConstraintsGenerateCommand),
     Check(ConstraintsCheckCommand),
+    CheckCandidate(ConstraintsCheckPathCommand),
+    SelfCheck(ConstraintsCheckPathCommand),
 }
 
 #[derive(Debug, Args)]
@@ -372,6 +374,16 @@ struct ConstraintsCheckCommand {
     path: PathBuf,
     #[arg(long, value_enum, default_value_t = ConstraintsCheckModeArg::CandidateContent)]
     mode: ConstraintsCheckModeArg,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
+struct ConstraintsCheckPathCommand {
+    #[arg(long)]
+    constraints: PathBuf,
+    #[arg(long)]
+    path: PathBuf,
     #[arg(long)]
     json: bool,
 }
@@ -689,6 +701,12 @@ fn main() -> Result<()> {
             }
             ConstraintsCommand::Check(args) => {
                 commands::constraints::command_constraints_check(args)
+            }
+            ConstraintsCommand::CheckCandidate(args) => {
+                commands::constraints::command_constraints_check_candidate(args)
+            }
+            ConstraintsCommand::SelfCheck(args) => {
+                commands::constraints::command_constraints_self_check(args)
             }
         },
         Commands::WorkloadFixture { command } => match command {
