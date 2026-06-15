@@ -592,6 +592,10 @@ Detailed acceptance criteria:
         under the enforced file budget.
   - [x] Run full local verification.
   - [x] Commit, push, and open PR.
+  - [x] Address PR #65 review by adding explicit workload plan staging and
+        deterministic retrieval preparation steps.
+  - [x] Run review-fix verification.
+  - [ ] Push review-fix commit.
 - [ ] PR 3: Profile split.
 - [ ] PR 4: Deep CPU / thermal characterization profile.
 - [ ] PR 5: Pressure / composite / endpoint-backed network coverage.
@@ -725,28 +729,35 @@ PR 2 dev-workflow route:
   CPU/memory unknown and `selection_ready=false`; `make verify` passes.
 - Test List: SSH collect-plan workload step uses `execution_location =
   target_local`, argv arrays, `--target local`, `--execution-mode
-  target-local`, and no `ssh://` target; retrieved path is deterministic and
-  consumed by suitability; local collect plans do not emit synthetic retrieval;
-  missing CPU/RSS metrics remain unknown; degraded workload demand remains
-  unknown.
+  target-local`, and no `ssh://` target; workload plan staging is explicit;
+  retrieval parent creation and rerun cleanup are explicit; retrieved path is
+  deterministic and consumed by suitability; local collect plans do not emit
+  synthetic SSH handoff steps; missing CPU/RSS metrics remain unknown; degraded
+  workload demand remains unknown.
 - Complexity Budget: changed production files <= 2; new modules/classes = 0;
-  new helper functions in production = 0; new workflow step <= 1; production
-  diff target <= 120 lines; tests may add fixtures/assertions as needed.
+  new helper functions in production = 0; initial new workflow step target <=
+  1, revised to <= 5 after PR #65 review required executable staging,
+  retrieval-parent, and rerun cleanup steps; production diff target <= 220
+  lines; tests may add fixtures/assertions as needed.
 
 PR 2 implementation-economy audit:
 
 | New abstraction | Justification | Decision | Evidence |
 |---|---|---|---|
+| `prepare_target_local_workload_plan_dir` collect-plan step | Makes target-local input directory creation executable instead of prose-only. | keep | CLI collect-plan test asserts step order, target-local execution location, and exact `mkdir -p` argv. |
+| `stage_target_local_workload_plan` collect-plan step | Prevents Agents from inventing scp staging harnesses for workload plans. | keep | CLI collect-plan test asserts exact controller source and target-local destination path. |
 | `retrieve_target_local_workload_demand` collect-plan step | Makes the target-local workload handoff path explicit so suitability can consume a deterministic path without filename discovery. | keep | CLI and core collect-plan tests assert the step and exact consumed path. |
+| `prepare_target_local_workload_retrieval_parent` and `reset_target_local_workload_retrieval_destination` collect-plan steps | Ensures retrieval parent exists and reruns cannot change `scp -r` destination layout. | keep | CLI collect-plan test asserts ordering, `mkdir -p`, scoped `rm -rf`, and rerun policy text. |
 | Additional local variables in `target_operating_contract_collect_plan` | Reuses the existing collect-plan generator and target-local convention instead of adding a new executor layer. | keep | No new module/schema; tests cover SSH and local paths. |
-| `crates/adc-lab-core/tests/workflow.rs` integration test target | Keeps workflow contract tests while returning `workflow.rs` below the enforced production file budget. | keep | File budget check reports `workflow.rs` at 1344/1500. |
+| `crates/adc-lab-core/tests/workflow.rs` integration test target | Keeps workflow contract tests while returning `workflow.rs` below the enforced production file budget. | keep | File budget check reports `workflow.rs` at 1455/1500 after the PR #65 review fix. |
 
 Budget note:
 Production changes stay in `workflow.rs` and `suitability.rs`. The PR adds no
 new schema or public command; the larger line count is test evidence for the
 workflow handoff and conservative suitability semantics. Existing workflow unit
 tests moved to an integration test file because `workflow.rs` exceeded the
-1500-line production file budget after PR 2.
+1500-line production file budget after PR 2. PR #65 review added more workflow
+steps, but `workflow.rs` remains under budget at 1455/1500.
 
 ### PR 3: Profile Split
 
@@ -914,6 +925,10 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   above the enforced 1500-line file budget. Moving workflow tests to
   `crates/adc-lab-core/tests/workflow.rs` reduced production `workflow.rs` to
   1344 lines without weakening coverage.
+- 2026-06-16: PR #65 review found two executable-handoff gaps: the SSH
+  workload run plan was only described in prose instead of staged by a collect
+  step, and workload retrieval did not create `<primary>/included` or define
+  rerun behavior when the destination already existed.
 
 ## Decision Log
 
@@ -968,6 +983,15 @@ A v0.2.4 target55 artifact is successful only if it can answer:
 - 2026-06-15: Move workflow tests out of `src/workflow.rs` instead of adding a
   file-budget override. Rationale: the tests remain first-class integration
   coverage and the production module stays within the existing budget.
+- 2026-06-16: Fix PR #65 with explicit argv steps instead of prose-only
+  instructions. Rationale: collect plan is the executable handoff contract, so
+  target-local input staging must be represented as `mkdir -p` plus `scp`
+  steps before `workload_demand`.
+- 2026-06-16: Use controller-side deterministic cleanup for workload retrieval
+  reruns. Rationale: `scp -r source dest` changes layout when `dest` already
+  exists; deleting only `<primary>/included/target-local-workload-demand`
+  before retrieval keeps the consumed suitability path stable without adding an
+  rsync dependency.
 
 ## Handoff
 
@@ -982,18 +1006,20 @@ PR #64 is merged. PR #65 is open as a draft for PR 2:
 SSH collect plans emit target-local workload demand argv, include an
 operator-handoff retrieval path, and feed that retrieved path into suitability.
 Suitability requires clean workload CPU/RSS demand before CPU/memory can meet.
-Focused tests, `make docs-smoke`, `make schemas-check`, and `make verify` are
-green locally. Initial implementation head was
-`4069641ac34c56e48f132e034d32d229021f036a`; this plan-only status update keeps
-the handoff current for the open PR.
+PR #65 review requested explicit workload plan staging and deterministic
+retrieval preparation. The review fix is implemented locally with unpushed
+changes: target-local plan dir preparation, plan staging, controller retrieval
+parent creation, and scoped destination cleanup are now collect-plan argv
+steps. Focused tests, file budget enforcement, `make docs-smoke`,
+`make schemas-check`, and `make verify` are green after the review fix.
 
 Current PR:
 https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/65
 
 Next steps:
-1. Wait for PR #65 CI on the latest pushed head.
-2. Address review comments if any.
-3. Mark Ready for review after approval and green CI.
+1. Run final quality-gate checklist.
+2. Commit and push the review-fix commit to PR #65.
+3. Wait for latest-head CI, then request re-review.
 
 Required process:
 every implementation PR must include
@@ -1080,3 +1106,23 @@ PR 2 quality gate:
 - Draft PR opened: #65
   (`https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/65`) at
   initial implementation head `4069641ac34c56e48f132e034d32d229021f036a`.
+
+PR #65 review-fix verification:
+
+- `cargo fmt --all --check`: pass.
+- `cargo test -p adc-lab-core --test workflow -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli collect_plan -- --nocapture`: pass.
+- `python3 scripts/ci/check-file-budgets.py --enforce`: pass (`workflow.rs`
+  1455/1500; `file budgets: enforced checked=55 violations=0`).
+- `make docs-smoke`: pass.
+- `make schemas-check`: pass (`schema ledger: ok top_level=0 no_schema_wire=31 maintained_by_hand=0`).
+- `make verify`: pass.
+
+PR #65 review-fix quality gate:
+
+- Decision: submit.
+- Findings: 0.
+- Required artifacts present: ExecPlan updated, PR2 workflow-contract review
+  report updated with staging/retrieval preparation chain, implementation
+  economy audit updated for the added handoff steps, focused regression tests
+  and full verification green.

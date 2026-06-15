@@ -261,10 +261,13 @@ pub fn target_operating_contract_collect_plan(
     );
     let target_local_workload_execution_run_dir =
         format!("adc-lab-target-local-workload-{}", input.run_id);
+    let target_local_workload_inputs_dir =
+        format!("{target_local_workload_execution_run_dir}/inputs");
     let retrieved_target_local_workload_run_dir = format!(
         "{}/included/target-local-workload-demand",
         input.planned_run_dir
     );
+    let retrieved_target_local_parent_dir = format!("{}/included", input.planned_run_dir);
     let target_local_workload_scp_source = format!(
         "{}:{target_local_workload_execution_run_dir}",
         target_spec.endpoint
@@ -324,10 +327,12 @@ pub fn target_operating_contract_collect_plan(
     let controller_workload_run_plan_path =
         format!("{}/inputs/workload_run_plan.yaml", input.planned_run_dir);
     let workload_run_plan_path = if target_is_ssh {
-        format!("{target_local_workload_execution_run_dir}/inputs/workload_run_plan.yaml")
+        format!("{target_local_workload_inputs_dir}/workload_run_plan.yaml")
     } else {
         controller_workload_run_plan_path.clone()
     };
+    let target_local_workload_plan_scp_dest =
+        format!("{}:{workload_run_plan_path}", target_spec.endpoint);
     let workload_demand_path = if target_is_ssh {
         format!("{retrieved_target_local_workload_run_dir}/reports/workload_demand_profile.json")
     } else {
@@ -1001,40 +1006,146 @@ pub fn target_operating_contract_collect_plan(
     ];
 
     if target_is_ssh {
-        let insert_index = steps
+        let workload_insert_index = steps
+            .iter()
+            .position(|step| step.step_id == "workload_demand")
+            .unwrap_or(steps.len());
+        steps.splice(
+            workload_insert_index..workload_insert_index,
+            vec![
+                collect_step_at(
+                    "prepare_target_local_workload_plan_dir",
+                    "workload",
+                    vec!["mkdir", "-p", &target_local_workload_inputs_dir],
+                    "target_local_repository_root",
+                    "target_local",
+                    false,
+                    true,
+                    false,
+                    false,
+                    Vec::<&str>::new(),
+                    vec![target_local_workload_inputs_dir.clone()],
+                    "workload_plan_staging_required_for_target_local_workload",
+                    vec![GovernorValidity::NotApplicable],
+                    vec![GovernorValidity::Refused],
+                    vec![
+                        "create the target-local workload input directory before scp staging"
+                            .to_string(),
+                        "run this argv on the target-local host; it is not a remote shell step"
+                            .to_string(),
+                    ],
+                    "Create the target-local workload run input directory before staging the workload plan.",
+                ),
+                collect_step_at(
+                    "stage_target_local_workload_plan",
+                    "workload",
+                    vec![
+                        "scp",
+                        &controller_workload_run_plan_path,
+                        &target_local_workload_plan_scp_dest,
+                    ],
+                    "repository_root",
+                    "operator_handoff",
+                    true,
+                    true,
+                    false,
+                    false,
+                    Vec::<&str>::new(),
+                    vec![workload_run_plan_path.clone()],
+                    "workload_plan_staging_required_for_target_local_workload",
+                    vec![GovernorValidity::NotApplicable],
+                    vec![GovernorValidity::Refused],
+                    vec![
+                        "stage the exact controller workload run plan path to the target-local workload run path".to_string(),
+                        "this staging step is handoff plumbing, not target measurement evidence"
+                            .to_string(),
+                    ],
+                    "Stage the workload run plan onto the target before target-local workload demand collection.",
+                ),
+            ],
+        );
+
+        let retrieval_insert_index = steps
             .iter()
             .position(|step| step.step_id == "workload_demand")
             .map(|index| index + 1)
             .unwrap_or(steps.len());
-        steps.insert(
-            insert_index,
-            collect_step_at(
-                "retrieve_target_local_workload_demand",
-                "workload",
-                vec![
-                    "scp",
-                    "-r",
-                    &target_local_workload_scp_source,
-                    &retrieved_target_local_workload_run_dir,
-                ],
-                "repository_root",
-                "operator_handoff",
-                true,
-                true,
-                false,
-                false,
-                vec!["workload"],
-                vec![workload_demand_path.clone()],
-                "workload_demand_required_for_suitability",
-                vec![GovernorValidity::Measured, GovernorValidity::Insufficient],
-                vec![GovernorValidity::Refused, GovernorValidity::Unknown],
-                vec![
-                    "retrieval is a handoff step, not target measurement evidence".to_string(),
-                    "decide suitability consumes the retrieved workload demand path exactly"
-                        .to_string(),
-                ],
-                "Retrieve the target-local workload demand run into the deterministic included-run path before suitability.",
-            ),
+        steps.splice(
+            retrieval_insert_index..retrieval_insert_index,
+            vec![
+                collect_step_at(
+                    "prepare_target_local_workload_retrieval_parent",
+                    "workload",
+                    vec!["mkdir", "-p", &retrieved_target_local_parent_dir],
+                    "repository_root",
+                    "operator_handoff",
+                    true,
+                    false,
+                    false,
+                    false,
+                    Vec::<&str>::new(),
+                    vec![retrieved_target_local_parent_dir.clone()],
+                    "handoff_only_not_target_evidence",
+                    vec![GovernorValidity::NotApplicable],
+                    vec![GovernorValidity::Refused],
+                    vec!["create the included-run parent before workload demand retrieval"
+                        .to_string()],
+                    "Create the included-run parent directory before retrieving target-local workload demand.",
+                ),
+                collect_step_at(
+                    "reset_target_local_workload_retrieval_destination",
+                    "workload",
+                    vec!["rm", "-rf", &retrieved_target_local_workload_run_dir],
+                    "repository_root",
+                    "operator_handoff",
+                    true,
+                    false,
+                    false,
+                    false,
+                    Vec::<&str>::new(),
+                    Vec::<String>::new(),
+                    "handoff_only_not_target_evidence",
+                    vec![GovernorValidity::NotApplicable],
+                    vec![GovernorValidity::Refused],
+                    vec![
+                        format!(
+                            "rerun policy: delete only the deterministic retrieved workload path {retrieved_target_local_workload_run_dir} before scp"
+                        ),
+                        "this cleanup is controller-side handoff plumbing, not target evidence"
+                            .to_string(),
+                    ],
+                    "Reset only the deterministic retrieved workload demand destination before scp so reruns keep the same layout.",
+                ),
+                collect_step_at(
+                    "retrieve_target_local_workload_demand",
+                    "workload",
+                    vec![
+                        "scp",
+                        "-r",
+                        &target_local_workload_scp_source,
+                        &retrieved_target_local_workload_run_dir,
+                    ],
+                    "repository_root",
+                    "operator_handoff",
+                    true,
+                    true,
+                    false,
+                    false,
+                    vec!["workload"],
+                    vec![workload_demand_path.clone()],
+                    "workload_demand_required_for_suitability",
+                    vec![GovernorValidity::Measured, GovernorValidity::Insufficient],
+                    vec![GovernorValidity::Refused, GovernorValidity::Unknown],
+                    vec![
+                        "retrieval is a handoff step, not target measurement evidence".to_string(),
+                        "decide suitability consumes the retrieved workload demand path exactly"
+                            .to_string(),
+                        "destination is removed before scp so existing directories cannot change the copied layout"
+                            .to_string(),
+                    ],
+                    "Retrieve the target-local workload demand run into the deterministic included-run path before suitability.",
+                ),
+            ],
         );
     }
 

@@ -106,6 +106,13 @@ fn step_by_id<'a>(steps: &'a [serde_json::Value], step_id: &str) -> &'a serde_js
         .unwrap_or_else(|| panic!("missing collect-plan step {step_id}"))
 }
 
+fn step_index(steps: &[serde_json::Value], step_id: &str) -> usize {
+    steps
+        .iter()
+        .position(|step| step["step_id"] == step_id)
+        .unwrap_or_else(|| panic!("missing collect-plan step {step_id}"))
+}
+
 fn argv_values(argv: &[serde_json::Value], flag: &str) -> Vec<String> {
     argv.iter()
         .enumerate()
@@ -433,9 +440,71 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
     assert!(!governor_argv.iter().any(|arg| arg == "ssh://target55"));
 
     let workload_step = step_by_id(steps, "workload_demand");
+    let prepare_workload_dir_step = step_by_id(steps, "prepare_target_local_workload_plan_dir");
+    let stage_workload_plan_step = step_by_id(steps, "stage_target_local_workload_plan");
     assert_eq!(workload_step["execution_location"], "target_local");
     assert_eq!(workload_step["requires_controller"], false);
     assert_eq!(workload_step["requires_target_local"], true);
+    assert!(
+        step_index(steps, "prepare_target_local_workload_plan_dir")
+            < step_index(steps, "stage_target_local_workload_plan")
+    );
+    assert!(
+        step_index(steps, "stage_target_local_workload_plan")
+            < step_index(steps, "workload_demand")
+    );
+    assert_eq!(
+        prepare_workload_dir_step["execution_location"],
+        "target_local"
+    );
+    assert_eq!(prepare_workload_dir_step["requires_controller"], false);
+    assert_eq!(prepare_workload_dir_step["requires_target_local"], true);
+    assert_eq!(
+        prepare_workload_dir_step["command_argv"]
+            .as_array()
+            .unwrap(),
+        &[
+            serde_json::Value::String("mkdir".to_string()),
+            serde_json::Value::String("-p".to_string()),
+            serde_json::Value::String("adc-lab-target-local-workload-run/inputs".to_string())
+        ]
+    );
+    assert_eq!(
+        prepare_workload_dir_step["expected_artifact_paths_or_globs"]
+            .as_array()
+            .unwrap(),
+        &[serde_json::Value::String(
+            "adc-lab-target-local-workload-run/inputs".to_string()
+        )]
+    );
+    assert_eq!(
+        stage_workload_plan_step["execution_location"],
+        "operator_handoff"
+    );
+    assert_eq!(stage_workload_plan_step["requires_controller"], true);
+    assert_eq!(stage_workload_plan_step["requires_target_local"], true);
+    assert_eq!(
+        stage_workload_plan_step["command_argv"].as_array().unwrap(),
+        &[
+            serde_json::Value::String("scp".to_string()),
+            serde_json::Value::String(format!(
+                "{}/inputs/workload_run_plan.yaml",
+                run_dir.display()
+            )),
+            serde_json::Value::String(
+                "target55:adc-lab-target-local-workload-run/inputs/workload_run_plan.yaml"
+                    .to_string()
+            )
+        ]
+    );
+    assert_eq!(
+        stage_workload_plan_step["expected_artifact_paths_or_globs"]
+            .as_array()
+            .unwrap(),
+        &[serde_json::Value::String(
+            "adc-lab-target-local-workload-run/inputs/workload_run_plan.yaml".to_string()
+        )]
+    );
     let workload_argv = workload_step["command_argv"].as_array().unwrap();
     let workload_target_index = workload_argv
         .iter()
@@ -468,6 +537,22 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
     );
 
     let retrieve_workload_step = step_by_id(steps, "retrieve_target_local_workload_demand");
+    let prepare_retrieval_parent_step =
+        step_by_id(steps, "prepare_target_local_workload_retrieval_parent");
+    let reset_retrieval_destination_step =
+        step_by_id(steps, "reset_target_local_workload_retrieval_destination");
+    assert!(
+        step_index(steps, "workload_demand")
+            < step_index(steps, "prepare_target_local_workload_retrieval_parent")
+    );
+    assert!(
+        step_index(steps, "prepare_target_local_workload_retrieval_parent")
+            < step_index(steps, "reset_target_local_workload_retrieval_destination")
+    );
+    assert!(
+        step_index(steps, "reset_target_local_workload_retrieval_destination")
+            < step_index(steps, "retrieve_target_local_workload_demand")
+    );
     assert_eq!(
         retrieve_workload_step["execution_location"],
         "operator_handoff"
@@ -476,6 +561,42 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
         "{}/included/target-local-workload-demand",
         run_dir.display()
     );
+    assert_eq!(
+        prepare_retrieval_parent_step["command_argv"]
+            .as_array()
+            .unwrap(),
+        &[
+            serde_json::Value::String("mkdir".to_string()),
+            serde_json::Value::String("-p".to_string()),
+            serde_json::Value::String(format!("{}/included", run_dir.display()))
+        ]
+    );
+    assert_eq!(
+        reset_retrieval_destination_step["command_argv"]
+            .as_array()
+            .unwrap(),
+        &[
+            serde_json::Value::String("rm".to_string()),
+            serde_json::Value::String("-rf".to_string()),
+            serde_json::Value::String(retrieved_workload_dir.clone())
+        ]
+    );
+    assert_eq!(
+        reset_retrieval_destination_step["expected_artifact_paths_or_globs"]
+            .as_array()
+            .unwrap()
+            .len(),
+        0
+    );
+    let reset_notes = reset_retrieval_destination_step["validation_after_step"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|note| note.as_str().unwrap())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(reset_notes.contains("rerun policy"));
+    assert!(reset_notes.contains(&retrieved_workload_dir));
     let retrieve_workload_argv = retrieve_workload_step["command_argv"].as_array().unwrap();
     assert_eq!(retrieve_workload_argv[0], "scp");
     assert_eq!(retrieve_workload_argv[1], "-r");
@@ -584,6 +705,9 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
     assert!(instructions.contains("adc-lab-target"));
     assert!(instructions.contains("~/.local/bin"));
     assert!(instructions.contains("non-interactive SSH PATH"));
+    assert!(instructions.contains("stage_target_local_workload_plan"));
+    assert!(instructions.contains("prepare_target_local_workload_retrieval_parent"));
+    assert!(instructions.contains("reset_target_local_workload_retrieval_destination"));
     assert!(instructions.contains("retrieve_target_local_workload_demand"));
     assert!(instructions.contains("target-local workload demand"));
     for forbidden in [
@@ -644,9 +768,18 @@ fn collect_plan_local_does_not_emit_include_run_for_validation_or_contract() {
     let workload_step = step_by_id(steps, "workload_demand");
     assert_eq!(workload_step["execution_location"], "controller");
     assert_eq!(workload_step["requires_target_local"], false);
-    assert!(steps
-        .iter()
-        .all(|step| step["step_id"] != "retrieve_target_local_workload_demand"));
+    for ssh_only_step in [
+        "prepare_target_local_workload_plan_dir",
+        "stage_target_local_workload_plan",
+        "prepare_target_local_workload_retrieval_parent",
+        "reset_target_local_workload_retrieval_destination",
+        "retrieve_target_local_workload_demand",
+    ] {
+        assert!(
+            steps.iter().all(|step| step["step_id"] != ssh_only_step),
+            "local collect plan must not emit SSH-only step {ssh_only_step}"
+        );
+    }
     assert!(argv_values(
         validation_step["command_argv"].as_array().unwrap(),
         "--include-run"
