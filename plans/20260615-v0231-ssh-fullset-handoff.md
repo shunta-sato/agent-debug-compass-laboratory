@@ -187,16 +187,22 @@ Current branch: `codex/v0231-ssh-fullset-handoff`.
 
 Current PR: #62.
 
-Reviewed implementation commit: `1a048a34bfef406dce3f29e5fe63d9f8e10a6849`.
+Reviewed implementation commit:
+`1a048a34bfef406dce3f29e5fe63d9f8e10a6849`.
 
-Status: draft PR open, mergeable, CI success on the implementation commit,
-awaiting this ExecPlan-only status update before Ready for review.
+Latest PR head at this review checkpoint:
+`6d918a4d81511ce3e215aaf7b8ceb87b032ab5f0`.
+
+Status:
+Ready for review, draft=false, mergeable=true, CI success on the latest reviewed
+head.
 
 Next steps:
 
-1. Address review comments if any.
-2. Mark Ready for review after this ExecPlan status update is pushed.
-3. Merge after CI remains green.
+1. Merge after final review.
+2. Tag/release v0.2.3.1 if release gate remains green.
+3. Re-run target55 workflow-authority prompt with `ADC_LAB_TARGET_RUNNER`
+   set as needed.
 
 ## Outcomes & Retrospective
 
