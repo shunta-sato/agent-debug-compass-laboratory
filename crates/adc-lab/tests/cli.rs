@@ -1,7 +1,7 @@
 use adc_lab_core::{
     canonical_plan_digest, governor_sweep_policy_digest, Actor, ActorKind, ApprovalBounds,
-    ApprovalRecord, Artifact, ControlPlan, EvidenceStore, GovernorSweepPolicyPayload, Kind,
-    RiskTier,
+    ApprovalRecord, Artifact, ControlPlan, EvidenceRefResolutionKind, EvidenceStore,
+    GovernorSweepPolicyPayload, Kind, RiskTier, RunSetSourceRole,
 };
 use assert_cmd::Command;
 use predicates::str::contains;
@@ -928,6 +928,202 @@ fn suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end() {
     assert!(audit.contains("\"operation\":\"report.target_operating_contract\""));
     assert!(audit.contains("\"operation\":\"decide.suitability\""));
     assert!(audit.contains("\"operation\":\"constraints.generate\""));
+}
+
+#[test]
+fn suitability_and_constraints_refs_resolve_across_included_run_set() {
+    let temp = tempfile::tempdir().unwrap();
+    let primary = temp.path().join("primary");
+    let included = temp.path().join("included");
+    fs::create_dir_all(primary.join("observations")).unwrap();
+    fs::write(
+        primary.join("observations/observe.json"),
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "max_observed_temp_c": 61.0,
+            "memory_available_kb": 7340032
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let demand_path = primary.join("workload_demand_profile.json");
+    let policy_path = primary.join("policy.yaml");
+    let decision_path = primary.join("reports/suitability_decision.json");
+    let constraints_path = primary.join("reports/design_constraint_pack.json");
+    let agent_md_path = primary.join("reports/agent_constraints.md");
+    fs::copy(
+        workspace_root().join("tests/golden/lab.workload_demand_profile.v1.valid.json"),
+        &demand_path,
+    )
+    .unwrap();
+    fs::copy(
+        workspace_root().join("tests/golden/lab.suitability_policy.v1.valid.json"),
+        &policy_path,
+    )
+    .unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "pressure",
+            "run",
+            "--target",
+            "local",
+            "--kind",
+            "latency_jitter",
+            "--duration",
+            "1ms",
+            "--run-dir",
+            included.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "operating-contract",
+            "--run",
+            primary.to_str().unwrap(),
+            "--include-run",
+            included.to_str().unwrap(),
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"included_run_count\": 1"))
+        .stdout(contains("\"kind\": \"report.operating_contract\""))
+        .stdout(contains("\"kind\": \"report.evidence_ref_resolution\""));
+    let contract_path = primary.join("reports/target_operating_contract.v2.json");
+    let resolution_path = primary.join("reports/evidence_ref_resolution.v2.json");
+    assert!(contract_path.exists());
+    assert!(resolution_path.exists());
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "decide",
+            "suitability",
+            "--target-run",
+            primary.to_str().unwrap(),
+            "--target-contract",
+            contract_path.to_str().unwrap(),
+            "--workload-demand",
+            demand_path.to_str().unwrap(),
+            "--policy",
+            policy_path.to_str().unwrap(),
+            "--out",
+            decision_path.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"kind\": \"report.suitability\""));
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "constraints",
+            "generate",
+            "--decision",
+            decision_path.to_str().unwrap(),
+            "--out",
+            constraints_path.to_str().unwrap(),
+            "--agent-instructions-out",
+            agent_md_path.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"kind\": \"report.constraints\""));
+
+    let contract: serde_json::Value =
+        serde_json::from_slice(&fs::read(&contract_path).unwrap()).unwrap();
+    let production_ready = contract["payload"]["evaluations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|evaluation| {
+            evaluation["rule_id"] == "operating.production_readiness_requires_run_report"
+        })
+        .unwrap();
+    assert_eq!(production_ready["decision"], "blocked");
+
+    let decision: serde_json::Value =
+        serde_json::from_slice(&fs::read(&decision_path).unwrap()).unwrap();
+    assert_eq!(decision["kind"], "report.suitability");
+    assert!(decision["payload"]["blocked_claims"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|claim| claim == "target.selection.production_ready"));
+
+    let constraints: serde_json::Value =
+        serde_json::from_slice(&fs::read(&constraints_path).unwrap()).unwrap();
+    assert_eq!(constraints["kind"], "report.constraints");
+    assert!(constraints["payload"]["blocked_claims"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|claim| claim == "target.selection.production_ready"));
+
+    let mut evidence_refs = evidence_refs_in_value(&contract);
+    evidence_refs.extend(evidence_refs_in_value(&decision));
+    evidence_refs.extend(evidence_refs_in_value(&constraints));
+    evidence_refs.sort();
+    evidence_refs.dedup();
+    assert!(
+        evidence_refs
+            .iter()
+            .any(|reference| reference.starts_with("artifact://lab/runs/")
+                && reference.contains("/pressure/")),
+        "operating-contract/suitability/constraints refs must include included-run pressure evidence: {evidence_refs:?}"
+    );
+
+    let store = EvidenceStore::open(&[primary.clone(), included.clone()]).unwrap();
+    let resolution = store.evidence_ref_resolution_payload(
+        "RUN-SET-cli-included-downstream",
+        vec![
+            contract_path.display().to_string(),
+            decision_path.display().to_string(),
+            constraints_path.display().to_string(),
+        ],
+        evidence_refs,
+    );
+    assert!(
+        resolution.invalid_refs.is_empty(),
+        "all artifact:// refs must resolve in the opened run set: {:?}",
+        resolution.invalid_refs
+    );
+    assert_eq!(resolution.run_set_resolution_map.len(), 2);
+    assert_eq!(
+        resolution.run_set_resolution_map[0].source_role,
+        RunSetSourceRole::Primary
+    );
+    assert_eq!(
+        resolution.run_set_resolution_map[1].source_role,
+        RunSetSourceRole::Included
+    );
+    let included_prefix = included.display().to_string();
+    assert!(
+        resolution.resolutions.iter().any(|resolution| {
+            resolution.classification == EvidenceRefResolutionKind::Resolvable
+                && resolution
+                    .resolved_path
+                    .as_ref()
+                    .is_some_and(|path| path.starts_with(&included_prefix))
+        }),
+        "at least one downstream evidence ref must resolve to the included run: {:?}",
+        resolution.resolutions
+    );
+    assert!(fs::read_to_string(agent_md_path)
+        .unwrap()
+        .contains("## Blocked claims"));
 }
 
 #[test]

@@ -430,6 +430,10 @@ adc-lab report operating-contract \
 `reports/evidence_ref_resolution.v2.json` so handoff review can see whether
 the contract evidence refs resolve inside the opened run set or are explicitly
 diagnostic/external.
+For `report.evidence_ref_resolution`, `status.state = measured` means every
+`artifact://` ref in the checked set is resolvable and every non-artifact ref is
+explicitly classified as `diagnostic_external`. It does not mean diagnostic or
+external refs are machine-resolved artifacts.
 
 The target operating contract tells agents which patterns are allowed by evidence, burst-only, degraded-mode triggers, forbidden without more evidence, or blocked as claims.
 

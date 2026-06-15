@@ -652,7 +652,8 @@ PR 1 dev-workflow route:
   non-artifact refs are classified; invalid artifact refs fail the resolution
   report; measured validation removes `matching_report.run_validation` while
   keeping `target.selection.production_ready` blocked; CLI writes the handoff
-  resolution report.
+  resolution report; included-run operating-contract refs continue to resolve
+  after downstream suitability and constraints generation.
 - Complexity Budget: changed production files <= 5; new modules = 0; new
   helpers/structs <= 6 inside existing evidence/report modules; schema/golden
   files only as generated contract evidence; production diff target <= 250
@@ -853,6 +854,10 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   already owns opened run roots and symlink rejection. PR 1 therefore extends
   EvidenceStore with read-only evidence-ref resolution instead of creating a
   separate report resolver module.
+- 2026-06-15: PR #64 review found that the original A-052 evidence only tested
+  suitability/constraints ref resolution against a single-run store. The
+  review requires an included-run downstream regression or an explicit scope
+  reduction.
 
 ## Decision Log
 
@@ -892,6 +897,10 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   repository instructions and `.gitignore` keep `.agents/` out of source
   control; the PR-visible function-boundary summary is recorded in this
   ExecPlan instead.
+- 2026-06-15: Address PR #64 review by adding the included-run downstream
+  regression instead of narrowing PR scope. Rationale: PR 1 is the auditability
+  foundation, so it should prove operating-contract, suitability, and
+  constraints refs resolve through the same primary + included run set.
 
 ## Handoff
 
@@ -904,26 +913,21 @@ Current implementation branch:
 Status:
 PR #63 is merged. PR 1 branch is open locally from updated `origin/main`.
 Implementation is complete locally; resolver/report code, focused tests,
-schema generation, workflow-contract review report, and full verification are
-green. Draft PR #64 is open and mergeable. This handoff may receive plan-only
-status commits, so check the PR UI for latest-head CI before Ready for review.
+schema generation, workflow-contract review report, and full verification were
+green before review. PR #64 review requested one small A-052 coverage fix; this
+branch now adds the included-run downstream suitability/constraints regression
+and documentation clarification. Local verification is green after the review
+fix; check PR #64 for latest-head CI before merge.
 
 Next steps:
-1. Address review feedback.
-2. Mark PR #64 Ready for review after approval.
-3. Merge after CI remains green.
+1. Push the PR #64 review-fix commit if it is not already on the remote branch.
+2. Check latest-head CI.
+3. Merge after final review approval and green CI.
 
 Required process:
 every implementation PR must include
 `reports/workflow-contract-review/<slug>.md` because workflow-contract review
 is now part of the development gate.
-
-Suggested next steps:
-
-1. Address review comments on PR #63.
-2. Mark PR #63 ready for review when approved.
-3. After merge, start PR 1 on evidence-ref resolution and production-readiness
-   missing-reason cleanup.
 
 ## Outcomes & Retrospective
 
@@ -956,6 +960,7 @@ PR 1 verification:
 - `cargo test -p adc-lab-core operating_contract_validation_gate_removes_matching_validation_missing_reason -- --nocapture`: pass.
 - `cargo test -p adc-lab --test cli report_operating_contract_accepts_include_run_in_v2_store -- --nocapture`: pass.
 - `cargo test -p adc-lab --test cli suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli suitability_and_constraints_refs_resolve_across_included_run_set -- --nocapture`: pass.
 - `cargo test -p adc-lab-core --test probe_artifacts -- --nocapture`: pass.
 - `cargo test -p adc-lab-core --test rules_engine operating_contract -- --nocapture`: pass.
 - `cargo test -p adc-lab --test cli report_operating_contract -- --nocapture`: pass.
@@ -963,6 +968,11 @@ PR 1 verification:
 - `make contract`: pass.
 - `make docs-smoke`: pass.
 - `make verify`: pass.
+- PR #64 review-fix verification:
+  - `cargo test -p adc-lab --test cli suitability_and_constraints_refs_resolve_across_included_run_set -- --nocapture`: pass.
+  - `make docs-smoke`: pass.
+  - `make schemas-check`: pass (`schema ledger: ok top_level=0 no_schema_wire=31 maintained_by_hand=0`).
+  - `make verify`: pass.
 
 Quality gate:
 

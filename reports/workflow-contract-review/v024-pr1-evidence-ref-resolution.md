@@ -26,6 +26,8 @@
 | Step | Execution location | argv | Required env | Expected artifact | Stop/continue |
 | --- | --- | --- | --- | --- | --- |
 | operating_contract | controller | Existing public `adc-lab report operating-contract --run <main> --include-run <included> --validation <path> --strict-fullset --json` | none beyond existing adc-lab runtime | `report.operating_contract`, `report.evidence_ref_resolution` | Existing strict-fullset failure behavior is unchanged. |
+| suitability | controller | Existing public `adc-lab decide suitability --target-run <main> --target-contract <contract> --workload-demand <path> --policy <path> --out <suitability> --json` | none beyond existing adc-lab runtime | `report.suitability` | Uses the contract artifact produced from the same primary + included run set. |
+| constraints | controller | Existing public `adc-lab constraints generate --decision <suitability> --out <constraints> --agent-instructions-out <md> --json` | none beyond existing adc-lab runtime | `report.constraints` | Preserves blocked claims; does not promote production readiness. |
 
 ## Producer/consumer consistency
 
@@ -33,6 +35,7 @@
 | --- | --- | --- | --- | --- |
 | `EvidenceStore::open` | run-set resolution map | `report.evidence_ref_resolution` | logical run id, opened path, artifact URI root, primary/included role | pass |
 | `report operating-contract` | `report.operating_contract` evidence refs | resolver report | every `artifact://` ref resolves inside opened run set, non-artifact refs are diagnostic/external | pass |
+| `report operating-contract` | `report.operating_contract` from primary + included run set | `decide suitability` and `constraints generate` | downstream `artifact://` evidence refs resolve through `EvidenceStore::open([primary, included])` | pass; covered by `suitability_and_constraints_refs_resolve_across_included_run_set` |
 | `report validate-run` | `report.run_validation` | operating-contract validation gate | run-set id, included refs, workflow id, target id, target class | pass; unchanged |
 
 ## Run-set / target / workflow identity consistency
