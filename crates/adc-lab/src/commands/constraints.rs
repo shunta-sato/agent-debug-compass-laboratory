@@ -48,7 +48,7 @@ fn run_context_for_report_artifact(path: &Path, run_id: &str) -> Option<RunConte
 
 pub(crate) fn command_constraints_check(args: ConstraintsCheckCommand) -> Result<()> {
     eprintln!(
-        "warning: `constraints check --mode` is compatibility syntax. Prefer `constraints check-candidate` or `constraints self-check`."
+        "warning: `constraints check` is compatibility syntax. Prefer `constraints check-candidate` or `constraints self-check`."
     );
     let constraints = read_constraints_artifact(&args.constraints, "constraints check")?;
     let mode = match args.mode {

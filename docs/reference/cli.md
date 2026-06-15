@@ -11,12 +11,14 @@ an operator-facing path; the stable contract is the envelope `kind`.
 
 | Command surface | Default or example path | Artifact kind |
 | --- | --- | --- |
+| `workflow recommend --run-dir ...` | `workflows/recommendation.v2.json` | `workflow.recommendation` |
+| `collect plan --out ...` | `workflows/collect_plan.v2.json` | `workflow.collect_plan` |
 | `familiarize read-only`, `report pack`, `report operating-point` | `reports/run_report.v2.json` | `report.run` |
 | `report validate-run` | `reports/run_validation.v2.json` | `report.run_validation` |
 | `report operating-contract` | `reports/target_operating_contract.v2.json` | `report.operating_contract` |
 | `decide suitability --out ...` | `reports/suitability.v2.json` | `report.suitability` |
 | `constraints generate --out ...` | `reports/constraints.v2.json` | `report.constraints` |
-| `constraints check --json` | stdout | `report.constraints_check` |
+| `constraints check-candidate --json`, `constraints self-check --json` | stdout | `report.constraints_check` |
 | `load cpu` | `load/cpu.<result_id>.v2.json` | `load` |
 | `pressure run` | `pressure/<kind>.<result_id>.v2.json` | `pressure` |
 | `pressure composite` | `composite/<scenario>.<result_id>.v2.json` | `composite` |
@@ -66,6 +68,46 @@ adc-lab privilege provider-status --target local
 ```
 
 Provider status is evidence about privilege-provider availability only. It is not permission to grant an Agent a root shell.
+
+## Workflow authority handoff
+
+For Target Operating Contract full-set work, ask adc-lab for the workflow
+surface instead of reusing a static prompt or writing a shell harness.
+
+```sh
+adc-lab workflow recommend \
+  --goal target-operating-contract-fullset \
+  --target ssh://target55 \
+  --target-id target55 \
+  --target-class raspberry_pi_4 \
+  --run-dir lab/runs/LAB-RUN-fullset \
+  --json
+
+adc-lab agent instructions \
+  --goal target-operating-contract-fullset \
+  --target ssh://target55 \
+  --target-id target55 \
+  --target-class raspberry_pi_4 \
+  --format codex \
+  --out lab/runs/LAB-RUN-fullset/workflows/codex_instructions.md \
+  --json
+
+adc-lab collect plan \
+  --goal target-operating-contract-fullset \
+  --target ssh://target55 \
+  --target-id target55 \
+  --target-class raspberry_pi_4 \
+  --run-dir lab/runs/LAB-RUN-fullset \
+  --out lab/runs/LAB-RUN-fullset/workflows/collect_plan.v2.json \
+  --agent-instructions-out lab/runs/LAB-RUN-fullset/workflows/collect_plan.md \
+  --json
+```
+
+`workflow.recommendation` and `workflow.collect_plan` are authority and handoff
+artifacts. They are not target measurement evidence. The collect plan contains
+argv arrays plus expected artifact kinds and continuation rules; execute those
+argv entries as typed commands, and stop rather than inventing missing workflow
+surfaces.
 
 ## Privileged operating-point workflow
 
@@ -132,8 +174,13 @@ unless `--allow-non-measured` is used for an exploratory dry run.
 ```sh
 adc-lab report validate-run \
   --run lab/runs/LAB-RUN-... \
+  --include-run lab/runs/LAB-RUN-target-local-governor-sweep \
   --profile target-operating-contract-fullset \
   --expected-governors ondemand,performance,powersave \
+  --workflow-recommendation lab/runs/LAB-RUN-.../workflows/recommendation.v2.json \
+  --collect-plan lab/runs/LAB-RUN-.../workflows/collect_plan.v2.json \
+  --target-id target55 \
+  --target-class raspberry_pi_4 \
   --json
 ```
 
@@ -144,6 +191,9 @@ does not infer a controlled-governor measurement from file names or timestamp
 order. By default it exits non-zero after writing the artifacts when any
 requested governor is not `measured`; pass `--allow-non-measured` only for
 exploratory review runs where that failure is expected.
+Version skew blocks full-set measured claims by default. `--allow-version-skew`
+records an exploratory override in the validation artifact, but it does not
+make full-set or production-style claims selection-ready.
 
 ## Bounded CPU load
 
@@ -310,24 +360,25 @@ adc-lab constraints generate \
 Run the minimal blocked-claim lint:
 
 ```sh
-adc-lab constraints check \
+adc-lab constraints check-candidate \
   --constraints lab/runs/LAB-RUN-workload-.../reports/constraints.v2.json \
-  --mode candidate-content \
   --path .
 ```
 
 This check is intentionally small. It fails when blocked claim text appears in
 candidate agent-facing content; it is not a full static analyzer. To validate
 the generated constraints artifact or generated agent instructions themselves,
-use the generated self-check mode so the expected `Blocked claims` section is
+use the generated self-check command so the expected `Blocked claims` section is
 not treated as downstream positive claim text:
 
 ```sh
-adc-lab constraints check \
+adc-lab constraints self-check \
   --constraints lab/runs/LAB-RUN-workload-.../reports/constraints.v2.json \
-  --mode generated-constraints \
   --path lab/runs/LAB-RUN-workload-.../reports/agent_constraints.md
 ```
+
+`adc-lab constraints check` remains a compatibility alias and prints a warning.
+New Agent workflows should use `check-candidate` or `self-check`.
 
 ## Experiment matrix
 
@@ -365,6 +416,8 @@ adc-lab report operating-contract \
   --include-run lab/runs/LAB-RUN-governor-control \
   --include-run lab/runs/LAB-RUN-composite \
   --include-run lab/runs/LAB-RUN-network-transfer \
+  --validation lab/runs/LAB-RUN-primary/reports/run_validation.v2.json \
+  --strict-fullset \
   --target-id target-id \
   --target-class raspberry_pi_4
 ```
@@ -379,6 +432,10 @@ The target operating contract tells agents which patterns are allowed by evidenc
 With `--include-run`, the v2 evidence store opens all provided run
 directories and evaluates the rule table against the combined v2 artifacts. It
 does not emit v1 run-set or multi-run compatibility artifacts.
+With `--validation`, controlled-governor full-set claims require a matching
+`report.run_validation` artifact for the same workflow, run set, target id, and
+target class. `--strict-fullset` writes the contract and then exits non-zero
+when that validation gate is missing or non-measured.
 
 An operating contract can support scoped lab claims. It cannot say:
 
