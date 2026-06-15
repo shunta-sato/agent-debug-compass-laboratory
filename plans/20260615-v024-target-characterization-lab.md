@@ -905,12 +905,13 @@ Status:
 PR #63 is merged. PR 1 branch is open locally from updated `origin/main`.
 Implementation is complete locally; resolver/report code, focused tests,
 schema generation, workflow-contract review report, and full verification are
-green. Draft PR #64 is open.
+green. Draft PR #64 is open and mergeable. This handoff may receive plan-only
+status commits, so check the PR UI for latest-head CI before Ready for review.
 
 Next steps:
-1. Wait for GitHub CI on PR #64.
-2. Address review feedback.
-3. Mark PR #64 Ready for review after approval.
+1. Address review feedback.
+2. Mark PR #64 Ready for review after approval.
+3. Merge after CI remains green.
 
 Required process:
 every implementation PR must include
@@ -973,3 +974,5 @@ Quality gate:
 - Draft PR opened: #64
   (`https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/64`) at
   head `46d3757e05f4af4bd88fc024c4a7f89bba5f6fd1`.
+- PR #64 status-only handoff updates are plan-only; latest-head CI should be
+  checked in the PR UI before Ready for review.
