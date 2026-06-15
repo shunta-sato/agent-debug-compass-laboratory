@@ -64,6 +64,28 @@ fn single_v2_load_artifact_path(run_dir: &std::path::Path) -> PathBuf {
         .unwrap()
 }
 
+fn step_by_id<'a>(steps: &'a [serde_json::Value], step_id: &str) -> &'a serde_json::Value {
+    steps
+        .iter()
+        .find(|step| step["step_id"] == step_id)
+        .unwrap_or_else(|| panic!("missing collect-plan step {step_id}"))
+}
+
+fn argv_values(argv: &[serde_json::Value], flag: &str) -> Vec<String> {
+    argv.iter()
+        .enumerate()
+        .filter_map(|(index, value)| {
+            if value.as_str() == Some(flag) {
+                argv.get(index + 1)
+                    .and_then(|value| value.as_str())
+                    .map(str::to_string)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 fn write_workload_plan(run_dir: &std::path::Path, adc_lab_bin: &std::path::Path) -> PathBuf {
     let plan_path = run_dir.join("workload.yaml");
     let working_directory = workspace_root();
@@ -254,6 +276,10 @@ fn agent_instructions_generate_codex_prompt_from_workflow_registry() {
     assert!(prompt.contains("Do not fall back to a static prompt or hand-written shell harness"));
     assert!(prompt.contains("stop and report adc-lab version/capability mismatch"));
     assert!(prompt.contains("run adc-lab collect plan"));
+    assert!(prompt.contains("ADC_LAB_TARGET_RUNNER"));
+    assert!(prompt.contains("adc-lab-target"));
+    assert!(prompt.contains("~/.local/bin"));
+    assert!(prompt.contains("non-interactive SSH PATH"));
 
     for forbidden in [
         "PLAN-*.json",
@@ -371,10 +397,7 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
     assert_eq!(governor_argv[target_index], "local");
     assert!(!governor_argv.iter().any(|arg| arg == "ssh://target55"));
 
-    let validation_step = steps
-        .iter()
-        .find(|step| step["step_id"] == "run_validation")
-        .unwrap();
+    let validation_step = step_by_id(steps, "run_validation");
     assert!(validation_step["command_argv"]
         .as_array()
         .unwrap()
@@ -391,11 +414,19 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
         .iter()
         .any(|kind| kind == "report.run_validation"));
 
-    let operating_contract_step = steps
-        .iter()
-        .find(|step| step["step_id"] == "operating_contract")
-        .unwrap();
+    let operating_contract_step = step_by_id(steps, "operating_contract");
     let operating_contract_argv = operating_contract_step["command_argv"].as_array().unwrap();
+    let validation_argv = validation_step["command_argv"].as_array().unwrap();
+    let validation_include_runs = argv_values(validation_argv, "--include-run");
+    let operating_contract_include_runs = argv_values(operating_contract_argv, "--include-run");
+    assert_eq!(validation_include_runs, operating_contract_include_runs);
+    assert_eq!(
+        validation_include_runs,
+        vec![format!(
+            "{}/included/target-local-governor-sweep",
+            run_dir.display()
+        )]
+    );
     assert!(operating_contract_argv
         .iter()
         .any(|arg| arg == "--validation"));
@@ -439,6 +470,10 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
     assert!(instructions.contains("argv: `["));
     assert!(instructions.contains("execution_location: `target_local`"));
     assert!(instructions.contains("Packaging steps are handoff steps, not target evidence"));
+    assert!(instructions.contains("ADC_LAB_TARGET_RUNNER"));
+    assert!(instructions.contains("adc-lab-target"));
+    assert!(instructions.contains("~/.local/bin"));
+    assert!(instructions.contains("non-interactive SSH PATH"));
     for forbidden in [
         "PLAN-*.json",
         "APPROVAL-*.json",
@@ -457,6 +492,53 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
             "collect instructions must not contain {forbidden}"
         );
     }
+}
+
+#[test]
+fn collect_plan_local_does_not_emit_include_run_for_validation_or_contract() {
+    let temp = tempfile::tempdir().unwrap();
+    let run_dir = temp.path().join("run");
+    let out = run_dir.join("workflows/collect_plan.v2.json");
+    let instructions_out = run_dir.join("workflows/collect_plan.md");
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "collect",
+            "plan",
+            "--goal",
+            "target-operating-contract-fullset",
+            "--target",
+            "local",
+            "--target-id",
+            "local-target",
+            "--target-class",
+            "developer_host",
+            "--run-dir",
+            run_dir.to_str().unwrap(),
+            "--out",
+            out.to_str().unwrap(),
+            "--agent-instructions-out",
+            instructions_out.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    let plan: Artifact<serde_json::Value> =
+        serde_json::from_slice(&fs::read(&out).unwrap()).unwrap();
+    let steps = plan.payload["steps"].as_array().unwrap();
+    let validation_step = step_by_id(steps, "run_validation");
+    let operating_contract_step = step_by_id(steps, "operating_contract");
+    assert!(argv_values(
+        validation_step["command_argv"].as_array().unwrap(),
+        "--include-run"
+    )
+    .is_empty());
+    assert!(argv_values(
+        operating_contract_step["command_argv"].as_array().unwrap(),
+        "--include-run"
+    )
+    .is_empty());
 }
 
 #[test]

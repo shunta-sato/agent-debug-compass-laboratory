@@ -106,15 +106,16 @@ pub fn target_runner_build_info(target: &TargetSpec) -> LabResult<BuildInfo> {
     match target.transport {
         TargetTransport::Local => Ok(build_info("adc-lab-target")),
         TargetTransport::Ssh => {
+            let runner = ssh_runner_program()?;
             let output = Command::new("ssh")
                 .arg(&target.endpoint)
-                .arg(ssh_runner_program()?)
+                .arg(&runner)
                 .arg("--version")
                 .output()?;
             if !output.status.success() {
                 return Err(LabError::Command(format!(
                     "ssh target runner version failed: {}",
-                    String::from_utf8_lossy(&output.stderr)
+                    ssh_runner_failure_diagnostic(target, &runner, &output.stderr)
                 )));
             }
             let mut info: BuildInfo = serde_json::from_slice(&output.stdout)?;
@@ -122,4 +123,20 @@ pub fn target_runner_build_info(target: &TargetSpec) -> LabResult<BuildInfo> {
             Ok(info)
         }
     }
+}
+
+fn ssh_runner_failure_diagnostic(target: &TargetSpec, runner: &str, stderr: &[u8]) -> String {
+    let remote_user = ssh_endpoint_user(&target.endpoint).unwrap_or("<target-user>");
+    format!(
+        "tried_runner={runner}; default_runner=adc-lab-target; remote_endpoint={}; remote_user={remote_user}; remote_path=unknown (non-interactive SSH PATH is not captured by this version check); suggested_ADC_LAB_TARGET_RUNNER=/home/{remote_user}/.local/bin/adc-lab-target; release installer default is ~/.local/bin/adc-lab-target, but non-interactive SSH PATH may omit ~/.local/bin; remote stderr: {}",
+        target.endpoint,
+        String::from_utf8_lossy(stderr).trim()
+    )
+}
+
+fn ssh_endpoint_user(endpoint: &str) -> Option<&str> {
+    endpoint
+        .split_once('@')
+        .map(|(user, _)| user)
+        .filter(|user| !user.is_empty())
 }

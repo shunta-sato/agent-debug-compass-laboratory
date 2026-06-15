@@ -162,6 +162,19 @@ pub fn target_operating_contract_workflow_recommendation(
     input: WorkflowRecommendationInput,
 ) -> LabResult<Artifact<WorkflowRecommendationPayload>> {
     validate_workflow_goal(&input.goal)?;
+    let target_is_ssh = input.target.starts_with("ssh://");
+    let mut must_use = vec![
+        "adc-lab collect plan or equivalent workflow.collect_plan artifact".to_string(),
+        "adc-lab control governor-sweep prepare/approve/run for governor evidence".to_string(),
+        "adc-lab report validate-run before controlled-governor operating-contract claims"
+            .to_string(),
+    ];
+    if target_is_ssh {
+        must_use.push(
+            "For SSH targets, set ADC_LAB_TARGET_RUNNER=/home/<target-user>/.local/bin/adc-lab-target when the release installer default is not on the non-interactive SSH PATH."
+                .to_string(),
+        );
+    }
     let mut artifact = Artifact::new(
         Kind::WorkflowRecommendation,
         new_id("WORKFLOW-RECOMMENDATION"),
@@ -179,13 +192,7 @@ pub fn target_operating_contract_workflow_recommendation(
             target_id: input.target_id,
             target_class: input.target_class,
             source_of_truth_chain: source_of_truth_chain(),
-            must_use: vec![
-                "adc-lab collect plan or equivalent workflow.collect_plan artifact".to_string(),
-                "adc-lab control governor-sweep prepare/approve/run for governor evidence"
-                    .to_string(),
-                "adc-lab report validate-run before controlled-governor operating-contract claims"
-                    .to_string(),
-            ],
+            must_use,
             must_not_use_for_claims: vec![
                 "manual plan/approval/lease discovery by filename order".to_string(),
                 "raw primitive control artifacts without report.run_validation".to_string(),
@@ -315,12 +322,37 @@ pub fn target_operating_contract_collect_plan(
     ];
     let mut run_validation_notes =
         vec!["selection_ready remains false unless overall validity is measured".to_string()];
+    let include_run_args = if target_is_ssh {
+        vec![
+            "--include-run".to_string(),
+            retrieved_target_local_run_dir.clone(),
+        ]
+    } else {
+        Vec::new()
+    };
     if target_is_ssh {
-        run_validation_argv.insert(5, retrieved_target_local_run_dir.clone());
-        run_validation_argv.insert(5, "--include-run".to_string());
+        run_validation_argv.splice(5..5, include_run_args.clone());
         run_validation_notes.push(format!(
             "copy or mount the target-local governor run into {retrieved_target_local_run_dir} before validation; directory co-presence alone is not causal evidence"
         ));
+    }
+    let mut operating_contract_argv = vec![
+        "adc-lab".to_string(),
+        "report".to_string(),
+        "operating-contract".to_string(),
+        "--run".to_string(),
+        input.planned_run_dir.clone(),
+        "--target-id".to_string(),
+        input.target_id.clone(),
+        "--target-class".to_string(),
+        input.target_class.clone(),
+        "--validation".to_string(),
+        validation_path.clone(),
+        "--strict-fullset".to_string(),
+        "--json".to_string(),
+    ];
+    if target_is_ssh {
+        operating_contract_argv.splice(5..5, include_run_args.clone());
     }
 
     let steps = vec![
@@ -729,21 +761,7 @@ pub fn target_operating_contract_collect_plan(
         collect_step(
             "operating_contract",
             "reporting",
-            vec![
-                "adc-lab",
-                "report",
-                "operating-contract",
-                "--run",
-                &input.planned_run_dir,
-                "--target-id",
-                &input.target_id,
-                "--target-class",
-                &input.target_class,
-                "--validation",
-                &validation_path,
-                "--strict-fullset",
-                "--json",
-            ],
+            operating_contract_argv,
             "repository_root",
             false,
             false,
@@ -994,6 +1012,19 @@ pub fn render_collect_plan_agent_instructions(
     out.push_str("Do not fall back to a static prompt or hand-written shell harness when this collect plan is available.\n");
     out.push_str("If a required workflow surface is missing, stop and report adc-lab version/capability mismatch.\n");
     out.push_str("Do not infer artifact relationships from path names, timestamps, or directory co-presence.\n\n");
+    if payload.target.starts_with("ssh://") {
+        out.push_str("## SSH Target Runner Boundary\n\n");
+        out.push_str("Set `ADC_LAB_TARGET_RUNNER=/home/<target-user>/.local/bin/adc-lab-target` when the release installer default is not on the non-interactive SSH PATH.\n");
+        out.push_str("The release installer installs user binaries under `~/.local/bin` by default; non-interactive SSH PATH may omit that directory.\n");
+        out.push_str("Do not treat adc-lab or adc-lab-target as missing merely because command -v fails under the default non-interactive SSH PATH.\n\n");
+    }
+    if payload
+        .steps
+        .iter()
+        .any(|step| step.execution_location == "target_local")
+    {
+        out.push_str("For target_local execution, run `export PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH\"` before executing target-local argv steps.\n\n");
+    }
     out.push_str("## Steps\n\n");
     for step in &payload.steps {
         out.push_str(&format!("### `{}`\n\n", step.step_id));
@@ -1193,6 +1224,14 @@ pub fn render_codex_agent_instructions(
     out.push_str("- If a required workflow surface is missing, stop and report adc-lab version/capability mismatch.\n");
     out.push_str("- Do not infer artifact relationships from filenames, timestamps, or directory co-presence.\n");
     out.push_str("- Do not use raw primitive control artifacts for controlled-governor full-set claims without matching report.run_validation.\n\n");
+
+    if payload.target.starts_with("ssh://") {
+        out.push_str("## SSH Target Runner Boundary\n\n");
+        out.push_str("- Set `ADC_LAB_TARGET_RUNNER=/home/<target-user>/.local/bin/adc-lab-target` when the installed target runner is under the release installer default path.\n");
+        out.push_str("- The release installer installs `adc-lab-target` under `~/.local/bin`; non-interactive SSH PATH may omit that directory.\n");
+        out.push_str("- Do not treat adc-lab or adc-lab-target as missing merely because command -v fails under the default non-interactive SSH PATH.\n");
+        out.push_str("- For target_local execution, run `export PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH\"` before executing target-local argv steps.\n\n");
+    }
 
     out.push_str("## Expected Outputs\n\n");
     for item in &payload.expected_outputs {

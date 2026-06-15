@@ -213,7 +213,7 @@ bash install-adc-lab-helper.sh --latest --install-sudoers --user "$(id -un)"
 For reproducible setup, pin a release tag:
 
 ```sh
-VERSION=vX.Y.Z
+VERSION=vX.Y.Z[.N]
 curl -fsSLO "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${VERSION}/install-adc-lab-helper.sh"
 bash install-adc-lab-helper.sh --version "${VERSION}" --install-sudoers --user "$(id -un)"
 ```
@@ -222,7 +222,7 @@ If you have the installer checksum from a trusted channel, pin the installer
 itself before executing it:
 
 ```sh
-VERSION=vX.Y.Z
+VERSION=vX.Y.Z[.N]
 INSTALLER_SHA256=<expected-sha256>
 curl -fsSLo install-adc-lab-helper.sh "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${VERSION}/install-adc-lab-helper.sh"
 echo "${INSTALLER_SHA256}  install-adc-lab-helper.sh" | sha256sum -c -
@@ -357,6 +357,11 @@ It does not expose arbitrary remote shell.
 /home/<user>/.local/bin/adc-lab-target
 /home/<user>/.local/share/adc-lab/runners/<version>/adc-lab-target
 ```
+
+The release installer installs user binaries under `~/.local/bin` by default.
+Non-interactive SSH often does not include that directory in PATH, so set
+`ADC_LAB_TARGET_RUNNER=/home/<target-user>/.local/bin/adc-lab-target` when the
+default `adc-lab-target` lookup fails over SSH.
 
 ---
 

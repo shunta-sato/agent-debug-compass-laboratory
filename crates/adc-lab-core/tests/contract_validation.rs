@@ -472,7 +472,7 @@ fn contract_validation_release_helper_installer_keeps_fixed_safety_boundary() {
     assert!(script.contains("REPOSITORY=\"shunta-sato/agent-debug-compass-laboratory\""));
     assert!(script.contains("HELPER_DEST=\"/usr/local/libexec/adc-lab-priv-helper\""));
     assert!(script.contains("SUDOERS_DEST=\"/etc/sudoers.d/adc-lab\""));
-    assert!(script.contains("usage: install-adc-lab-helper.sh (--version vX.Y.Z | --latest)"));
+    assert!(script.contains("usage: install-adc-lab-helper.sh (--version vX.Y.Z[.N] | --latest)"));
     assert!(script.contains("do not run this installer as root"));
     assert!(script.contains("validate_version \"$version\""));
     assert!(script.contains("--version and --latest are mutually exclusive"));

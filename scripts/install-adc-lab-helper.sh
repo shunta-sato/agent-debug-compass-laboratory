@@ -16,12 +16,12 @@ user_bin_dir="${HOME}/.local/bin"
 
 usage() {
   cat <<'USAGE'
-usage: install-adc-lab-helper.sh (--version vX.Y.Z | --latest) [options]
+usage: install-adc-lab-helper.sh (--version vX.Y.Z[.N] | --latest) [options]
 
 Install adc-lab user binaries and the privileged helper from a GitHub Release.
 
 Options:
-  --version vX.Y.Z        Pinned release tag to install.
+  --version vX.Y.Z[.N]    Pinned release tag to install.
   --latest                Install from the GitHub latest release pointer.
   --asset-triple VALUE    Optional release asset triple. Defaults to auto.
                           Supported: linux-aarch64, linux-x86_64.
