@@ -224,6 +224,53 @@ fn contract_validation_ssh_runner_rejects_shell_fragment_env() {
 }
 
 #[cfg(unix)]
+#[test]
+fn contract_validation_ssh_runner_missing_on_path_has_actionable_diagnostic() {
+    let temp = tempfile::tempdir().unwrap();
+    let bin_dir = temp.path().join("bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    let ssh_path = bin_dir.join("ssh");
+    fs::write(
+        &ssh_path,
+        r#"#!/bin/sh
+echo "adc-lab-target: not found" >&2
+exit 127
+"#,
+    )
+    .unwrap();
+    fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o755)).unwrap();
+    let old_path = std::env::var_os("PATH").unwrap_or_default();
+    let path_env = format!("{}:{}", bin_dir.display(), old_path.to_string_lossy());
+    let run_dir = temp.path().join("run");
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .env("PATH", path_env)
+        .env_remove("ADC_LAB_TARGET_RUNNER")
+        .args([
+            "load",
+            "cpu",
+            "--target",
+            "ssh://target55",
+            "--workers",
+            "1",
+            "--duration",
+            "1s",
+            "--run-dir",
+            run_dir.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("ssh target runner version failed"))
+        .stderr(contains("tried_runner=adc-lab-target"))
+        .stderr(contains("default_runner=adc-lab-target"))
+        .stderr(contains("ADC_LAB_TARGET_RUNNER"))
+        .stderr(contains("~/.local/bin/adc-lab-target"))
+        .stderr(contains("non-interactive SSH PATH"));
+}
+
+#[cfg(unix)]
 struct FakeSshHarness {
     temp: tempfile::TempDir,
     bin_dir: PathBuf,

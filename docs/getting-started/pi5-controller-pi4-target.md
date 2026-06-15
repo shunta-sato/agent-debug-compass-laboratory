@@ -46,6 +46,15 @@ adc-lab toolchain discover --target ssh://pi4
 adc-lab observe --target ssh://pi4 --duration 30s --signals cpu,freq,thermal,memory
 ```
 
+If `adc-lab-target` was installed by the release installer under
+`~/.local/bin`, non-interactive SSH may not include that directory in PATH. Use
+the fixed runner path instead of relying on remote PATH lookup:
+
+```sh
+ADC_LAB_TARGET_RUNNER=/home/<target-user>/.local/bin/adc-lab-target \
+  adc-lab inventory --target ssh://pi4
+```
+
 Run the read-only familiarization pack smoke. This performs no privileged
 control, no cpufreq writes, no load generation, and only qualifies discovered
 tools through inventory policy:

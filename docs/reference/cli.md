@@ -457,6 +457,12 @@ For SSH targets, `adc-lab` uses fixed `adc-lab-target` subcommands over SSH. It 
 /home/<user>/.local/share/adc-lab/runners/<version>/adc-lab-target
 ```
 
+The release installer installs user binaries under `~/.local/bin` by default.
+Non-interactive SSH may not include that directory in PATH. If the target
+runner was installed there, set
+`ADC_LAB_TARGET_RUNNER=/home/<target-user>/.local/bin/adc-lab-target` instead
+of relying on remote PATH lookup.
+
 Remote read-only inventory, observe, and non-root load are supported. Privileged apply/restore should remain typed, bounded, approved, audited, and restorable; do not grant an Agent a root shell.
 
 ## Verification

@@ -91,7 +91,7 @@ bash install-adc-lab-helper.sh --latest --install-sudoers --user "$(id -un)"
 Pinned release installer:
 
 ```sh
-VERSION=vX.Y.Z
+VERSION=vX.Y.Z[.N]
 curl -fsSLO "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${VERSION}/install-adc-lab-helper.sh"
 bash install-adc-lab-helper.sh --version "${VERSION}" --install-sudoers --user "$(id -un)"
 ```
@@ -100,7 +100,7 @@ Checksum-pinned variant, when the installer hash is available from a trusted
 channel:
 
 ```sh
-VERSION=vX.Y.Z
+VERSION=vX.Y.Z[.N]
 INSTALLER_SHA256=<expected-sha256>
 curl -fsSLo install-adc-lab-helper.sh "https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${VERSION}/install-adc-lab-helper.sh"
 echo "${INSTALLER_SHA256}  install-adc-lab-helper.sh" | sha256sum -c -

@@ -9,7 +9,7 @@ The goal is to produce a first evidence pack. The goal is not to prove productio
 Use release binaries for Pi4 / Pi5 measurement work. Do not build from source on the target unless you are explicitly testing the build process.
 
 ```sh
-VERSION=vX.Y.Z
+VERSION=vX.Y.Z[.N]
 ASSET=adc-lab-${VERSION}-linux-aarch64.tar.gz
 
 curl -LO https://github.com/shunta-sato/agent-debug-compass-laboratory/releases/download/${VERSION}/${ASSET}
