@@ -432,6 +432,70 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
     assert_eq!(governor_argv[target_index], "local");
     assert!(!governor_argv.iter().any(|arg| arg == "ssh://target55"));
 
+    let workload_step = step_by_id(steps, "workload_demand");
+    assert_eq!(workload_step["execution_location"], "target_local");
+    assert_eq!(workload_step["requires_controller"], false);
+    assert_eq!(workload_step["requires_target_local"], true);
+    let workload_argv = workload_step["command_argv"].as_array().unwrap();
+    let workload_target_index = workload_argv
+        .iter()
+        .position(|arg| arg == "--target")
+        .unwrap()
+        + 1;
+    assert_eq!(workload_argv[workload_target_index], "local");
+    assert!(!workload_argv.iter().any(|arg| arg == "ssh://target55"));
+    let workload_run_dir_index = workload_argv
+        .iter()
+        .position(|arg| arg == "--run-dir")
+        .unwrap()
+        + 1;
+    assert_eq!(
+        workload_argv[workload_run_dir_index],
+        "adc-lab-target-local-workload-run"
+    );
+    let workload_plan_index = workload_argv
+        .iter()
+        .position(|arg| arg == "--plan")
+        .unwrap()
+        + 1;
+    assert_eq!(
+        workload_argv[workload_plan_index],
+        "adc-lab-target-local-workload-run/inputs/workload_run_plan.yaml"
+    );
+    assert_eq!(
+        argv_values(workload_argv, "--execution-mode"),
+        vec!["target-local".to_string()]
+    );
+
+    let retrieve_workload_step = step_by_id(steps, "retrieve_target_local_workload_demand");
+    assert_eq!(
+        retrieve_workload_step["execution_location"],
+        "operator_handoff"
+    );
+    let retrieved_workload_dir = format!(
+        "{}/included/target-local-workload-demand",
+        run_dir.display()
+    );
+    let retrieve_workload_argv = retrieve_workload_step["command_argv"].as_array().unwrap();
+    assert_eq!(retrieve_workload_argv[0], "scp");
+    assert_eq!(retrieve_workload_argv[1], "-r");
+    assert_eq!(
+        retrieve_workload_argv[2],
+        "target55:adc-lab-target-local-workload-run"
+    );
+    assert_eq!(
+        retrieve_workload_argv[3],
+        serde_json::Value::String(retrieved_workload_dir.clone())
+    );
+    assert_eq!(
+        retrieve_workload_step["expected_artifact_paths_or_globs"]
+            .as_array()
+            .unwrap(),
+        &[serde_json::Value::String(format!(
+            "{retrieved_workload_dir}/reports/workload_demand_profile.json"
+        ))]
+    );
+
     let validation_step = step_by_id(steps, "run_validation");
     assert!(validation_step["command_argv"]
         .as_array()
@@ -474,6 +538,17 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
         .iter()
         .any(|kind| kind == "report.operating_contract"));
 
+    let suitability_step = step_by_id(steps, "suitability");
+    assert_eq!(
+        argv_values(
+            suitability_step["command_argv"].as_array().unwrap(),
+            "--workload-demand"
+        ),
+        vec![format!(
+            "{retrieved_workload_dir}/reports/workload_demand_profile.json"
+        )]
+    );
+
     let constraints_self_check_step = steps
         .iter()
         .find(|step| step["step_id"] == "constraints_self_check")
@@ -509,6 +584,8 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
     assert!(instructions.contains("adc-lab-target"));
     assert!(instructions.contains("~/.local/bin"));
     assert!(instructions.contains("non-interactive SSH PATH"));
+    assert!(instructions.contains("retrieve_target_local_workload_demand"));
+    assert!(instructions.contains("target-local workload demand"));
     for forbidden in [
         "PLAN-*.json",
         "APPROVAL-*.json",
@@ -564,6 +641,12 @@ fn collect_plan_local_does_not_emit_include_run_for_validation_or_contract() {
     let steps = plan.payload["steps"].as_array().unwrap();
     let validation_step = step_by_id(steps, "run_validation");
     let operating_contract_step = step_by_id(steps, "operating_contract");
+    let workload_step = step_by_id(steps, "workload_demand");
+    assert_eq!(workload_step["execution_location"], "controller");
+    assert_eq!(workload_step["requires_target_local"], false);
+    assert!(steps
+        .iter()
+        .all(|step| step["step_id"] != "retrieve_target_local_workload_demand"));
     assert!(argv_values(
         validation_step["command_argv"].as_array().unwrap(),
         "--include-run"
@@ -794,6 +877,110 @@ fn decide_suitability_writes_v2_without_legacy_sidecar() {
         .iter()
         .any(|claim| claim.as_str().is_some_and(|claim| claim.contains(' '))));
     assert!(!temp.path().join("suitability_decision.v1.json").exists());
+}
+
+#[test]
+fn decide_suitability_refused_workload_demand_keeps_selection_not_ready() {
+    let temp = tempfile::tempdir().unwrap();
+    fs::create_dir_all(temp.path().join("observations")).unwrap();
+    fs::write(
+        temp.path().join("observations/observe.json"),
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "max_observed_temp_c": 61.0,
+            "memory_available_kb": 7340032
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let adc_lab_bin = assert_cmd::cargo::cargo_bin("adc-lab");
+    let plan_path = write_workload_plan(temp.path(), &adc_lab_bin);
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "workload",
+            "run",
+            "--target",
+            "ssh://target55",
+            "--target-id",
+            "target55",
+            "--plan",
+            plan_path.to_str().unwrap(),
+            "--run-dir",
+            temp.path().to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("remote_workload_execution_not_supported_in_v1"));
+    let demand_path = temp.path().join("reports/workload_demand_profile.json");
+    let demand: serde_json::Value =
+        serde_json::from_slice(&fs::read(&demand_path).unwrap()).unwrap();
+    assert_eq!(demand["data_quality"]["degraded"], true);
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "report",
+            "operating-contract",
+            "--run",
+            temp.path().to_str().unwrap(),
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--json",
+        ])
+        .assert()
+        .success();
+    let contract_path = temp
+        .path()
+        .join("reports/target_operating_contract.v2.json");
+    let policy_path = temp.path().join("policy.yaml");
+    let decision_path = temp
+        .path()
+        .join("reports/suitability_refused_workload.json");
+    fs::copy(
+        workspace_root().join("tests/golden/lab.suitability_policy.v1.valid.json"),
+        &policy_path,
+    )
+    .unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "decide",
+            "suitability",
+            "--target-run",
+            temp.path().to_str().unwrap(),
+            "--target-contract",
+            contract_path.to_str().unwrap(),
+            "--workload-demand",
+            demand_path.to_str().unwrap(),
+            "--policy",
+            policy_path.to_str().unwrap(),
+            "--out",
+            decision_path.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"kind\": \"report.suitability\""));
+    let decision: serde_json::Value =
+        serde_json::from_slice(&fs::read(&decision_path).unwrap()).unwrap();
+    assert_eq!(decision["payload"]["selection_ready"], false);
+    assert_eq!(decision["data_quality"]["level"], "degraded");
+    let dimensions = decision["payload"]["dimensions"].as_array().unwrap();
+    for dimension in ["cpu", "memory"] {
+        let entry = dimensions
+            .iter()
+            .find(|entry| entry["dimension"] == dimension)
+            .unwrap();
+        assert_eq!(entry["decision"], "unknown");
+        assert!(entry["unknown_reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("workload run did not complete cleanly")));
+    }
 }
 
 #[test]

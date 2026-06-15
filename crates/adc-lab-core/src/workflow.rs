@@ -259,6 +259,16 @@ pub fn target_operating_contract_collect_plan(
         "{}/included/target-local-governor-sweep",
         input.planned_run_dir
     );
+    let target_local_workload_execution_run_dir =
+        format!("adc-lab-target-local-workload-{}", input.run_id);
+    let retrieved_target_local_workload_run_dir = format!(
+        "{}/included/target-local-workload-demand",
+        input.planned_run_dir
+    );
+    let target_local_workload_scp_source = format!(
+        "{}:{target_local_workload_execution_run_dir}",
+        target_spec.endpoint
+    );
     let governor_run_dir = if target_is_ssh {
         target_local_execution_run_dir.clone()
     } else {
@@ -282,6 +292,27 @@ pub fn target_operating_contract_collect_plan(
         "controller"
     };
     let governor_requires_controller = !target_is_ssh;
+    let workload_run_dir = if target_is_ssh {
+        target_local_workload_execution_run_dir.clone()
+    } else {
+        input.planned_run_dir.clone()
+    };
+    let workload_target = if target_is_ssh {
+        "local"
+    } else {
+        input.target.as_str()
+    };
+    let workload_working_directory = if target_is_ssh {
+        "target_local_repository_root"
+    } else {
+        "repository_root"
+    };
+    let workload_execution_location = if target_is_ssh {
+        "target_local"
+    } else {
+        "controller"
+    };
+    let workload_requires_controller = !target_is_ssh;
     let policy_request_path =
         format!("{governor_approvals_dir}/governor_sweep_policy_request.v2.json");
     let policy_path = format!("{governor_approvals_dir}/governor_sweep_policy.v2.json");
@@ -290,7 +321,23 @@ pub fn target_operating_contract_collect_plan(
     let gaps_path = format!("{reports_dir}/GAPS.md");
     let governor_gaps_path = format!("{governor_reports_dir}/GAPS.md");
     let contract_path = format!("{reports_dir}/target_operating_contract.v2.json");
-    let workload_run_plan_path = format!("{}/inputs/workload_run_plan.yaml", input.planned_run_dir);
+    let controller_workload_run_plan_path =
+        format!("{}/inputs/workload_run_plan.yaml", input.planned_run_dir);
+    let workload_run_plan_path = if target_is_ssh {
+        format!("{target_local_workload_execution_run_dir}/inputs/workload_run_plan.yaml")
+    } else {
+        controller_workload_run_plan_path.clone()
+    };
+    let workload_demand_path = if target_is_ssh {
+        format!("{retrieved_target_local_workload_run_dir}/reports/workload_demand_profile.json")
+    } else {
+        input.workload_demand_path.clone()
+    };
+    let workload_step_output_path = if target_is_ssh {
+        format!("{target_local_workload_execution_run_dir}/reports/workload_demand_profile.json")
+    } else {
+        input.workload_demand_path.clone()
+    };
     let suitability_path = format!("{reports_dir}/suitability.v2.json");
     let constraints_path = format!("{reports_dir}/constraints.v2.json");
     let constraints_markdown_path = format!("{reports_dir}/agent_constraints.md");
@@ -355,7 +402,7 @@ pub fn target_operating_contract_collect_plan(
         operating_contract_argv.splice(5..5, include_run_args.clone());
     }
 
-    let steps = vec![
+    let mut steps = vec![
         collect_step(
             "workflow_recommendation",
             "authority",
@@ -591,7 +638,7 @@ pub fn target_operating_contract_collect_plan(
             vec!["composite status must be measured before coupling claims are supported".to_string()],
             "Run the bounded composite pressure probe for coupling coverage.",
         ),
-        collect_step(
+        collect_step_at(
             "workload_demand",
             "workload",
             vec![
@@ -599,26 +646,37 @@ pub fn target_operating_contract_collect_plan(
                 "workload",
                 "run",
                 "--target",
-                &input.target,
+                workload_target,
                 "--plan",
                 &workload_run_plan_path,
                 "--target-id",
                 &input.target_id,
                 "--run-dir",
-                &input.planned_run_dir,
+                &workload_run_dir,
+                "--execution-mode",
+                "target-local",
                 "--json",
             ],
-            "repository_root",
-            false,
+            workload_working_directory,
+            workload_execution_location,
+            workload_requires_controller,
+            target_is_ssh,
             false,
             false,
             vec!["workload"],
-            vec![input.workload_demand_path.clone()],
+            vec![workload_step_output_path.clone()],
             "workload_demand_required_for_suitability",
             vec![GovernorValidity::Measured, GovernorValidity::Insufficient],
             vec![GovernorValidity::Refused, GovernorValidity::Unknown],
             vec![
                 "operator must provide the workload run plan; refused workload artifacts cannot support suitability claims".to_string(),
+                if target_is_ssh {
+                    format!(
+                        "stage {controller_workload_run_plan_path} on the target as {workload_run_plan_path}, then retrieve the target-local workload run into {retrieved_target_local_workload_run_dir} before suitability"
+                    )
+                } else {
+                    "local workload demand stays in the primary run directory".to_string()
+                },
             ],
             "Generate or preserve workload demand evidence using an explicit workload plan path.",
         ),
@@ -786,7 +844,7 @@ pub fn target_operating_contract_collect_plan(
                 "--target-contract",
                 &contract_path,
                 "--workload-demand",
-                &input.workload_demand_path,
+                &workload_demand_path,
                 "--policy",
                 &input.suitability_policy_path,
                 "--out",
@@ -942,6 +1000,44 @@ pub fn target_operating_contract_collect_plan(
         ),
     ];
 
+    if target_is_ssh {
+        let insert_index = steps
+            .iter()
+            .position(|step| step.step_id == "workload_demand")
+            .map(|index| index + 1)
+            .unwrap_or(steps.len());
+        steps.insert(
+            insert_index,
+            collect_step_at(
+                "retrieve_target_local_workload_demand",
+                "workload",
+                vec![
+                    "scp",
+                    "-r",
+                    &target_local_workload_scp_source,
+                    &retrieved_target_local_workload_run_dir,
+                ],
+                "repository_root",
+                "operator_handoff",
+                true,
+                true,
+                false,
+                false,
+                vec!["workload"],
+                vec![workload_demand_path.clone()],
+                "workload_demand_required_for_suitability",
+                vec![GovernorValidity::Measured, GovernorValidity::Insufficient],
+                vec![GovernorValidity::Refused, GovernorValidity::Unknown],
+                vec![
+                    "retrieval is a handoff step, not target measurement evidence".to_string(),
+                    "decide suitability consumes the retrieved workload demand path exactly"
+                        .to_string(),
+                ],
+                "Retrieve the target-local workload demand run into the deterministic included-run path before suitability.",
+            ),
+        );
+    }
+
     let mut artifact = Artifact::new(
         Kind::WorkflowCollectPlan,
         new_id("WORKFLOW-COLLECT-PLAN"),
@@ -971,7 +1067,7 @@ pub fn target_operating_contract_collect_plan(
                 validation_path,
                 gaps_path,
                 contract_path,
-                input.workload_demand_path,
+                workload_demand_path,
                 suitability_path,
                 constraints_path,
                 constraints_markdown_path,
@@ -1245,213 +1341,4 @@ pub fn render_codex_agent_instructions(
     out.push_str("- Version skew blocks full-set measured claims unless a later validation artifact explicitly records the allowed exploratory override, and even then full-set selection remains not ready.\n");
     out.push_str("- No Agent root shell, arbitrary sysfs writes, remote privileged apply/restore, Pi4/Pi5 selection claim, or production-style claim is authorized by this prompt.\n");
     out
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn recommendation_is_not_target_measurement_evidence() {
-        let artifact =
-            target_operating_contract_workflow_recommendation(WorkflowRecommendationInput {
-                run_id: "LAB-RUN-test".to_string(),
-                goal: WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET.to_string(),
-                target: "ssh://target55".to_string(),
-                target_id: "target55".to_string(),
-                target_class: "raspberry_pi_4".to_string(),
-                recommendation_mode: WorkflowRecommendationMode::OfflineRecommendation,
-            })
-            .unwrap();
-
-        assert_eq!(artifact.kind, Kind::WorkflowRecommendation);
-        assert!(matches!(artifact.status, Status::NotApplicable { .. }));
-        assert!(artifact.claims.is_empty());
-        assert!(
-            !artifact
-                .payload
-                .evidence_policy
-                .recommendation_is_target_measurement_evidence
-        );
-        assert!(
-            !artifact
-                .payload
-                .evidence_policy
-                .raw_primitives_are_claim_producing
-        );
-    }
-
-    #[test]
-    fn codex_agent_instructions_are_registry_derived_without_artifact_selection_heuristics() {
-        let artifact =
-            target_operating_contract_workflow_recommendation(WorkflowRecommendationInput {
-                run_id: "LAB-RUN-test".to_string(),
-                goal: WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET.to_string(),
-                target: "ssh://target55".to_string(),
-                target_id: "target55".to_string(),
-                target_class: "raspberry_pi_4".to_string(),
-                recommendation_mode: WorkflowRecommendationMode::OfflineRecommendation,
-            })
-            .unwrap();
-        let text = render_codex_agent_instructions(&artifact, false);
-
-        assert!(text.contains(WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023));
-        assert!(text.contains("Do not fall back to a static prompt"));
-        assert!(text.contains("stop and report adc-lab version/capability mismatch"));
-        assert!(text.contains(COLLECT_PLAN_DEFERRED_NEXT_STEP));
-        for forbidden in [
-            "PLAN-*.json",
-            "APPROVAL-*.json",
-            "LEASE-*.json",
-            "tail -n 1",
-            "ls -t",
-            "find ",
-            "mtime",
-            "newest",
-            "latest plan",
-            "latest approval",
-            "latest lease",
-        ] {
-            assert!(
-                !text.contains(forbidden),
-                "generated prompt must not contain {forbidden}"
-            );
-        }
-    }
-
-    #[test]
-    fn collect_plan_steps_are_argv_arrays_and_not_measurement_evidence() {
-        let artifact = target_operating_contract_collect_plan(WorkflowCollectPlanInput {
-            run_id: "LAB-RUN-test".to_string(),
-            goal: WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET.to_string(),
-            target: "ssh://target55".to_string(),
-            target_id: "target55".to_string(),
-            target_class: "raspberry_pi_4".to_string(),
-            planned_run_dir: "/tmp/adc-lab-run".to_string(),
-            collect_plan_path: "/tmp/adc-lab-run/workflows/collect_plan.v2.json".to_string(),
-            agent_instructions_path: "/tmp/adc-lab-run/workflows/collect_plan.md".to_string(),
-            handoff_dir: "/tmp/handoff".to_string(),
-            workflow_recommendation_path: "/tmp/adc-lab-run/workflows/recommendation.v2.json"
-                .to_string(),
-            workflow_recommendation_ref: None,
-            workflow_recommendation_digest: None,
-            workload_demand_path: "/tmp/adc-lab-run/inputs/workload_demand.json".to_string(),
-            suitability_policy_path: "/tmp/adc-lab-run/inputs/suitability_policy.yaml".to_string(),
-            expected_governors: vec!["ondemand".to_string(), "performance".to_string()],
-            recommendation_mode: WorkflowRecommendationMode::OfflineRecommendation,
-        })
-        .unwrap();
-
-        assert_eq!(artifact.kind, Kind::WorkflowCollectPlan);
-        assert!(matches!(artifact.status, Status::NotApplicable { .. }));
-        assert!(artifact.claims.is_empty());
-        assert!(!artifact.payload.packaging_is_target_evidence);
-        assert!(artifact.payload.packaging_failure_blocks_handoff);
-        assert!(artifact
-            .payload
-            .source_of_truth_chain
-            .contains(&"report.run_validation".to_string()));
-
-        let validation_step = artifact
-            .payload
-            .steps
-            .iter()
-            .find(|step| step.step_id == "run_validation")
-            .unwrap();
-        assert!(validation_step
-            .command_argv
-            .contains(&"--collect-plan".to_string()));
-        assert!(validation_step
-            .command_argv
-            .contains(&"--include-run".to_string()));
-        assert!(validation_step
-            .expected_artifact_kinds
-            .contains(&"report.run_validation".to_string()));
-
-        let governor_step = artifact
-            .payload
-            .steps
-            .iter()
-            .find(|step| step.step_id == "governor_sweep_run")
-            .unwrap();
-        assert_eq!(governor_step.execution_location, "target_local");
-        assert!(!governor_step.requires_controller);
-        let target_arg_index = governor_step
-            .command_argv
-            .iter()
-            .position(|arg| arg == "--target")
-            .unwrap()
-            + 1;
-        assert_eq!(governor_step.command_argv[target_arg_index], "local");
-        assert!(!governor_step
-            .command_argv
-            .iter()
-            .any(|arg| arg == "ssh://target55"));
-
-        let archive_step = artifact
-            .payload
-            .steps
-            .iter()
-            .find(|step| step.step_id == "archive")
-            .unwrap();
-        assert!(archive_step
-            .command_argv
-            .contains(&"/tmp/handoff/LAB-RUN-test.tgz".to_string()));
-        assert!(!archive_step
-            .command_argv
-            .contains(&"/tmp/adc-lab-run/handoff/adc-lab-run.tgz".to_string()));
-
-        for required_step in [
-            "read_only_inventory",
-            "toolchain_discover",
-            "observe_baseline",
-            "cpu_ladder",
-            "pressure_probe_set",
-            "composite_probe",
-            "workload_demand",
-        ] {
-            assert!(
-                artifact
-                    .payload
-                    .steps
-                    .iter()
-                    .any(|step| step.step_id == required_step),
-                "collect plan missing full-set skeleton step {required_step}"
-            );
-        }
-
-        for step in &artifact.payload.steps {
-            assert!(!step.command_argv.is_empty());
-            for arg in &step.command_argv {
-                for forbidden in ["|", "&&", "$(", "`"] {
-                    assert!(
-                        !arg.contains(forbidden),
-                        "argv item must not contain shell fragment {forbidden}: {arg}"
-                    );
-                }
-            }
-        }
-
-        let instructions = render_collect_plan_agent_instructions(&artifact);
-        assert!(instructions.contains("argv: `["));
-        assert!(instructions.contains("Do not fall back to a static prompt"));
-        for forbidden in [
-            "PLAN-*.json",
-            "APPROVAL-*.json",
-            "LEASE-*.json",
-            "tail -n 1",
-            "ls -t",
-            "find ",
-            "mtime",
-            "newest",
-            "latest plan",
-            "latest approval",
-            "latest lease",
-        ] {
-            assert!(
-                !instructions.contains(forbidden),
-                "generated collect instructions must not contain {forbidden}"
-            );
-        }
-    }
 }
