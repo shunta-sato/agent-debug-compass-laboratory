@@ -826,13 +826,14 @@ Base branch:
 Current implementation branch:
 `codex/v024-phase0-characterization`.
 
-Status: Phase 0 in progress. Plan amendments are reflected, branch is based on
-updated `origin/main`, profile compatibility Option C is recorded,
-workflow-contract review seed report exists, baseline verification passed, and
-draft PR #63 is open.
+Status:
+Phase 0 plan artifacts complete. Draft PR #63 is open, mergeable, and CI is
+green. Awaiting review feedback before Ready for review.
 
-Phase 0 next step:
-address review comments, then mark PR #63 ready for review.
+Next steps:
+1. Address review comments.
+2. Mark PR #63 Ready for review.
+3. Merge after CI remains green.
 
 Required process:
 every implementation PR must include

@@ -33,7 +33,7 @@
 | Identity | Producer value | Consumer value | Result |
 | --- | --- | --- | --- |
 | run set | not produced in Phase 0 | not consumed in Phase 0 | not applicable |
-| workflow id | profile compatibility decision deferred to implementation, with Phase 0 default Option C | future workflow registry / collect plan | pass as planning constraint |
+| workflow id | Phase 0 decision = Option C; implementation PRs must preserve `target-operating-contract-fullset` compatibility while making profile depth explicit through warning text or `--profile-depth` | future workflow registry / collect plan | pass as planning constraint; implementation remains in PR 3 |
 | target id / class | not produced in Phase 0 | not consumed in Phase 0 | not applicable |
 
 ## Controller / target-local execution locations
