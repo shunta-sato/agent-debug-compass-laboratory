@@ -144,7 +144,7 @@ Required commands:
 - [x] Implement include-run parity and SSH runner guidance.
 - [x] Improve target-runner diagnostics.
 - [x] Run focused and full verification.
-- [ ] Commit, push, and open PR.
+- [x] Commit, push, and open PR.
 
 ## Design -> WBS Coverage Check
 
@@ -185,12 +185,18 @@ Required commands:
 
 Current branch: `codex/v0231-ssh-fullset-handoff`.
 
-Status: implementation complete; full `make verify` passed; PR publication
-pending.
+Current PR: #62.
+
+Reviewed implementation commit: `1a048a34bfef406dce3f29e5fe63d9f8e10a6849`.
+
+Status: draft PR open, mergeable, CI success on the implementation commit,
+awaiting this ExecPlan-only status update before Ready for review.
 
 Next steps:
 
-1. Commit, push, and publish PR.
+1. Address review comments if any.
+2. Mark Ready for review after this ExecPlan status update is pushed.
+3. Merge after CI remains green.
 
 ## Outcomes & Retrospective
 
