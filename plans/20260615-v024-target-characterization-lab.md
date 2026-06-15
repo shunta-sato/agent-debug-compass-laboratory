@@ -595,7 +595,7 @@ Detailed acceptance criteria:
   - [x] Address PR #65 review by adding explicit workload plan staging and
         deterministic retrieval preparation steps.
   - [x] Run review-fix verification.
-  - [ ] Push review-fix commit.
+  - [x] Push review-fix commit.
 - [ ] PR 3: Profile split.
 - [ ] PR 4: Deep CPU / thermal characterization profile.
 - [ ] PR 5: Pressure / composite / endpoint-backed network coverage.
@@ -1007,19 +1007,22 @@ SSH collect plans emit target-local workload demand argv, include an
 operator-handoff retrieval path, and feed that retrieved path into suitability.
 Suitability requires clean workload CPU/RSS demand before CPU/memory can meet.
 PR #65 review requested explicit workload plan staging and deterministic
-retrieval preparation. The review fix is implemented locally with unpushed
-changes: target-local plan dir preparation, plan staging, controller retrieval
-parent creation, and scoped destination cleanup are now collect-plan argv
-steps. Focused tests, file budget enforcement, `make docs-smoke`,
-`make schemas-check`, and `make verify` are green after the review fix.
+retrieval preparation. The review fix has been pushed to PR #65:
+target-local plan dir preparation, plan staging, controller retrieval parent
+creation, and scoped destination cleanup are now collect-plan argv steps.
+Focused tests, file budget enforcement, `make docs-smoke`, `make
+schemas-check`, and `make verify` are green after the review fix.
+
+Reviewed review-fix implementation commit:
+`faa1e13b12b86774b508fb34d88a5192300f02ef`.
 
 Current PR:
 https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/65
 
 Next steps:
-1. Run final quality-gate checklist.
-2. Commit and push the review-fix commit to PR #65.
-3. Wait for latest-head CI, then request re-review.
+1. Wait for PR #65 CI on the latest pushed head.
+2. Request re-review after CI remains green.
+3. Mark Ready for review after approval.
 
 Required process:
 every implementation PR must include
