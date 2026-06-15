@@ -1,6 +1,6 @@
 use super::super::*;
 use super::common::*;
-use adc_lab_core::ids::now_unix_ms;
+use adc_lab_core::ids::{new_id, now_unix_ms};
 use anyhow::{bail, Context};
 
 struct OperatingContractGateResult {
@@ -127,6 +127,21 @@ pub(crate) fn command_report_operating_contract(args: OperatingContractCommand) 
         .run_dir
         .join("reports/target_operating_contract.v2.json");
     let v2_contract_ref = write_json_artifact(&run, &v2_contract_path, &v2_contract)?;
+    let expected_identity = run_set_identity_for_runs(&run_contexts)?;
+    let evidence_ref_resolution = evidence_ref_resolution_artifact(
+        &run,
+        &store,
+        expected_identity.subject_run_set_id,
+        vec![v2_contract_ref.clone()],
+        operating_contract_evidence_refs(&v2_contract),
+        args.target_id.clone(),
+    );
+    let evidence_ref_resolution_path = run.run_dir.join("reports/evidence_ref_resolution.v2.json");
+    let evidence_ref_resolution_ref = write_json_artifact(
+        &run,
+        &evidence_ref_resolution_path,
+        &evidence_ref_resolution,
+    )?;
     append_audit_event(
         &run,
         AuditInput {
@@ -143,17 +158,102 @@ pub(crate) fn command_report_operating_contract(args: OperatingContractCommand) 
                 .to_string(),
         },
     )?;
+    append_audit_event(
+        &run,
+        AuditInput {
+            target_id: args.target_id.clone(),
+            actor: Actor::codex(),
+            operation: "report.evidence_ref_resolution".to_string(),
+            operation_id: Some(evidence_ref_resolution.id.clone()),
+            risk_tier: RiskTier::Tier0ReadOnlyObservation,
+            approval_ref: None,
+            restore_lease_ref: None,
+            result: serde_json::to_string(&evidence_ref_resolution.status)
+                .unwrap_or_else(|_| "unknown".to_string())
+                .trim_matches('"')
+                .to_string(),
+        },
+    )?;
 
     print_json(&serde_json::json!({
         "target_operating_contract_ref": v2_contract_ref,
+        "evidence_ref_resolution_ref": evidence_ref_resolution_ref,
         "included_run_count": args.include_runs.len(),
         "validation_gate": gate_result.summary,
-        "target_operating_contract": v2_contract
+        "target_operating_contract": v2_contract,
+        "evidence_ref_resolution": evidence_ref_resolution
     }))?;
     if let Some(reason) = gate_result.strict_failure {
         bail!("strict full-set operating-contract validation failed: {reason}");
     }
     Ok(())
+}
+
+fn evidence_ref_resolution_artifact(
+    run: &RunContext,
+    store: &EvidenceStore,
+    subject_run_set_id: String,
+    checked_artifact_refs: Vec<String>,
+    references: Vec<String>,
+    target_id: String,
+) -> Artifact<EvidenceRefResolutionPayload> {
+    let payload = store.evidence_ref_resolution_payload(
+        subject_run_set_id,
+        checked_artifact_refs,
+        references,
+    );
+    let invalid_refs_empty = payload.invalid_refs.is_empty();
+    let mut artifact = Artifact::new(
+        Kind::ReportEvidenceRefResolution,
+        new_id("EVIDENCE-REF-RESOLUTION"),
+        run.run_id.clone(),
+        target_id,
+        if invalid_refs_empty {
+            Status::Measured
+        } else {
+            Status::Insufficient
+        },
+        payload,
+        now_unix_ms(),
+    );
+    artifact.evidence_refs = artifact
+        .payload
+        .resolutions
+        .iter()
+        .filter(|resolution| resolution.classification == EvidenceRefResolutionKind::Resolvable)
+        .map(|resolution| resolution.reference.clone())
+        .collect();
+    artifact.evidence_refs.sort();
+    artifact.evidence_refs.dedup();
+    artifact.data_quality = DataQuality {
+        level: if invalid_refs_empty {
+            DataQualityLevel::Complete
+        } else {
+            DataQualityLevel::Degraded
+        },
+        notes: vec!["evidence refs checked against the opened run-set resolver".to_string()],
+    };
+    artifact
+}
+
+fn operating_contract_evidence_refs(contract: &Artifact<OperatingContractPayload>) -> Vec<String> {
+    let mut refs = contract.evidence_refs.clone();
+    refs.extend(
+        contract
+            .claims
+            .iter()
+            .flat_map(|claim| claim.evidence_refs.clone()),
+    );
+    refs.extend(
+        contract
+            .payload
+            .evaluations
+            .iter()
+            .flat_map(|evaluation| evaluation.evidence_refs.clone()),
+    );
+    refs.sort();
+    refs.dedup();
+    refs
 }
 
 fn operating_contract_validation_gate(

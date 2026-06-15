@@ -309,6 +309,7 @@
         "report.suitability",
         "report.constraints",
         "report.constraints_check",
+        "report.evidence_ref_resolution",
         "report.run_validation",
         "control.governor_sweep_policy",
         "workflow.recommendation",

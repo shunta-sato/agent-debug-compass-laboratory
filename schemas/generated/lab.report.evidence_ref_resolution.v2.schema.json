@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Artifact_for_ConstraintCheckPayload",
+  "title": "Artifact_for_EvidenceRefResolutionPayload",
   "type": "object",
   "required": [
     "claims",
@@ -59,7 +59,7 @@
       }
     },
     "payload": {
-      "$ref": "#/definitions/ConstraintCheckPayload"
+      "$ref": "#/definitions/EvidenceRefResolutionPayload"
     },
     "run_id": {
       "type": "string"
@@ -134,60 +134,6 @@
       },
       "additionalProperties": false
     },
-    "ConstraintCheckMatch": {
-      "type": "object",
-      "required": [
-        "blocked_claim",
-        "claim_id",
-        "path"
-      ],
-      "properties": {
-        "blocked_claim": {
-          "type": "string"
-        },
-        "claim_id": {
-          "type": "string"
-        },
-        "path": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
-    },
-    "ConstraintCheckMode": {
-      "type": "string",
-      "enum": [
-        "candidate_content",
-        "generated_constraints"
-      ]
-    },
-    "ConstraintCheckPayload": {
-      "type": "object",
-      "required": [
-        "checked_path",
-        "matches",
-        "mode",
-        "status"
-      ],
-      "properties": {
-        "checked_path": {
-          "type": "string"
-        },
-        "matches": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ConstraintCheckMatch"
-          }
-        },
-        "mode": {
-          "$ref": "#/definitions/ConstraintCheckMode"
-        },
-        "status": {
-          "type": "string"
-        }
-      },
-      "additionalProperties": false
-    },
     "DataQuality": {
       "type": "object",
       "required": [
@@ -222,6 +168,87 @@
         "provisional",
         "blocked"
       ]
+    },
+    "EvidenceRefResolution": {
+      "type": "object",
+      "required": [
+        "classification",
+        "reason",
+        "reference"
+      ],
+      "properties": {
+        "classification": {
+          "$ref": "#/definitions/EvidenceRefResolutionKind"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "string"
+        },
+        "resolved_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "EvidenceRefResolutionKind": {
+      "type": "string",
+      "enum": [
+        "resolvable",
+        "diagnostic_external",
+        "invalid"
+      ]
+    },
+    "EvidenceRefResolutionPayload": {
+      "type": "object",
+      "required": [
+        "checked_artifact_refs",
+        "diagnostic_external_refs",
+        "invalid_refs",
+        "resolutions",
+        "run_set_resolution_map",
+        "subject_run_set_id"
+      ],
+      "properties": {
+        "checked_artifact_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "diagnostic_external_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "invalid_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "resolutions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EvidenceRefResolution"
+          }
+        },
+        "run_set_resolution_map": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RunSetResolutionMapEntry"
+          }
+        },
+        "subject_run_set_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     },
     "EvidenceRefusalCode": {
       "type": "string",
@@ -305,6 +332,41 @@
         }
       },
       "additionalProperties": false
+    },
+    "RunSetResolutionMapEntry": {
+      "type": "object",
+      "required": [
+        "artifact_uri_root",
+        "included_as",
+        "logical_run_id",
+        "opened_path",
+        "source_role"
+      ],
+      "properties": {
+        "artifact_uri_root": {
+          "type": "string"
+        },
+        "included_as": {
+          "type": "string"
+        },
+        "logical_run_id": {
+          "type": "string"
+        },
+        "opened_path": {
+          "type": "string"
+        },
+        "source_role": {
+          "$ref": "#/definitions/RunSetSourceRole"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RunSetSourceRole": {
+      "type": "string",
+      "enum": [
+        "primary",
+        "included"
+      ]
     },
     "Status": {
       "oneOf": [

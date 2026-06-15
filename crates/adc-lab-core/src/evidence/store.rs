@@ -3,14 +3,15 @@ use crate::evidence::envelope::{ArtifactHeader, ARTIFACT_SCHEMA_V2};
 use crate::evidence::{Artifact, Kind};
 use crate::fsutil::{append_json_line, write_json_pretty};
 use crate::ids::{new_id, now_unix_ms};
-use crate::run::artifact_uri_for_run;
+use crate::run::{artifact_uri_for_run, run_id_from_run_dir};
 use crate::runfs::artifact_path;
 use crate::{Actor, AuditEvent, RiskTier, POLICY_VERSION};
+use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArtifactMeta {
@@ -27,6 +28,51 @@ pub struct EvidenceStore {
     run_dirs: Vec<PathBuf>,
     artifacts: Vec<ArtifactMeta>,
     by_kind: BTreeMap<String, Vec<usize>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RunSetSourceRole {
+    Primary,
+    Included,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RunSetResolutionMapEntry {
+    pub logical_run_id: String,
+    pub opened_path: String,
+    pub artifact_uri_root: String,
+    pub source_role: RunSetSourceRole,
+    pub included_as: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceRefResolutionKind {
+    Resolvable,
+    DiagnosticExternal,
+    Invalid,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceRefResolution {
+    pub reference: String,
+    pub classification: EvidenceRefResolutionKind,
+    pub resolved_path: Option<String>,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceRefResolutionPayload {
+    pub subject_run_set_id: String,
+    pub run_set_resolution_map: Vec<RunSetResolutionMapEntry>,
+    pub checked_artifact_refs: Vec<String>,
+    pub resolutions: Vec<EvidenceRefResolution>,
+    pub invalid_refs: Vec<String>,
+    pub diagnostic_external_refs: Vec<String>,
 }
 
 impl EvidenceStore {
@@ -58,6 +104,136 @@ impl EvidenceStore {
 
     pub fn all(&self) -> &[ArtifactMeta] {
         &self.artifacts
+    }
+
+    pub fn run_set_resolution_map(&self) -> Vec<RunSetResolutionMapEntry> {
+        self.run_dirs
+            .iter()
+            .enumerate()
+            .map(|(index, run_dir)| {
+                let logical_run_id = run_id_from_run_dir(run_dir);
+                RunSetResolutionMapEntry {
+                    artifact_uri_root: format!("artifact://lab/runs/{logical_run_id}/"),
+                    logical_run_id,
+                    opened_path: run_dir.display().to_string(),
+                    source_role: if index == 0 {
+                        RunSetSourceRole::Primary
+                    } else {
+                        RunSetSourceRole::Included
+                    },
+                    included_as: if index == 0 {
+                        "primary".to_string()
+                    } else {
+                        format!("include-run-{index}")
+                    },
+                }
+            })
+            .collect()
+    }
+
+    pub fn resolve_evidence_ref(&self, reference: &str) -> EvidenceRefResolution {
+        let Some(stripped) = reference.strip_prefix("artifact://lab/runs/") else {
+            return EvidenceRefResolution {
+                reference: reference.to_string(),
+                classification: EvidenceRefResolutionKind::DiagnosticExternal,
+                resolved_path: None,
+                reason: "non-artifact evidence ref; preserved for operator review".to_string(),
+            };
+        };
+        let Some((run_id, relative)) = stripped.split_once('/') else {
+            return EvidenceRefResolution {
+                reference: reference.to_string(),
+                classification: EvidenceRefResolutionKind::Invalid,
+                resolved_path: None,
+                reason: "artifact ref is missing a run-relative path".to_string(),
+            };
+        };
+        if relative.is_empty() {
+            return EvidenceRefResolution {
+                reference: reference.to_string(),
+                classification: EvidenceRefResolutionKind::Invalid,
+                resolved_path: None,
+                reason: "artifact ref is missing a run-relative path".to_string(),
+            };
+        }
+        let Some(run_dir) = self
+            .run_dirs
+            .iter()
+            .find(|run_dir| run_id_from_run_dir(run_dir) == run_id)
+        else {
+            return EvidenceRefResolution {
+                reference: reference.to_string(),
+                classification: EvidenceRefResolutionKind::Invalid,
+                resolved_path: None,
+                reason: "artifact run id is not opened in the current run set".to_string(),
+            };
+        };
+        if relative_path_escapes_run(relative) {
+            return EvidenceRefResolution {
+                reference: reference.to_string(),
+                classification: EvidenceRefResolutionKind::Invalid,
+                resolved_path: None,
+                reason: "artifact ref path escapes its run root".to_string(),
+            };
+        }
+        let path = run_dir.join(relative);
+        if !path.exists() {
+            return EvidenceRefResolution {
+                reference: reference.to_string(),
+                classification: EvidenceRefResolutionKind::Invalid,
+                resolved_path: Some(path.display().to_string()),
+                reason: "artifact file does not exist in the opened run set".to_string(),
+            };
+        }
+        if let Err(error) = reject_symlink_components(run_dir, &path) {
+            return EvidenceRefResolution {
+                reference: reference.to_string(),
+                classification: EvidenceRefResolutionKind::Invalid,
+                resolved_path: Some(path.display().to_string()),
+                reason: error.to_string(),
+            };
+        }
+        EvidenceRefResolution {
+            reference: reference.to_string(),
+            classification: EvidenceRefResolutionKind::Resolvable,
+            resolved_path: Some(path.display().to_string()),
+            reason: "artifact ref resolves inside the opened run set".to_string(),
+        }
+    }
+
+    pub fn evidence_ref_resolution_payload(
+        &self,
+        subject_run_set_id: impl Into<String>,
+        checked_artifact_refs: Vec<String>,
+        references: Vec<String>,
+    ) -> EvidenceRefResolutionPayload {
+        let mut references = references;
+        references.sort();
+        references.dedup();
+        let resolutions = references
+            .iter()
+            .map(|reference| self.resolve_evidence_ref(reference))
+            .collect::<Vec<_>>();
+        let invalid_refs = resolutions
+            .iter()
+            .filter(|resolution| resolution.classification == EvidenceRefResolutionKind::Invalid)
+            .map(|resolution| resolution.reference.clone())
+            .collect::<Vec<_>>();
+        let diagnostic_external_refs = resolutions
+            .iter()
+            .filter(|resolution| {
+                resolution.classification == EvidenceRefResolutionKind::DiagnosticExternal
+            })
+            .map(|resolution| resolution.reference.clone())
+            .collect::<Vec<_>>();
+        EvidenceRefResolutionPayload {
+            subject_run_set_id: subject_run_set_id.into(),
+            run_set_resolution_map: self.run_set_resolution_map(),
+            checked_artifact_refs,
+            resolutions,
+            invalid_refs,
+            diagnostic_external_refs,
+        }
     }
 
     pub fn load<P: DeserializeOwned>(&self, meta: &ArtifactMeta) -> LabResult<Artifact<P>> {
@@ -159,6 +335,15 @@ impl EvidenceStore {
     }
 }
 
+fn relative_path_escapes_run(relative: &str) -> bool {
+    Path::new(relative).components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
+    })
+}
+
 fn kind_key(kind: &Kind) -> String {
     serde_json::to_string(kind).unwrap_or_else(|_| format!("{kind:?}"))
 }
@@ -170,6 +355,18 @@ fn reject_symlink(path: &Path) -> LabResult<()> {
             "evidence store refuses symlink path: {}",
             path.display()
         )));
+    }
+    Ok(())
+}
+
+fn reject_symlink_components(run_dir: &Path, path: &Path) -> LabResult<()> {
+    let mut current = run_dir.to_path_buf();
+    let relative = path.strip_prefix(run_dir).map_err(|_| {
+        crate::LabError::Validation("artifact path escapes run directory".to_string())
+    })?;
+    for component in relative.components() {
+        current.push(component.as_os_str());
+        reject_symlink(&current)?;
     }
     Ok(())
 }
