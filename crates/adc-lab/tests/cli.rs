@@ -1,6 +1,7 @@
 use adc_lab_core::{
     canonical_plan_digest, governor_sweep_policy_digest, Actor, ActorKind, ApprovalBounds,
-    ApprovalRecord, Artifact, ControlPlan, GovernorSweepPolicyPayload, Kind, RiskTier,
+    ApprovalRecord, Artifact, ControlPlan, EvidenceStore, GovernorSweepPolicyPayload, Kind,
+    RiskTier,
 };
 use assert_cmd::Command;
 use predicates::str::contains;
@@ -36,6 +37,40 @@ fn single_approval_path(run_dir: &std::path::Path) -> PathBuf {
         .map(|entry| entry.path())
         .find(|path| path.extension().and_then(|ext| ext.to_str()) == Some("json"))
         .unwrap()
+}
+
+fn evidence_refs_in_value(value: &serde_json::Value) -> Vec<String> {
+    let mut refs = Vec::new();
+    collect_evidence_refs(value, &mut refs);
+    refs.sort();
+    refs.dedup();
+    refs
+}
+
+fn collect_evidence_refs(value: &serde_json::Value, refs: &mut Vec<String>) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (key, value) in map {
+                if key == "evidence_refs" {
+                    if let Some(items) = value.as_array() {
+                        refs.extend(
+                            items
+                                .iter()
+                                .filter_map(|item| item.as_str())
+                                .map(ToString::to_string),
+                        );
+                    }
+                }
+                collect_evidence_refs(value, refs);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect_evidence_refs(item, refs);
+            }
+        }
+        _ => {}
+    }
 }
 
 fn single_load_artifact_path(run_dir: &std::path::Path, suffix: &str) -> PathBuf {
@@ -849,6 +884,8 @@ fn suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end() {
         .stdout(contains("\"schema\": \"lab.artifact.v2\""))
         .stdout(contains("\"kind\": \"report.constraints\""));
 
+    let contract: serde_json::Value =
+        serde_json::from_slice(&fs::read(&contract_path).unwrap()).unwrap();
     let decision: serde_json::Value =
         serde_json::from_slice(&fs::read(&decision_path).unwrap()).unwrap();
     assert_eq!(decision["schema"], "lab.artifact.v2");
@@ -867,6 +904,24 @@ fn suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end() {
         .unwrap()
         .iter()
         .any(|claim| claim == "target.selection.production_ready"));
+    let mut evidence_refs = evidence_refs_in_value(&contract);
+    evidence_refs.extend(evidence_refs_in_value(&decision));
+    evidence_refs.extend(evidence_refs_in_value(&constraints));
+    let store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+    let resolution = store.evidence_ref_resolution_payload(
+        "RUN-SET-cli-suitability-loop",
+        vec![
+            contract_path.display().to_string(),
+            decision_path.display().to_string(),
+            constraints_path.display().to_string(),
+        ],
+        evidence_refs,
+    );
+    assert!(
+        resolution.invalid_refs.is_empty(),
+        "all artifact:// refs must resolve in the opened run set: {:?}",
+        resolution.invalid_refs
+    );
     let markdown = fs::read_to_string(agent_md_path).unwrap();
     assert!(markdown.contains("## Blocked claims"));
     let audit = fs::read_to_string(temp.path().join("audit.jsonl")).unwrap();
@@ -2311,12 +2366,33 @@ fn report_operating_contract_accepts_include_run_in_v2_store() {
         .assert()
         .success()
         .stdout(contains("\"included_run_count\": 1"))
-        .stdout(contains("\"kind\": \"report.operating_contract\""));
+        .stdout(contains("\"kind\": \"report.operating_contract\""))
+        .stdout(contains("\"kind\": \"report.evidence_ref_resolution\""))
+        .stdout(contains("\"evidence_ref_resolution_ref\""));
 
     assert!(primary
         .path()
         .join("reports/target_operating_contract.v2.json")
         .exists());
+    let resolution_path = primary
+        .path()
+        .join("reports/evidence_ref_resolution.v2.json");
+    assert!(resolution_path.exists());
+    let resolution: serde_json::Value =
+        serde_json::from_slice(&fs::read(&resolution_path).unwrap()).unwrap();
+    assert_eq!(resolution["kind"], "report.evidence_ref_resolution");
+    assert_eq!(resolution["status"]["state"], "measured");
+    assert!(resolution["payload"]["invalid_refs"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        resolution["payload"]["run_set_resolution_map"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
     assert!(!primary
         .path()
         .join("reports/run_set_manifest.json")
@@ -2328,6 +2404,7 @@ fn report_operating_contract_accepts_include_run_in_v2_store() {
 
     let audit = fs::read_to_string(primary.path().join("audit.jsonl")).unwrap();
     assert!(audit.contains("\"operation\":\"report.target_operating_contract\""));
+    assert!(audit.contains("\"operation\":\"report.evidence_ref_resolution\""));
 }
 
 #[test]

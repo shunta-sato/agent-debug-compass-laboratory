@@ -1,12 +1,13 @@
 use adc_lab_core::{
-    claim, evaluate_rules, write_composite_artifact_v2, write_load_artifact_v2,
+    claim, create_or_open_run, evaluate_rules, write_composite_artifact_v2, write_load_artifact_v2,
     write_observation_artifact_v2, write_pressure_artifact_v2, write_workload_artifact_v2,
-    Artifact, CompositeBoundaryResult, Decision, EvidenceStore, Kind, LoadRestoreOnAbortStatus,
-    LoadResult, LoadSafetyMonitorResult, ObservationResult, Pred, PressurePayload, Rule, Signal,
-    Status, WorkloadDataQuality, WorkloadDemand, WorkloadDemandProfile, WorkloadDemandScope,
-    WorkloadExecutionMode, WorkloadSystemContext, WorkloadTargetConditionedResponse,
+    Artifact, CompositeBoundaryResult, Decision, EvidenceRefResolutionKind, EvidenceStore, Kind,
+    LoadRestoreOnAbortStatus, LoadResult, LoadSafetyMonitorResult, ObservationResult, Pred,
+    PressurePayload, Rule, RunSetSourceRole, Signal, Status, WorkloadDataQuality, WorkloadDemand,
+    WorkloadDemandProfile, WorkloadDemandScope, WorkloadExecutionMode, WorkloadSystemContext,
+    WorkloadTargetConditionedResponse,
 };
-use std::path::Path;
+use std::{fs, path::Path};
 
 #[test]
 fn probe_artifact_writers_index_all_core_probe_kinds() {
@@ -25,6 +26,73 @@ fn probe_artifact_writers_index_all_core_probe_kinds() {
     assert_eq!(reopened.iter(Kind::Pressure).count(), 1);
     assert_eq!(reopened.iter(Kind::Composite).count(), 1);
     assert_eq!(reopened.iter(Kind::Workload).count(), 1);
+}
+
+#[test]
+fn evidence_store_resolves_artifact_refs_across_opened_run_set() {
+    let temp = tempfile::tempdir().unwrap();
+    let primary = create_or_open_run(Some(temp.path().join("primary"))).unwrap();
+    let included = create_or_open_run(Some(temp.path().join("included"))).unwrap();
+    let primary_audit = primary.run_dir.join("audit.jsonl");
+    fs::write(&primary_audit, "{}\n").unwrap();
+    let included_report = included.run_dir.join("reports/target-local.json");
+    fs::write(&included_report, "{}").unwrap();
+    let primary_ref = primary.artifact_uri(&primary_audit).unwrap();
+    let included_ref = included.artifact_uri(&included_report).unwrap();
+    let missing_ref = format!(
+        "artifact://lab/runs/{}/reports/missing.json",
+        included.run_id
+    );
+
+    let store = EvidenceStore::open(&[primary.run_dir.clone(), included.run_dir.clone()]).unwrap();
+    let payload = store.evidence_ref_resolution_payload(
+        "RUN-SET-test",
+        vec![primary_ref.clone()],
+        vec![
+            primary_ref.clone(),
+            included_ref.clone(),
+            missing_ref.clone(),
+            "operator-notes.txt".to_string(),
+        ],
+    );
+
+    assert_eq!(payload.run_set_resolution_map.len(), 2);
+    assert_eq!(
+        payload.run_set_resolution_map[0].source_role,
+        RunSetSourceRole::Primary
+    );
+    assert_eq!(
+        payload.run_set_resolution_map[1].source_role,
+        RunSetSourceRole::Included
+    );
+    let resolution_for = |reference: &str| {
+        payload
+            .resolutions
+            .iter()
+            .find(|resolution| resolution.reference == reference)
+            .unwrap()
+    };
+    assert_eq!(
+        resolution_for(&primary_ref).classification,
+        EvidenceRefResolutionKind::Resolvable
+    );
+    assert_eq!(
+        resolution_for(&included_ref).classification,
+        EvidenceRefResolutionKind::Resolvable
+    );
+    assert_eq!(
+        resolution_for("operator-notes.txt").classification,
+        EvidenceRefResolutionKind::DiagnosticExternal
+    );
+    assert_eq!(
+        resolution_for(&missing_ref).classification,
+        EvidenceRefResolutionKind::Invalid
+    );
+    assert_eq!(payload.invalid_refs, vec![missing_ref]);
+    assert_eq!(
+        payload.diagnostic_external_refs,
+        vec!["operator-notes.txt".to_string()]
+    );
 }
 
 #[test]

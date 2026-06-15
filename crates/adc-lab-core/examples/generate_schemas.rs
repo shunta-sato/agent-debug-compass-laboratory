@@ -41,6 +41,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &out_dir,
         "lab.report.constraints_check.v2.schema.json",
     )?;
+    write_schema::<Artifact<EvidenceRefResolutionPayload>>(
+        &out_dir,
+        "lab.report.evidence_ref_resolution.v2.schema.json",
+    )?;
     write_schema::<Artifact<ObservationPayload>>(&out_dir, "lab.observation.v2.schema.json")?;
     write_schema::<Artifact<LoadPayload>>(&out_dir, "lab.load.v2.schema.json")?;
     write_schema::<Artifact<PressurePayload>>(&out_dir, "lab.pressure.v2.schema.json")?;

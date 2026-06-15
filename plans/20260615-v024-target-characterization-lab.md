@@ -66,7 +66,7 @@ Out of scope:
 
 - Base branch: `origin/main` after PR #62 and agent-instructions-playbook PR
   #57 are merged.
-- Current implementation branch: `codex/v024-phase0-characterization`.
+- Current implementation branch: `codex/v024-pr1-evidence-ref-resolution`.
 - Phase 0 branch was created fresh from updated `origin/main`.
 - Release identity: v0.2.4 is a product release after v0.2.3.1; Cargo package
   versions remain decoupled unless release tooling requires otherwise.
@@ -573,6 +573,13 @@ Detailed acceptance criteria:
       baseline affected files/tests; decide profile compatibility and evidence
       ref categories.
 - [ ] PR 1: Evidence-ref resolution and operating-contract missing cleanup.
+  - [x] Create fresh branch from `origin/main` after PR #63 merge.
+  - [x] Inspect EvidenceStore, run validation, operating-contract gate, and
+        suitability/constraints evidence-ref flow.
+  - [x] Add run-set evidence-ref resolver and resolution report.
+  - [x] Add focused resolver / production-ready regression tests.
+  - [x] Add PR1 workflow-contract review report.
+  - [x] Run focused tests and `make verify`.
 - [ ] PR 2: Target-local workload demand workflow.
 - [ ] PR 3: Profile split.
 - [ ] PR 4: Deep CPU / thermal characterization profile.
@@ -632,6 +639,53 @@ Split guidance:
   (missing reason cleanup) and PR 1b (run-set resolver and resolution report).
 - If both remain small, keep them together and record that decision in the PR
   workflow-contract review.
+
+PR 1 dev-workflow route:
+
+- Risk route: normal for this PR. It changes report/evidence behavior and a
+  generated schema, but keeps target-local execution and privileged/control
+  behavior unchanged.
+- Definition of Done: A-050a/A-050b/A-050c/A-051/A-052 and A-060/A-061/A-062
+  have focused tests; resolver errors do not relax claim gates; `make verify`
+  passes.
+- Test List: resolver resolves main/included `artifact://` refs; diagnostic
+  non-artifact refs are classified; invalid artifact refs fail the resolution
+  report; measured validation removes `matching_report.run_validation` while
+  keeping `target.selection.production_ready` blocked; CLI writes the handoff
+  resolution report.
+- Complexity Budget: changed production files <= 5; new modules = 0; new
+  helpers/structs <= 6 inside existing evidence/report modules; schema/golden
+  files only as generated contract evidence; production diff target <= 250
+  lines.
+- Function-boundary plan: keep resolver ownership in `EvidenceStore`; keep CLI
+  persistence in `commands/report.rs`; add no generic artifact-discovery
+  framework.
+
+PR 1 implementation-economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `EvidenceStore::resolve_evidence_ref` | Centralizes artifact URI root/path validation so downstream reports do not each invent resolver logic. | keep | Core resolver test covers primary/included runs, diagnostic refs, and invalid refs. |
+| `EvidenceRefResolutionPayload` | Makes handoff review machine-readable and schema-checked instead of prose-only. | keep | Generated schema and golden fixture added. |
+| `evidence_ref_resolution_artifact` in `commands/report.rs` | Keeps CLI write/audit side effects out of the read-only core resolver. | keep | CLI operating-contract test verifies artifact persistence and audit event. |
+
+Budget note:
+production diff exceeded the initial 250-line target because the typed payload,
+resolver classifications, and CLI persistence are intentionally explicit. File
+budget enforcement remains green, no new module was added, and the extra code
+prevents a second ad hoc resolver in suitability/constraints.
+
+Function-boundary summary:
+recorded in local ignored `.agents/design-ledger/function-boundaries.md`; this
+ExecPlan carries the PR-visible summary because the repository intentionally
+ignores `.agents/`. Changed functions:
+`EvidenceStore::run_set_resolution_map`, `EvidenceStore::resolve_evidence_ref`,
+`EvidenceStore::evidence_ref_resolution_payload`,
+`evidence_ref_resolution_artifact`, and `operating_contract_evidence_refs`.
+Semantic neighbors considered: `artifact_uri_for_run`,
+`run_set_identity_for_runs`, `artifact_ref_for_optional_path`, and
+`operating_contract_validation_gate`. Decision: keep resolver in core store,
+keep report persistence in CLI, no destructive refactor.
 
 ### PR 2: Target-Local Workload Demand Workflow
 
@@ -791,6 +845,14 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   for each relevant PR. This is a new review artifact family and should be
   introduced with a minimal template in the first implementation PR that uses
   it.
+- 2026-06-15: PR #63 merged into `origin/main` as
+  `74cbd9921fa5b988be5e64fe14ffaac9c60c5627`; PR 1 branch
+  `codex/v024-pr1-evidence-ref-resolution` was created from that updated
+  `origin/main`.
+- 2026-06-15: EvidenceStore currently owns only v2 artifact indexing, but it
+  already owns opened run roots and symlink rejection. PR 1 therefore extends
+  EvidenceStore with read-only evidence-ref resolution instead of creating a
+  separate report resolver module.
 
 ## Decision Log
 
@@ -817,6 +879,19 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   invalid and require a run-set resolution map for included-run work. Rationale:
   PR 1 must be reviewable from a handoff archive, not only from implementation
   claims.
+- 2026-06-15: Keep PR 1 as a combined evidence-ref resolution plus
+  production-readiness cleanup PR unless implementation exceeds the complexity
+  budget. Rationale: existing production-ready gate already has most A-060
+  behavior, so the remaining work is small enough to review with the resolver.
+- 2026-06-15: Accept a small PR 1 complexity-budget overrun rather than split
+  the resolver into another module. Rationale: the added lines are schema-backed
+  payload/enum definitions and explicit resolver classifications; file budgets
+  remain green and a new module would add more indirection.
+- 2026-06-15: Do not force-add `.agents/design-ledger/function-boundaries.md`
+  despite function-boundary-governor using that local ledger. Rationale:
+  repository instructions and `.gitignore` keep `.agents/` out of source
+  control; the PR-visible function-boundary summary is recorded in this
+  ExecPlan instead.
 
 ## Handoff
 
@@ -824,16 +899,18 @@ Base branch:
 `origin/main` after PR #62 and agent-instructions-playbook PR #57 are merged.
 
 Current implementation branch:
-`codex/v024-phase0-characterization`.
+`codex/v024-pr1-evidence-ref-resolution`.
 
 Status:
-Phase 0 plan artifacts complete. Draft PR #63 is open, mergeable, and CI is
-green. Awaiting review feedback before Ready for review.
+PR #63 is merged. PR 1 branch is open locally from updated `origin/main`.
+Implementation is complete locally; resolver/report code, focused tests,
+schema generation, workflow-contract review report, and full verification are
+green. PR publication is pending.
 
 Next steps:
-1. Address review comments.
-2. Mark PR #63 Ready for review.
-3. Merge after CI remains green.
+1. Commit and push `codex/v024-pr1-evidence-ref-resolution`.
+2. Open PR 1 as draft.
+3. Address review feedback before marking Ready for review.
 
 Required process:
 every implementation PR must include
@@ -871,3 +948,25 @@ Phase 0 baseline verification:
 - `make schemas-check`: pass (`schema ledger: ok top_level=0 no_schema_wire=31
   maintained_by_hand=0`).
 - `make verify`: pass.
+
+PR 1 verification:
+
+- `cargo test -p adc-lab-core evidence_store_resolves_artifact_refs_across_opened_run_set -- --nocapture`: pass.
+- `cargo test -p adc-lab-core operating_contract_validation_gate_removes_matching_validation_missing_reason -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli report_operating_contract_accepts_include_run_in_v2_store -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end -- --nocapture`: pass.
+- `cargo test -p adc-lab-core --test probe_artifacts -- --nocapture`: pass.
+- `cargo test -p adc-lab-core --test rules_engine operating_contract -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli report_operating_contract -- --nocapture`: pass.
+- `make schemas-check`: pass (`schema ledger: ok top_level=0 no_schema_wire=31 maintained_by_hand=0`).
+- `make contract`: pass.
+- `make docs-smoke`: pass.
+- `make verify`: pass.
+
+Quality gate:
+
+- Decision: submit.
+- Findings: 0.
+- Required artifacts present: ExecPlan updated, PR1 workflow-contract review
+  report decision `submit`, implementation-economy audit recorded, and
+  function-boundary summary recorded in this plan because `.agents/` is ignored.

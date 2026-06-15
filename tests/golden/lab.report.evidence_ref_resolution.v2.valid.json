@@ -1,0 +1,61 @@
+{
+  "schema": "lab.artifact.v2",
+  "kind": "report.evidence_ref_resolution",
+  "id": "EVIDENCE-REF-RESOLUTION-001",
+  "run_id": "LAB-RUN-001",
+  "target_id": "target55",
+  "status": {
+    "state": "measured"
+  },
+  "bounds": null,
+  "factors": {
+    "controlled": [],
+    "observed": [],
+    "confounders": []
+  },
+  "metrics": [],
+  "claims": [],
+  "evidence_refs": [
+    "artifact://lab/runs/LAB-RUN-001/reports/target_operating_contract.v2.json"
+  ],
+  "data_quality": {
+    "level": "complete",
+    "notes": [
+      "evidence refs checked against the opened run-set resolver"
+    ]
+  },
+  "payload": {
+    "subject_run_set_id": "RUN-SET-001",
+    "run_set_resolution_map": [
+      {
+        "logical_run_id": "LAB-RUN-001",
+        "opened_path": "lab/runs/LAB-RUN-001",
+        "artifact_uri_root": "artifact://lab/runs/LAB-RUN-001/",
+        "source_role": "primary",
+        "included_as": "primary"
+      }
+    ],
+    "checked_artifact_refs": [
+      "artifact://lab/runs/LAB-RUN-001/reports/target_operating_contract.v2.json"
+    ],
+    "resolutions": [
+      {
+        "reference": "artifact://lab/runs/LAB-RUN-001/reports/target_operating_contract.v2.json",
+        "classification": "resolvable",
+        "resolved_path": "lab/runs/LAB-RUN-001/reports/target_operating_contract.v2.json",
+        "reason": "artifact ref resolves inside the opened run set"
+      },
+      {
+        "reference": "operator-notes.txt",
+        "classification": "diagnostic_external",
+        "resolved_path": null,
+        "reason": "non-artifact evidence ref; preserved for operator review"
+      }
+    ],
+    "invalid_refs": [],
+    "diagnostic_external_refs": [
+      "operator-notes.txt"
+    ]
+  },
+  "time_unix_ms": 1
+}

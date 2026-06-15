@@ -23,6 +23,8 @@ pub enum Kind {
     ReportConstraints,
     #[serde(rename = "report.constraints_check")]
     ReportConstraintsCheck,
+    #[serde(rename = "report.evidence_ref_resolution")]
+    ReportEvidenceRefResolution,
     #[serde(rename = "report.run_validation")]
     ReportRunValidation,
     #[serde(rename = "control.governor_sweep_policy")]

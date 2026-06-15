@@ -336,6 +336,58 @@ fn operating_contract_validation_gate_blocks_without_explicit_matching_validatio
 }
 
 #[test]
+fn operating_contract_validation_gate_removes_matching_validation_missing_reason() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+    write_marker(
+        &mut store,
+        temp.path(),
+        Kind::ReportRun,
+        "reports/run_report.v2.json",
+    );
+    write_run_validation(
+        &mut store,
+        temp.path(),
+        "reports/run_validation.v2.json",
+        GovernorValidity::Measured,
+    );
+
+    let validation_ref =
+        "artifact://lab/runs/LAB-RUN-001/reports/run_validation.v2.json".to_string();
+    let mut contract = evaluate_operating_contract_v2(&store, "LAB-RUN-001", "target55");
+    apply_operating_contract_validation_gate(
+        &mut contract,
+        &OperatingContractValidationGate {
+            validation_ref: Some(validation_ref.clone()),
+            measured: true,
+            reason: "validation artifact matches the current run set and is measured".to_string(),
+        },
+        true,
+    );
+    let production_ready = contract
+        .payload
+        .evaluations
+        .iter()
+        .find(|entry| entry.rule_id == "operating.production_readiness_requires_run_report")
+        .unwrap();
+
+    assert!(!production_ready.matched);
+    assert_eq!(production_ready.decision, Decision::Blocked);
+    assert!(!production_ready
+        .missing
+        .contains(&"matching_report.run_validation".to_string()));
+    assert!(!production_ready.missing.contains(&"report.run".to_string()));
+    assert!(production_ready
+        .missing
+        .contains(&"production_operating_envelope".to_string()));
+    assert!(production_ready.evidence_refs.contains(&validation_ref));
+    assert!(contract
+        .payload
+        .blocked_claims
+        .contains(&claim::PRODUCTION_READY.to_string()));
+}
+
+#[test]
 fn operating_contract_blocks_mixed_measured_and_contaminated_run_validation() {
     let temp = tempfile::tempdir().unwrap();
     let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();

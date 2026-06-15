@@ -16,6 +16,7 @@ an operator-facing path; the stable contract is the envelope `kind`.
 | `familiarize read-only`, `report pack`, `report operating-point` | `reports/run_report.v2.json` | `report.run` |
 | `report validate-run` | `reports/run_validation.v2.json` | `report.run_validation` |
 | `report operating-contract` | `reports/target_operating_contract.v2.json` | `report.operating_contract` |
+| `report operating-contract` | `reports/evidence_ref_resolution.v2.json` | `report.evidence_ref_resolution` |
 | `decide suitability --out ...` | `reports/suitability.v2.json` | `report.suitability` |
 | `constraints generate --out ...` | `reports/constraints.v2.json` | `report.constraints` |
 | `constraints check-candidate --json`, `constraints self-check --json` | stdout | `report.constraints_check` |
@@ -425,7 +426,10 @@ adc-lab report operating-contract \
 `adc-lab report operating-point` classifies run evidence as `observational_only`, `controlled_subset`, `controlled_full`, `not_controllable`, or `blocked_unsafe`. Passive frequency variation remains observational evidence; it is not a fixed-frequency sweep.
 
 `adc-lab report operating-contract` writes `lab.artifact.v2` with
-`kind = report.operating_contract`.
+`kind = report.operating_contract`. It also writes
+`reports/evidence_ref_resolution.v2.json` so handoff review can see whether
+the contract evidence refs resolve inside the opened run set or are explicitly
+diagnostic/external.
 
 The target operating contract tells agents which patterns are allowed by evidence, burst-only, degraded-mode triggers, forbidden without more evidence, or blocked as claims.
 
