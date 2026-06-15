@@ -67,9 +67,15 @@ adc-lab report operating-contract \
   --include-run lab/runs/LAB-RUN-<target>-governor-sweep \
   --include-run lab/runs/LAB-RUN-<target>-composite-memory-storage-jitter \
   --include-run lab/runs/LAB-RUN-<target>-network-bounded-transfer \
+  --validation lab/runs/LAB-RUN-<target>-platform-contract/reports/run_validation.v2.json \
+  --strict-fullset \
   --target-id <target-id> \
   --target-class raspberry_pi_4
 ```
+
+The validation artifact must match the same run set, workflow id, target id,
+and target class. A copied validation file from another run set is diagnostic
+input only and cannot satisfy controlled-governor full-set claims.
 
 ## Required Scenarios
 

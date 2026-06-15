@@ -1,5 +1,33 @@
 # Pi4/Pi5 Measurement Prompt
 
+This page is a release-binary and read-only familiarization reminder. For
+Target Operating Contract full-set collection, do not treat this static page as
+the workflow authority. Generate the current installed workflow first:
+
+```sh
+adc-lab agent instructions \
+  --goal target-operating-contract-fullset \
+  --target ssh://pi4 \
+  --target-id <target-id> \
+  --target-class raspberry_pi_4 \
+  --format codex \
+  --out lab/runs/LAB-RUN-fullset/workflows/codex_instructions.md \
+  --json
+
+adc-lab collect plan \
+  --goal target-operating-contract-fullset \
+  --target ssh://pi4 \
+  --target-id <target-id> \
+  --target-class raspberry_pi_4 \
+  --run-dir lab/runs/LAB-RUN-fullset \
+  --out lab/runs/LAB-RUN-fullset/workflows/collect_plan.v2.json \
+  --agent-instructions-out lab/runs/LAB-RUN-fullset/workflows/collect_plan.md \
+  --json
+```
+
+If those workflow surfaces are missing, stop and report an adc-lab
+version/capability mismatch rather than falling back to a hand-written harness.
+
 Before collecting Pi4/Pi5 capability evidence, install `adc-lab` from a GitHub
 Release and verify checksums. Do not use a source build for same-binary
 comparison unless the run is explicitly marked as development-only.

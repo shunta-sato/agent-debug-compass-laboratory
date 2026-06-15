@@ -450,9 +450,10 @@ For repeated privileged experiments, the recommended workflow is:
 1. Operator installs the helper with the release installer or reviewed local
    build.
 2. Operator configures the minimal helper-only sudo rule if appropriate.
-3. Agent uses `adc-lab control governor-sweep prepare`, an operator-approved
-   sweep policy, and `adc-lab control governor-sweep run` for full-set governor
-   collection.
+3. Agent asks `adc-lab collect plan` for the executable handoff contract, or
+   uses `adc-lab control governor-sweep prepare`, an operator-approved sweep
+   policy, and `adc-lab control governor-sweep run` only when following an
+   equivalent typed workflow.
 4. Agent verifies `report.run_validation` and `GAPS.md` before using any
    controlled-governor evidence in reports.
 5. Operator removes helper/sudoers when the lab session is done.
@@ -510,13 +511,14 @@ The point is to keep the Agent honest.
 
 | Workflow | Start here |
 | -------- | ---------- |
+| Workflow authority | `adc-lab workflow recommend`, `adc-lab agent instructions`, then `adc-lab collect plan` for target-operating-contract full-set handoff. |
 | Read-only familiarization | `adc-lab familiarize read-only ...` to learn what the target is and which signals are visible. |
 | Bounded CPU load | `adc-lab load cpu ...` to map short CPU / thermal response. |
 | Pressure probe | `adc-lab pressure run ...` to create bounded pressure evidence. |
 | Operating point experiment | `adc-lab control governor-sweep prepare`, approve the sweep policy, `adc-lab control governor-sweep run`, then `adc-lab report validate-run`. |
-| Operating contract generation | `adc-lab report operating-contract ...` after one or more pressure or control runs. |
+| Operating contract generation | `adc-lab report operating-contract --validation ... --strict-fullset ...` when controlled-governor full-set claims matter. |
 | Local workload suitability | `adc-lab workload run`, `adc-lab decide suitability`, and `adc-lab constraints generate`. |
-| Constraint lint | `adc-lab constraints check --mode candidate-content ...` for downstream content; use `--mode generated-constraints` only for generated constraints artifacts/instructions. |
+| Constraint lint | `adc-lab constraints check-candidate ...` for downstream content; use `adc-lab constraints self-check ...` for generated constraints artifacts/instructions. |
 
 Local workload suitability decisions can produce meet / marginal / fail /
 unknown for one target/workload/policy evidence body, but they still cannot say:

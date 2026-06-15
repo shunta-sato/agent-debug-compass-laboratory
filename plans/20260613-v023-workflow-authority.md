@@ -158,6 +158,16 @@ Phase 6 route:
   `commands::constraints`; do not create a second core checker because
   `check_constraints_v2` already owns the semantics.
 
+Phase 7 route:
+
+- Risk route: normal, because this changes public docs, examples coverage, and
+  docs-smoke guard semantics but does not change target runtime behavior.
+- Test list: docs heuristic guard, `make docs-smoke`, focused constraints
+  alias warning test, and full `make verify`.
+- Responsibility layout decision: extend the existing docs guard script rather
+  than adding a new linter; keep generated instruction protection in existing
+  CLI/core tests and include generated-instruction fixture roots if added later.
+
 ### Complexity Budget
 
 - PR1 changed files target: <= 8 tracked files.
@@ -197,6 +207,15 @@ Phase 6 complexity budget:
 - Production lines target: <= 90; test lines target: <= 90.
 - Indirection target: no new checker layer; command split reuses the existing
   core `check_constraints_v2`.
+
+Phase 7 complexity budget:
+
+- Changed files target: <= 9 tracked files.
+- New modules target: 0.
+- New helper target: <= 3 small docs-guard helper functions.
+- Production lines target: <= 120 script/code lines; docs lines as needed for
+  public command examples.
+- Indirection target: no new docs framework or generated fixture pipeline.
 
 ### Source-of-Truth Chain
 
@@ -276,7 +295,17 @@ Final v0.2.3:
         CLI warning.
   - [x] Update collect-plan constraints section to run `self-check` before
         handoff.
-- [ ] Phase 7: Update docs/examples and expand stale-pattern guards.
+- [x] Phase 7: Update docs/examples and expand stale-pattern guards.
+  - [x] Update README and CLI reference to present workflow authority,
+        collect-plan handoff, validation gate, and split constraints commands.
+  - [x] Update getting-started/testing docs so static prompts are not the
+        full-set workflow authority.
+  - [x] Expand docs-smoke guard over README, CLI reference, getting-started,
+        testing docs, examples, plans, and generated-instruction fixture roots.
+  - [x] Add negative-context exceptions so historical "do not use" examples
+        and plan guard descriptions remain documentable.
+  - [x] Record `constraints self-check --out` as deferred follow-up rather
+        than expanding Phase 7 scope.
 
 ## Design -> WBS Coverage Check
 
@@ -321,6 +350,9 @@ Final v0.2.3:
 - 2026-06-15: Phase 6 did not need a new constraints-check artifact or schema.
   The existing `report.constraints_check` payload already records the mode; the
   split is a CLI affordance and workflow-authority improvement.
+- 2026-06-15: Expanding the docs guard to `plans/` exposed AppleDouble
+  `._*.md` files as non-UTF-8 inputs. The guard now skips AppleDouble and
+  `.DS_Store` files so local filesystem metadata does not break docs-smoke.
 
 ## Decision Log
 
@@ -421,23 +453,34 @@ Final v0.2.3:
   generated constraints are Agent-facing handoff material, so the authoritative
   plan should validate them before archive/handoff rather than leaving
   self-check as optional tribal knowledge.
+- 2026-06-15: Keep stale-pattern detection semantic instead of banning every
+  occurrence of words such as `tail` or `latest`. Rationale: historical plans
+  and release-install docs can mention these words in non-artifact-selection or
+  explicitly negative contexts; the guard should block Agent-handoff misuse,
+  not prevent documenting failure modes.
+- 2026-06-15: Defer `constraints self-check --out` to a follow-up. Rationale:
+  Phase 7 is docs/guard cleanup; adding persisted checker output would change a
+  public command surface after Phase 6 and belongs in v0.2.4 or a dedicated
+  follow-up.
 
 ## Handoff
 
-Current branch: `codex/v023-constraints-split`.
+Current branch: `codex/v023-docs-stale-guards`.
 
 PR1 status: merged as PR #55.
 PR2 status: merged as PR #56.
 PR3 status: merged as PR #57.
 PR4 status: merged as PR #58.
 PR5 status: merged as PR #59.
-PR6 status: implemented locally and verified; ready to commit and open PR.
+PR6 status: merged as PR #60.
+PR7 status: implemented and verified locally on `codex/v023-docs-stale-guards`;
+ready to commit and open PR.
 
 Next steps:
 
-1. Commit and push Phase 6.
-2. Open the Phase 6 PR against `main`.
-3. After PR6 merge, start Phase 7 from updated `origin/main`.
+1. Commit and push Phase 7.
+2. Open the Phase 7 PR against `main`.
+3. Monitor CI and address review feedback if any.
 
 ## Outcomes & Retrospective
 
@@ -642,3 +685,38 @@ PR6 verification:
 - `cargo test -p adc-lab-core workflow -- --nocapture`: pass.
 - `python3 scripts/ci/check-file-budgets.py --enforce`: pass.
 - `make verify`: pass.
+
+PR7 outcomes:
+
+- Updated README and CLI reference to make `workflow recommend`, `agent
+  instructions`, and `collect plan` the public full-set handoff route.
+- Updated constraints docs to use `constraints check-candidate` and
+  `constraints self-check`; `constraints check` remains documented only as a
+  compatibility alias.
+- Updated getting-started/testing docs so static prompt pages and raw primitive
+  artifacts do not imply full-set claim-producing evidence.
+- Expanded the docs-smoke artifact heuristic guard across public docs,
+  examples, plans, and generated-instruction fixture roots.
+- Adjusted the compatibility warning to name `constraints check` as the
+  compatibility syntax.
+
+PR7 post-implementation economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `matches_bad_artifact_heuristic` | Keeps the expanded docs-smoke guard readable while preserving one script entrypoint. | keep | `python3 scripts/docs/check-no-artifact-heuristics.py` passes. |
+| `is_negative_context` | Allows plans to document forbidden stale patterns without teaching them as handoff commands. | keep | Guard passes while scanning `plans/`. |
+
+PR7 verification:
+
+- `python3 scripts/docs/check-no-artifact-heuristics.py`: pass.
+- `make docs-smoke`: pass.
+- `cargo test -p adc-lab --test cli constraints_ -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli collect_plan -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli agent_instructions -- --nocapture`: pass.
+- `python3 scripts/ci/check-file-budgets.py --enforce`: pass.
+- `make verify`: pass.
+- `make schemas-check`: pass.
+- `cargo test -p adc-lab-core -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli constraints_check_mode_alias_warns_and_allows_generated_blocked_claims_section -- --nocapture`: pass.
