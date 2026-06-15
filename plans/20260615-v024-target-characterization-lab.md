@@ -905,12 +905,12 @@ Status:
 PR #63 is merged. PR 1 branch is open locally from updated `origin/main`.
 Implementation is complete locally; resolver/report code, focused tests,
 schema generation, workflow-contract review report, and full verification are
-green. PR publication is pending.
+green. Draft PR #64 is open.
 
 Next steps:
-1. Commit and push `codex/v024-pr1-evidence-ref-resolution`.
-2. Open PR 1 as draft.
-3. Address review feedback before marking Ready for review.
+1. Wait for GitHub CI on PR #64.
+2. Address review feedback.
+3. Mark PR #64 Ready for review after approval.
 
 Required process:
 every implementation PR must include
@@ -970,3 +970,6 @@ Quality gate:
 - Required artifacts present: ExecPlan updated, PR1 workflow-contract review
   report decision `submit`, implementation-economy audit recorded, and
   function-boundary summary recorded in this plan because `.agents/` is ignored.
+- Draft PR opened: #64
+  (`https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/64`) at
+  head `46d3757e05f4af4bd88fc024c4a7f89bba5f6fd1`.
