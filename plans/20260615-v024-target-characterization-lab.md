@@ -591,7 +591,7 @@ Detailed acceptance criteria:
   - [x] Move workflow unit tests to an integration test to keep `workflow.rs`
         under the enforced file budget.
   - [x] Run full local verification.
-  - [ ] Commit, push, and open PR.
+  - [x] Commit, push, and open PR.
 - [ ] PR 3: Profile split.
 - [ ] PR 4: Deep CPU / thermal characterization profile.
 - [ ] PR 5: Pressure / composite / endpoint-backed network coverage.
@@ -978,17 +978,22 @@ Current implementation branch:
 `codex/v024-pr2-target-local-workload`.
 
 Status:
-PR #64 is merged. PR 2 implementation is complete locally on a fresh branch:
+PR #64 is merged. PR #65 is open as a draft for PR 2:
 SSH collect plans emit target-local workload demand argv, include an
 operator-handoff retrieval path, and feed that retrieved path into suitability.
 Suitability requires clean workload CPU/RSS demand before CPU/memory can meet.
 Focused tests, `make docs-smoke`, `make schemas-check`, and `make verify` are
-green. PR publication is pending.
+green locally. Initial implementation head was
+`4069641ac34c56e48f132e034d32d229021f036a`; this plan-only status update keeps
+the handoff current for the open PR.
+
+Current PR:
+https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/65
 
 Next steps:
-1. Commit and push `codex/v024-pr2-target-local-workload`.
-2. Open the PR #65-equivalent for PR 2.
-3. Update this handoff with the PR URL after publication if needed.
+1. Wait for PR #65 CI on the latest pushed head.
+2. Address review comments if any.
+3. Mark Ready for review after approval and green CI.
 
 Required process:
 every implementation PR must include
@@ -1072,3 +1077,6 @@ PR 2 quality gate:
 - Required artifacts present: ExecPlan updated, PR2 workflow-contract review
   report decision `submit`, implementation-economy audit recorded, workflow
   tests moved to an integration test to keep production file budgets green.
+- Draft PR opened: #65
+  (`https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/65`) at
+  initial implementation head `4069641ac34c56e48f132e034d32d229021f036a`.
