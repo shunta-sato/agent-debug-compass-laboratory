@@ -828,10 +828,11 @@ Current implementation branch:
 
 Status: Phase 0 in progress. Plan amendments are reflected, branch is based on
 updated `origin/main`, profile compatibility Option C is recorded,
-workflow-contract review seed report exists, and baseline verification passed.
+workflow-contract review seed report exists, baseline verification passed, and
+draft PR #63 is open.
 
 Phase 0 next step:
-publish the Phase 0 PR.
+address review comments, then mark PR #63 ready for review.
 
 Required process:
 every implementation PR must include
@@ -840,8 +841,9 @@ is now part of the development gate.
 
 Suggested next steps:
 
-1. Commit and open the Phase 0 PR.
-2. After merge, start PR 1 on evidence-ref resolution and production-readiness
+1. Address review comments on PR #63.
+2. Mark PR #63 ready for review when approved.
+3. After merge, start PR 1 on evidence-ref resolution and production-readiness
    missing-reason cleanup.
 
 ## Outcomes & Retrospective
@@ -855,6 +857,7 @@ Phase 0 complete:
 - Evidence-ref categories and run-set resolution-map shape recorded.
 - Workflow-contract review seed report added at
   `reports/workflow-contract-review/v024-phase0.md` with decision `submit`.
+- Draft PR opened: #63.
 
 Plan-drafting verification:
 
