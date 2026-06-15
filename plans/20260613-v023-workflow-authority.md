@@ -147,6 +147,17 @@ Phase 5 route:
   `adc_lab_core::rules::operating_contract`, and keep CLI path/index checks in
   `commands::report`.
 
+Phase 6 route:
+
+- Risk route: normal, because this changes public CLI command names but keeps
+  the underlying constraints check artifact and validation semantics stable.
+- Test list: CLI tests for `check-candidate`, `self-check`, compatibility
+  alias warning, generated constraints mismatch, collect-plan argv wiring, and
+  full `make verify`.
+- Responsibility layout decision: keep the mode-specific routing in
+  `commands::constraints`; do not create a second core checker because
+  `check_constraints_v2` already owns the semantics.
+
 ### Complexity Budget
 
 - PR1 changed files target: <= 8 tracked files.
@@ -176,6 +187,16 @@ Phase 5 complexity budget:
 - Production lines target: <= 250; test lines target: <= 180.
 - Indirection target: no generic gate framework; add one explicit
   operating-contract gate for `target-operating-contract-fullset`.
+
+Phase 6 complexity budget:
+
+- Changed files target: <= 5 tracked files.
+- New modules target: 0.
+- New helper target: <= 2 for shared constraints artifact loading and
+  mode-specific dispatch.
+- Production lines target: <= 90; test lines target: <= 90.
+- Indirection target: no new checker layer; command split reuses the existing
+  core `check_constraints_v2`.
 
 ### Source-of-Truth Chain
 
@@ -247,7 +268,14 @@ Final v0.2.3:
         gaps; make strict mode write the contract and then exit non-zero.
   - [x] Update collect-plan operating-contract step to pass `--validation`
         and `--strict-fullset`.
-- [ ] Phase 6: Add `constraints check-candidate` / `constraints self-check`.
+- [x] Phase 6: Add `constraints check-candidate` / `constraints self-check`.
+  - [x] Add explicit `check-candidate` command for candidate content.
+  - [x] Add explicit `self-check` command for generated constraints artifacts
+        or markdown.
+  - [x] Keep `constraints check --mode ...` as a compatibility alias with a
+        CLI warning.
+  - [x] Update collect-plan constraints section to run `self-check` before
+        handoff.
 - [ ] Phase 7: Update docs/examples and expand stale-pattern guards.
 
 ## Design -> WBS Coverage Check
@@ -290,6 +318,9 @@ Final v0.2.3:
   interpreted too broadly by raising `target.selection.production_ready` to
   `Provisional`. Full-set governor validation is evidence of typed/linked
   control workflow validity, not production readiness.
+- 2026-06-15: Phase 6 did not need a new constraints-check artifact or schema.
+  The existing `report.constraints_check` payload already records the mode; the
+  split is a CLI affordance and workflow-authority improvement.
 
 ## Decision Log
 
@@ -382,23 +413,31 @@ Final v0.2.3:
   gate success proves the full-set workflow validation gate, while production
   readiness still requires production envelope, workload validation, long-run
   recovery/degradation evidence, and deployment constraints.
+- 2026-06-15: Keep `constraints check --mode ...` as a compatibility alias but
+  print a warning that points Agents to `constraints check-candidate` and
+  `constraints self-check`. Rationale: old scripts remain diagnosable, while
+  new workflow authority surfaces avoid mode ambiguity.
+- 2026-06-15: Add a `constraints_self_check` step to `collect plan`. Rationale:
+  generated constraints are Agent-facing handoff material, so the authoritative
+  plan should validate them before archive/handoff rather than leaving
+  self-check as optional tribal knowledge.
 
 ## Handoff
 
-Current branch: `codex/v023-operating-contract-validation`.
+Current branch: `codex/v023-constraints-split`.
 
 PR1 status: merged as PR #55.
 PR2 status: merged as PR #56.
 PR3 status: merged as PR #57.
 PR4 status: merged as PR #58.
-PR5 status: PR #59 open; review blocker addressed locally and verified,
-ready to commit and push.
+PR5 status: merged as PR #59.
+PR6 status: implemented locally and verified; ready to commit and open PR.
 
 Next steps:
 
-1. Commit and push PR #59 review fix.
-2. Confirm PR #59 CI remains green.
-3. After PR5 merge, start Phase 6 from updated `origin/main`.
+1. Commit and push Phase 6.
+2. Open the Phase 6 PR against `main`.
+3. After PR6 merge, start Phase 7 from updated `origin/main`.
 
 ## Outcomes & Retrospective
 
@@ -578,3 +617,28 @@ PR5 verification:
 - Review fix: `cargo test -p adc-lab --test cli report_operating_contract -- --nocapture`: pass.
 - Review fix: `cargo test -p adc-lab-core --test rules_engine -- --nocapture`: pass.
 - Review fix: `make verify`: pass.
+
+PR6 outcomes:
+
+- Added `adc-lab constraints check-candidate` for candidate content checks.
+- Added `adc-lab constraints self-check` for generated constraints JSON or
+  markdown self-checks.
+- Kept `adc-lab constraints check --mode ...` as a compatibility alias and
+  added a deprecation warning.
+- Updated `collect plan` to include `constraints_self_check` before handoff.
+
+PR6 post-implementation economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `ConstraintsCheckPathCommand` | Avoids exposing a meaningless `--mode` flag on the explicit `check-candidate` and `self-check` commands. | keep | CLI tests cover both commands. |
+| `read_constraints_artifact` | Removes duplicated v2 envelope/kind validation across alias and split commands. | keep | Focused constraints tests. |
+| `command_constraints_check_mode` | Keeps fail/print behavior identical across alias and split command names. | keep | Alias and split command tests share output expectations. |
+
+PR6 verification:
+
+- `cargo test -p adc-lab --test cli constraints_ -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli collect_plan -- --nocapture`: pass.
+- `cargo test -p adc-lab-core workflow -- --nocapture`: pass.
+- `python3 scripts/ci/check-file-budgets.py --enforce`: pass.
+- `make verify`: pass.

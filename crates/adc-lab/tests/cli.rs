@@ -408,6 +408,22 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
         .iter()
         .any(|kind| kind == "report.operating_contract"));
 
+    let constraints_self_check_step = steps
+        .iter()
+        .find(|step| step["step_id"] == "constraints_self_check")
+        .unwrap();
+    let constraints_self_check_argv = constraints_self_check_step["command_argv"]
+        .as_array()
+        .unwrap();
+    assert!(constraints_self_check_argv
+        .iter()
+        .any(|arg| arg == "self-check"));
+    assert!(constraints_self_check_step["expected_artifact_kinds"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|kind| kind == "report.constraints_check"));
+
     let archive_step = steps
         .iter()
         .find(|step| step["step_id"] == "archive")
@@ -778,7 +794,7 @@ fn suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end() {
 }
 
 #[test]
-fn constraints_check_fails_on_blocked_claim_fixture() {
+fn constraints_check_candidate_fails_on_blocked_claim_fixture() {
     let temp = tempfile::tempdir().unwrap();
     let pack_path = temp.path().join("constraints.json");
     let claim_path = temp.path().join("CLAIMS.md");
@@ -822,7 +838,7 @@ fn constraints_check_fails_on_blocked_claim_fixture() {
         .unwrap()
         .args([
             "constraints",
-            "check",
+            "check-candidate",
             "--constraints",
             pack_path.to_str().unwrap(),
             "--path",
@@ -837,7 +853,51 @@ fn constraints_check_fails_on_blocked_claim_fixture() {
 }
 
 #[test]
-fn constraints_check_generated_mode_allows_generated_blocked_claims_section() {
+fn constraints_self_check_allows_generated_blocked_claims_section() {
+    let temp = tempfile::tempdir().unwrap();
+    let pack_path = temp.path().join("constraints.json");
+    let generated_md = temp.path().join("agent_constraints.md");
+    write_minimal_constraints_pack(&pack_path);
+    fs::write(
+        &generated_md,
+        [
+            "# Target Constraints for target55 / workload-001",
+            "",
+            "Source:",
+            "- suitability_artifact: artifact://lab/runs/LAB-RUN-001/reports/suitability.v2.json",
+            "",
+            "## Must obey",
+            "",
+            "- Do not claim production readiness from this v2 workload suitability slice.",
+            "",
+            "## Blocked claims",
+            "",
+            "- `target.selection.production_ready`: \"production readiness\"",
+        ]
+        .join("\n"),
+    )
+    .unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "constraints",
+            "self-check",
+            "--constraints",
+            pack_path.to_str().unwrap(),
+            "--path",
+            generated_md.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"kind\": \"report.constraints_check\""))
+        .stdout(contains("\"mode\": \"generated_constraints\""))
+        .stdout(contains("\"status\": \"pass\""));
+}
+
+#[test]
+fn constraints_check_mode_alias_warns_and_allows_generated_blocked_claims_section() {
     let temp = tempfile::tempdir().unwrap();
     let pack_path = temp.path().join("constraints.json");
     let generated_md = temp.path().join("agent_constraints.md");
@@ -877,13 +937,14 @@ fn constraints_check_generated_mode_allows_generated_blocked_claims_section() {
         ])
         .assert()
         .success()
+        .stderr(contains("compatibility syntax"))
         .stdout(contains("\"kind\": \"report.constraints_check\""))
         .stdout(contains("\"mode\": \"generated_constraints\""))
         .stdout(contains("\"status\": \"pass\""));
 }
 
 #[test]
-fn constraints_check_generated_mode_fails_on_mismatched_constraints_artifact() {
+fn constraints_self_check_fails_on_mismatched_constraints_artifact() {
     let temp = tempfile::tempdir().unwrap();
     let pack_path = temp.path().join("constraints.json");
     let other_pack_path = temp.path().join("other_constraints.json");
@@ -898,13 +959,11 @@ fn constraints_check_generated_mode_fails_on_mismatched_constraints_artifact() {
         .unwrap()
         .args([
             "constraints",
-            "check",
+            "self-check",
             "--constraints",
             pack_path.to_str().unwrap(),
             "--path",
             other_pack_path.to_str().unwrap(),
-            "--mode",
-            "generated-constraints",
             "--json",
         ])
         .assert()

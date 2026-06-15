@@ -47,15 +47,52 @@ fn run_context_for_report_artifact(path: &Path, run_id: &str) -> Option<RunConte
 }
 
 pub(crate) fn command_constraints_check(args: ConstraintsCheckCommand) -> Result<()> {
-    let constraints: Artifact<ConstraintsPayload> = read_json(&args.constraints)?;
-    if constraints.schema != ARTIFACT_SCHEMA_V2 || constraints.kind != Kind::ReportConstraints {
-        anyhow::bail!("constraints check --constraints must be a v2 report.constraints artifact");
-    }
+    eprintln!(
+        "warning: `constraints check --mode` is compatibility syntax. Prefer `constraints check-candidate` or `constraints self-check`."
+    );
+    let constraints = read_constraints_artifact(&args.constraints, "constraints check")?;
     let mode = match args.mode {
         ConstraintsCheckModeArg::CandidateContent => ConstraintCheckMode::CandidateContent,
         ConstraintsCheckModeArg::GeneratedConstraints => ConstraintCheckMode::GeneratedConstraints,
     };
-    let result = check_constraints_v2(&constraints, &args.path, mode)?;
+    command_constraints_check_mode(&constraints, &args.path, mode)
+}
+
+pub(crate) fn command_constraints_check_candidate(args: ConstraintsCheckPathCommand) -> Result<()> {
+    let constraints = read_constraints_artifact(&args.constraints, "constraints check-candidate")?;
+    command_constraints_check_mode(
+        &constraints,
+        &args.path,
+        ConstraintCheckMode::CandidateContent,
+    )
+}
+
+pub(crate) fn command_constraints_self_check(args: ConstraintsCheckPathCommand) -> Result<()> {
+    let constraints = read_constraints_artifact(&args.constraints, "constraints self-check")?;
+    command_constraints_check_mode(
+        &constraints,
+        &args.path,
+        ConstraintCheckMode::GeneratedConstraints,
+    )
+}
+
+fn read_constraints_artifact(
+    path: &Path,
+    command_name: &str,
+) -> Result<Artifact<ConstraintsPayload>> {
+    let constraints: Artifact<ConstraintsPayload> = read_json(path)?;
+    if constraints.schema != ARTIFACT_SCHEMA_V2 || constraints.kind != Kind::ReportConstraints {
+        anyhow::bail!("{command_name} --constraints must be a v2 report.constraints artifact");
+    }
+    Ok(constraints)
+}
+
+fn command_constraints_check_mode(
+    constraints: &Artifact<ConstraintsPayload>,
+    path: &Path,
+    mode: ConstraintCheckMode,
+) -> Result<()> {
+    let result = check_constraints_v2(constraints, path, mode)?;
     print_json(&result)?;
     if result.payload.status == "fail" {
         anyhow::bail!("constraint check failed");
