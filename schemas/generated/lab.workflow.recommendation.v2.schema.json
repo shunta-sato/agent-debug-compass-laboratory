@@ -435,6 +435,13 @@
       },
       "additionalProperties": false
     },
+    "WorkflowProfileDepth": {
+      "type": "string",
+      "enum": [
+        "smoke",
+        "characterization-full"
+      ]
+    },
     "WorkflowRecommendationMode": {
       "type": "string",
       "enum": [
@@ -445,7 +452,10 @@
     "WorkflowRecommendationPayload": {
       "type": "object",
       "required": [
+        "claim_boundary",
         "controller_adc_lab",
+        "coverage",
+        "effective_profile",
         "evidence_policy",
         "expected_outputs",
         "forbidden_patterns",
@@ -453,7 +463,10 @@
         "must_not_use_for_claims",
         "must_use",
         "next_step",
+        "profile_depth",
+        "profile_summary",
         "recommendation_mode",
+        "safety_caps",
         "source_of_truth_chain",
         "target",
         "target_class",
@@ -462,8 +475,17 @@
         "workflow_id"
       ],
       "properties": {
+        "claim_boundary": {
+          "type": "string"
+        },
         "controller_adc_lab": {
           "$ref": "#/definitions/BuildInfo"
+        },
+        "coverage": {
+          "type": "string"
+        },
+        "effective_profile": {
+          "type": "string"
         },
         "evidence_policy": {
           "$ref": "#/definitions/WorkflowEvidencePolicy"
@@ -498,8 +520,17 @@
         "next_step": {
           "type": "string"
         },
+        "profile_depth": {
+          "$ref": "#/definitions/WorkflowProfileDepth"
+        },
+        "profile_summary": {
+          "type": "string"
+        },
         "recommendation_mode": {
           "$ref": "#/definitions/WorkflowRecommendationMode"
+        },
+        "safety_caps": {
+          "type": "string"
         },
         "source_of_truth_chain": {
           "type": "array",

@@ -3,12 +3,16 @@ use crate::contracts::BuildInfo;
 use crate::evidence::{Artifact, DataQuality, DataQualityLevel, Kind, Status};
 use crate::ids::{new_id, now_unix_ms};
 use crate::run_validation::GovernorValidity;
+use crate::workflow_profile::{resolve_workflow_profile, supported_validation_profile};
+pub use crate::workflow_profile::{
+    WorkflowProfileDepth, WORKFLOW_PROFILE_CHARACTERIZATION_FULL,
+    WORKFLOW_PROFILE_LEGACY_FULLSET as WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET,
+    WORKFLOW_PROFILE_SMOKE,
+};
 use crate::{LabError, LabResult, TargetSpec, TargetTransport};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-pub const WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET: &str =
-    "target-operating-contract-fullset";
 pub const WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023: &str =
     "target-operating-contract-fullset.v0.2.3";
 
@@ -40,6 +44,12 @@ pub struct WorkflowEvidencePolicy {
 #[serde(deny_unknown_fields)]
 pub struct WorkflowRecommendationPayload {
     pub goal: String,
+    pub effective_profile: String,
+    pub profile_depth: WorkflowProfileDepth,
+    pub profile_summary: String,
+    pub claim_boundary: String,
+    pub coverage: String,
+    pub safety_caps: String,
     pub workflow_id: String,
     pub recommendation_mode: WorkflowRecommendationMode,
     pub controller_adc_lab: BuildInfo,
@@ -88,6 +98,12 @@ pub struct WorkflowContinuationRule {
 #[serde(deny_unknown_fields)]
 pub struct WorkflowCollectPlanPayload {
     pub goal: String,
+    pub effective_profile: String,
+    pub profile_depth: WorkflowProfileDepth,
+    pub profile_summary: String,
+    pub claim_boundary: String,
+    pub coverage: String,
+    pub safety_caps: String,
     pub workflow_id: String,
     pub recommendation_mode: WorkflowRecommendationMode,
     pub controller_adc_lab: BuildInfo,
@@ -108,6 +124,7 @@ pub struct WorkflowCollectPlanPayload {
 pub struct WorkflowRecommendationInput {
     pub run_id: String,
     pub goal: String,
+    pub profile_depth: Option<WorkflowProfileDepth>,
     pub target: String,
     pub target_id: String,
     pub target_class: String,
@@ -117,6 +134,7 @@ pub struct WorkflowRecommendationInput {
 pub struct WorkflowCollectPlanInput {
     pub run_id: String,
     pub goal: String,
+    pub profile_depth: Option<WorkflowProfileDepth>,
     pub target: String,
     pub target_id: String,
     pub target_class: String,
@@ -137,12 +155,15 @@ pub const COLLECT_PLAN_DEFERRED_NEXT_STEP: &str =
     "collect plan PR after it is available; stop before claim-producing full-set execution and report adc-lab version/capability mismatch";
 
 pub fn validate_workflow_goal(goal: &str) -> LabResult<()> {
-    if goal == WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET {
+    if supported_validation_profile(goal) {
         Ok(())
     } else {
         Err(LabError::Validation(format!(
-            "unsupported workflow goal {}; expected {}",
-            goal, WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET
+            "unsupported workflow profile {}; expected {}, {}, or legacy {} with --profile-depth",
+            goal,
+            WORKFLOW_PROFILE_SMOKE,
+            WORKFLOW_PROFILE_CHARACTERIZATION_FULL,
+            WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET
         )))
     }
 }
@@ -161,7 +182,7 @@ fn source_of_truth_chain() -> Vec<String> {
 pub fn target_operating_contract_workflow_recommendation(
     input: WorkflowRecommendationInput,
 ) -> LabResult<Artifact<WorkflowRecommendationPayload>> {
-    validate_workflow_goal(&input.goal)?;
+    let profile = resolve_workflow_profile(&input.goal, input.profile_depth)?;
     let target_is_ssh = input.target.starts_with("ssh://");
     let mut must_use = vec![
         "adc-lab collect plan or equivalent workflow.collect_plan artifact".to_string(),
@@ -184,7 +205,13 @@ pub fn target_operating_contract_workflow_recommendation(
             reason: "workflow authority artifact; not target measurement evidence".to_string(),
         },
         WorkflowRecommendationPayload {
-            goal: input.goal,
+            goal: profile.requested_profile,
+            effective_profile: profile.effective_profile,
+            profile_depth: profile.depth,
+            profile_summary: profile.summary.to_string(),
+            claim_boundary: profile.claim_boundary.to_string(),
+            coverage: profile.coverage.to_string(),
+            safety_caps: profile.safety_caps.to_string(),
             workflow_id: WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023.to_string(),
             recommendation_mode: input.recommendation_mode,
             controller_adc_lab: build_info("adc-lab"),
@@ -244,7 +271,13 @@ pub fn target_operating_contract_workflow_recommendation(
 pub fn target_operating_contract_collect_plan(
     input: WorkflowCollectPlanInput,
 ) -> LabResult<Artifact<WorkflowCollectPlanPayload>> {
-    validate_workflow_goal(&input.goal)?;
+    let profile = resolve_workflow_profile(&input.goal, input.profile_depth)?;
+    if profile.depth == WorkflowProfileDepth::CharacterizationFull {
+        return Err(LabError::Validation(
+            "target-characterization-full collect plan is not implemented until PR 4/5/6; use target-operating-contract-smoke for executable handoff now"
+                .to_string(),
+        ));
+    }
     let target_spec = TargetSpec::parse(&input.target)?;
     let target_is_ssh = matches!(target_spec.transport, TargetTransport::Ssh);
     let governors = if input.expected_governors.is_empty() {
@@ -354,7 +387,7 @@ pub fn target_operating_contract_collect_plan(
         "--run".to_string(),
         input.planned_run_dir.clone(),
         "--profile".to_string(),
-        input.goal.clone(),
+        profile.effective_profile.clone(),
         "--expected-governors".to_string(),
         governor_arg.clone(),
         "--workflow-recommendation".to_string(),
@@ -417,6 +450,8 @@ pub fn target_operating_contract_collect_plan(
                 "recommend",
                 "--goal",
                 &input.goal,
+                "--profile-depth",
+                profile.depth.as_str(),
                 "--target",
                 &input.target,
                 "--target-id",
@@ -1158,7 +1193,13 @@ pub fn target_operating_contract_collect_plan(
             reason: "workflow handoff artifact; not target measurement evidence".to_string(),
         },
         WorkflowCollectPlanPayload {
-            goal: input.goal,
+            goal: profile.requested_profile,
+            effective_profile: profile.effective_profile,
+            profile_depth: profile.depth,
+            profile_summary: profile.summary.to_string(),
+            claim_boundary: profile.claim_boundary.to_string(),
+            coverage: profile.coverage.to_string(),
+            safety_caps: profile.safety_caps.to_string(),
             workflow_id: WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023.to_string(),
             recommendation_mode: input.recommendation_mode,
             controller_adc_lab: build_info("adc-lab"),
@@ -1198,63 +1239,6 @@ pub fn target_operating_contract_collect_plan(
         ],
     };
     Ok(artifact)
-}
-
-pub fn render_collect_plan_agent_instructions(
-    collect_plan: &Artifact<WorkflowCollectPlanPayload>,
-) -> String {
-    let payload = &collect_plan.payload;
-    let mut out = String::new();
-    out.push_str("# adc-lab Collect Plan Instructions\n\n");
-    out.push_str("Use this workflow.collect_plan artifact as the executable handoff contract.\n\n");
-    out.push_str(&format!("- goal: `{}`\n", payload.goal));
-    out.push_str(&format!("- workflow_id: `{}`\n", payload.workflow_id));
-    out.push_str(&format!("- target: `{}`\n", payload.target));
-    out.push_str(&format!("- target_id: `{}`\n", payload.target_id));
-    out.push_str(&format!("- target_class: `{}`\n", payload.target_class));
-    out.push_str(&format!(
-        "- planned_run_dir: `{}`\n\n",
-        payload.planned_run_dir
-    ));
-    out.push_str("Do not fall back to a static prompt or hand-written shell harness when this collect plan is available.\n");
-    out.push_str("If a required workflow surface is missing, stop and report adc-lab version/capability mismatch.\n");
-    out.push_str("Do not infer artifact relationships from path names, timestamps, or directory co-presence.\n\n");
-    if payload.target.starts_with("ssh://") {
-        out.push_str("## SSH Target Runner Boundary\n\n");
-        out.push_str("Set `ADC_LAB_TARGET_RUNNER=/home/<target-user>/.local/bin/adc-lab-target` when the release installer default is not on the non-interactive SSH PATH.\n");
-        out.push_str("The release installer installs user binaries under `~/.local/bin` by default; non-interactive SSH PATH may omit that directory.\n");
-        out.push_str("Do not treat adc-lab or adc-lab-target as missing merely because command -v fails under the default non-interactive SSH PATH.\n\n");
-    }
-    if payload
-        .steps
-        .iter()
-        .any(|step| step.execution_location == "target_local")
-    {
-        out.push_str("For target_local execution, run `export PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH\"` before executing target-local argv steps.\n\n");
-    }
-    out.push_str("## Steps\n\n");
-    for step in &payload.steps {
-        out.push_str(&format!("### `{}`\n\n", step.step_id));
-        out.push_str(&format!("- phase: `{}`\n", step.phase));
-        out.push_str(&format!(
-            "- execution_location: `{}`\n",
-            step.execution_location
-        ));
-        out.push_str(&format!("- claim_gate: `{}`\n", step.claim_gate));
-        out.push_str(&format!(
-            "- argv: `{}`\n",
-            serde_json::to_string(&step.command_argv).unwrap_or_else(|_| "[]".to_string())
-        ));
-        if !step.expected_artifact_paths_or_globs.is_empty() {
-            out.push_str("- expected_paths:\n");
-            for path in &step.expected_artifact_paths_or_globs {
-                out.push_str(&format!("  - `{path}`\n"));
-            }
-        }
-        out.push_str(&format!("- summary: {}\n\n", step.human_summary));
-    }
-    out.push_str("Packaging steps are handoff steps, not target evidence. Packaging failure blocks final handoff completion but does not change measurement validity.\n");
-    out
 }
 
 fn default_fullset_governors() -> Vec<String> {
@@ -1384,72 +1368,4 @@ fn continuation_semantics() -> Vec<WorkflowContinuationRule> {
                 .to_string(),
         },
     ]
-}
-
-pub fn render_codex_agent_instructions(
-    recommendation: &Artifact<WorkflowRecommendationPayload>,
-    collect_plan_available: bool,
-) -> String {
-    let payload = &recommendation.payload;
-    let next_step = if collect_plan_available {
-        "run adc-lab collect plan, then follow the emitted argv-array steps"
-    } else {
-        COLLECT_PLAN_DEFERRED_NEXT_STEP
-    };
-    let mut out = String::new();
-    out.push_str("# adc-lab Controller Agent Instructions\n\n");
-    out.push_str("## Workflow Authority\n\n");
-    out.push_str("Use adc-lab workflow outputs as the source of truth for Target Operating Contract full-set collection.\n\n");
-    out.push_str(&format!("- goal: `{}`\n", payload.goal));
-    out.push_str(&format!("- workflow_id: `{}`\n", payload.workflow_id));
-    out.push_str(&format!(
-        "- adc_lab_version: `{}`\n",
-        payload.controller_adc_lab.version
-    ));
-    out.push_str(&format!(
-        "- adc_lab_git_sha: `{}`\n",
-        payload.controller_adc_lab.git_sha
-    ));
-    out.push_str(&format!("- target: `{}`\n", payload.target));
-    out.push_str(&format!("- target_id: `{}`\n", payload.target_id));
-    out.push_str(&format!("- target_class: `{}`\n\n", payload.target_class));
-
-    out.push_str("## Source Of Truth Chain\n\n");
-    for item in &payload.source_of_truth_chain {
-        out.push_str(&format!("- `{item}`\n"));
-    }
-    out.push('\n');
-
-    out.push_str("## Required Workflow\n\n");
-    for item in &payload.must_use {
-        out.push_str(&format!("- {item}\n"));
-    }
-    out.push_str(&format!("- next_step: {next_step}\n\n"));
-
-    out.push_str("## Forbidden Fallbacks\n\n");
-    out.push_str("- Do not fall back to a static prompt or hand-written shell harness when adc-lab workflow surfaces are available.\n");
-    out.push_str("- If a required workflow surface is missing, stop and report adc-lab version/capability mismatch.\n");
-    out.push_str("- Do not infer artifact relationships from filenames, timestamps, or directory co-presence.\n");
-    out.push_str("- Do not use raw primitive control artifacts for controlled-governor full-set claims without matching report.run_validation.\n\n");
-
-    if payload.target.starts_with("ssh://") {
-        out.push_str("## SSH Target Runner Boundary\n\n");
-        out.push_str("- Set `ADC_LAB_TARGET_RUNNER=/home/<target-user>/.local/bin/adc-lab-target` when the installed target runner is under the release installer default path.\n");
-        out.push_str("- The release installer installs `adc-lab-target` under `~/.local/bin`; non-interactive SSH PATH may omit that directory.\n");
-        out.push_str("- Do not treat adc-lab or adc-lab-target as missing merely because command -v fails under the default non-interactive SSH PATH.\n");
-        out.push_str("- For target_local execution, run `export PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH\"` before executing target-local argv steps.\n\n");
-    }
-
-    out.push_str("## Expected Outputs\n\n");
-    for item in &payload.expected_outputs {
-        out.push_str(&format!("- `{item}`\n"));
-    }
-    out.push('\n');
-
-    out.push_str("## Claim Boundaries\n\n");
-    out.push_str("- This prompt is not target measurement evidence.\n");
-    out.push_str("- Insufficient, refused, contaminated, not applicable, and unknown outcomes remain valid evidence boundaries.\n");
-    out.push_str("- Version skew blocks full-set measured claims unless a later validation artifact explicitly records the allowed exploratory override, and even then full-set selection remains not ready.\n");
-    out.push_str("- No Agent root shell, arbitrary sysfs writes, remote privileged apply/restore, Pi4/Pi5 selection claim, or production-style claim is authorized by this prompt.\n");
-    out
 }

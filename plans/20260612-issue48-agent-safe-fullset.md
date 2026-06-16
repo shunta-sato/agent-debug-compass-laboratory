@@ -485,6 +485,7 @@ Add a report command, tentatively:
 adc-lab report validate-run \
   --run lab/runs/... \
   --profile target-operating-contract-fullset \
+  --profile-depth smoke \
   --expected-governors ondemand,performance,powersave \
   --json
 ```

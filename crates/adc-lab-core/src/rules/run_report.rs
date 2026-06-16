@@ -10,7 +10,8 @@ use crate::report::{
     OP_BOUNDED_LOAD, OP_CONTROLLED_OPERATING_POINT, STATUS_COMPLETED,
 };
 use crate::rules::engine::RuleEvaluation;
-use crate::run_validation::{GovernorValidity, RunValidationPayload, FULLSET_PROFILE};
+use crate::run_validation::{GovernorValidity, RunValidationPayload};
+use crate::workflow_profile::supported_validation_profile;
 use crate::LabResult;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -282,7 +283,7 @@ fn add_validation_operating_points(
     let mut blocked_governors = BTreeMap::new();
     for meta in store.iter(Kind::ReportRunValidation) {
         let artifact: Artifact<RunValidationPayload> = store.load(meta)?;
-        if artifact.payload.profile != FULLSET_PROFILE {
+        if !supported_validation_profile(&artifact.payload.profile) {
             continue;
         }
         let legacy_identity = !artifact.payload.has_run_set_identity();

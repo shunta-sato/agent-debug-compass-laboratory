@@ -201,7 +201,7 @@ fn workflow_recommend_stdout_is_authority_not_measurement_evidence() {
             "workflow",
             "recommend",
             "--goal",
-            "target-operating-contract-fullset",
+            "target-operating-contract-smoke",
             "--target",
             "ssh://target55",
             "--target-id",
@@ -223,6 +223,24 @@ fn workflow_recommend_stdout_is_authority_not_measurement_evidence() {
         value["payload"]["workflow_id"],
         "target-operating-contract-fullset.v0.2.3"
     );
+    assert_eq!(value["payload"]["goal"], "target-operating-contract-smoke");
+    assert_eq!(
+        value["payload"]["effective_profile"],
+        "target-operating-contract-smoke"
+    );
+    assert_eq!(value["payload"]["profile_depth"], "smoke");
+    assert!(value["payload"]["profile_summary"]
+        .as_str()
+        .unwrap()
+        .contains("smoke profile"));
+    assert!(value["payload"]["claim_boundary"]
+        .as_str()
+        .unwrap()
+        .contains("not deep target characterization"));
+    assert!(!value["payload"]["profile_summary"]
+        .as_str()
+        .unwrap()
+        .contains("characterization-full profile"));
     assert_eq!(
         value["payload"]["evidence_policy"]["recommendation_is_target_measurement_evidence"],
         false
@@ -239,6 +257,28 @@ fn workflow_recommend_stdout_is_authority_not_measurement_evidence() {
 }
 
 #[test]
+fn workflow_legacy_fullset_requires_profile_depth() {
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "workflow",
+            "recommend",
+            "--goal",
+            "target-operating-contract-fullset",
+            "--target",
+            "ssh://target55",
+            "--target-id",
+            "target55",
+            "--target-class",
+            "raspberry_pi_4",
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("requires --profile-depth"));
+}
+
+#[test]
 fn workflow_recommend_run_dir_writes_artifact_and_audit() {
     let temp = tempfile::tempdir().unwrap();
 
@@ -248,7 +288,7 @@ fn workflow_recommend_run_dir_writes_artifact_and_audit() {
             "workflow",
             "recommend",
             "--goal",
-            "target-operating-contract-fullset",
+            "target-operating-contract-smoke",
             "--target",
             "ssh://target55",
             "--target-id",
@@ -283,7 +323,7 @@ fn agent_instructions_generate_codex_prompt_from_workflow_registry() {
             "agent",
             "instructions",
             "--goal",
-            "target-operating-contract-fullset",
+            "target-operating-contract-smoke",
             "--target",
             "ssh://target55",
             "--target-id",
@@ -305,6 +345,12 @@ fn agent_instructions_generate_codex_prompt_from_workflow_registry() {
         summary["workflow_id"],
         "target-operating-contract-fullset.v0.2.3"
     );
+    assert_eq!(summary["goal"], "target-operating-contract-smoke");
+    assert_eq!(
+        summary["effective_profile"],
+        "target-operating-contract-smoke"
+    );
+    assert_eq!(summary["profile_depth"], "smoke");
     assert_eq!(
         summary["next_step"],
         "run adc-lab collect plan, then follow the emitted argv-array steps"
@@ -312,6 +358,10 @@ fn agent_instructions_generate_codex_prompt_from_workflow_registry() {
 
     let prompt = fs::read_to_string(out).unwrap();
     assert!(prompt.contains("workflow_id: `target-operating-contract-fullset.v0.2.3`"));
+    assert!(prompt.contains("effective_profile: `target-operating-contract-smoke`"));
+    assert!(prompt.contains("profile_depth: `smoke`"));
+    assert!(prompt.contains("smoke profile"));
+    assert!(prompt.contains("not deep target characterization"));
     assert!(prompt.contains("adc_lab_version: `"));
     assert!(prompt.contains("reports/run_validation.v2.json"));
     assert!(prompt.contains("reports/target_operating_contract.v2.json"));
@@ -355,7 +405,7 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
             "collect",
             "plan",
             "--goal",
-            "target-operating-contract-fullset",
+            "target-operating-contract-smoke",
             "--target",
             "ssh://target55",
             "--target-id",
@@ -385,6 +435,15 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
         summary["value"]["payload"]["workflow_id"],
         "target-operating-contract-fullset.v0.2.3"
     );
+    assert_eq!(
+        summary["value"]["payload"]["effective_profile"],
+        "target-operating-contract-smoke"
+    );
+    assert_eq!(summary["value"]["payload"]["profile_depth"], "smoke");
+    assert!(summary["value"]["payload"]["claim_boundary"]
+        .as_str()
+        .unwrap()
+        .contains("not deep target characterization"));
     assert_eq!(
         summary["value"]["payload"]["packaging_is_target_evidence"],
         false
@@ -618,6 +677,13 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
     );
 
     let validation_step = step_by_id(steps, "run_validation");
+    assert_eq!(
+        argv_values(
+            validation_step["command_argv"].as_array().unwrap(),
+            "--profile"
+        ),
+        vec!["target-operating-contract-smoke".to_string()]
+    );
     assert!(validation_step["command_argv"]
         .as_array()
         .unwrap()
@@ -698,6 +764,10 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
 
     let instructions = fs::read_to_string(instructions_out).unwrap();
     assert!(instructions.contains("workflow.collect_plan"));
+    assert!(instructions.contains("effective_profile: `target-operating-contract-smoke`"));
+    assert!(instructions.contains("profile_depth: `smoke`"));
+    assert!(instructions.contains("smoke profile"));
+    assert!(instructions.contains("not deep target characterization"));
     assert!(instructions.contains("argv: `["));
     assert!(instructions.contains("execution_location: `target_local`"));
     assert!(instructions.contains("Packaging steps are handoff steps, not target evidence"));
@@ -731,6 +801,82 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
 }
 
 #[test]
+fn workflow_recommend_characterization_full_declares_planned_depth_boundary() {
+    let output = Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "workflow",
+            "recommend",
+            "--goal",
+            "target-characterization-full",
+            "--target",
+            "local",
+            "--target-id",
+            "local-target",
+            "--target-class",
+            "developer_host",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        value["payload"]["effective_profile"],
+        "target-characterization-full"
+    );
+    assert_eq!(value["payload"]["profile_depth"], "characterization-full");
+    assert!(value["payload"]["profile_summary"]
+        .as_str()
+        .unwrap()
+        .contains("planned bounded deeper target characterization"));
+    assert!(value["payload"]["profile_summary"]
+        .as_str()
+        .unwrap()
+        .contains("fail-closed until PR 4/5/6"));
+    assert!(value["payload"]["claim_boundary"]
+        .as_str()
+        .unwrap()
+        .contains("does not claim deep coverage"));
+}
+
+#[test]
+fn collect_plan_characterization_full_fails_closed_until_profile_steps_exist() {
+    let temp = tempfile::tempdir().unwrap();
+    let run_dir = temp.path().join("run");
+    let out = run_dir.join("workflows/collect_plan.v2.json");
+    let instructions_out = run_dir.join("workflows/collect_plan.md");
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "collect",
+            "plan",
+            "--goal",
+            "target-characterization-full",
+            "--target",
+            "local",
+            "--target-id",
+            "local-target",
+            "--target-class",
+            "developer_host",
+            "--run-dir",
+            run_dir.to_str().unwrap(),
+            "--out",
+            out.to_str().unwrap(),
+            "--agent-instructions-out",
+            instructions_out.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains(
+            "target-characterization-full collect plan is not implemented until PR 4/5/6",
+        ))
+        .stderr(contains("target-operating-contract-smoke"));
+}
+
+#[test]
 fn collect_plan_local_does_not_emit_include_run_for_validation_or_contract() {
     let temp = tempfile::tempdir().unwrap();
     let run_dir = temp.path().join("run");
@@ -742,7 +888,7 @@ fn collect_plan_local_does_not_emit_include_run_for_validation_or_contract() {
             "collect",
             "plan",
             "--goal",
-            "target-operating-contract-fullset",
+            "target-operating-contract-smoke",
             "--target",
             "local",
             "--target-id",

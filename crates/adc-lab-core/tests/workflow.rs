@@ -4,7 +4,8 @@ use adc_lab_core::*;
 fn recommendation_is_not_target_measurement_evidence() {
     let artifact = target_operating_contract_workflow_recommendation(WorkflowRecommendationInput {
         run_id: "LAB-RUN-test".to_string(),
-        goal: WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET.to_string(),
+        goal: WORKFLOW_PROFILE_SMOKE.to_string(),
+        profile_depth: None,
         target: "ssh://target55".to_string(),
         target_id: "target55".to_string(),
         target_class: "raspberry_pi_4".to_string(),
@@ -13,6 +14,8 @@ fn recommendation_is_not_target_measurement_evidence() {
     .unwrap();
 
     assert_eq!(artifact.kind, Kind::WorkflowRecommendation);
+    assert_eq!(artifact.payload.effective_profile, WORKFLOW_PROFILE_SMOKE);
+    assert_eq!(artifact.payload.profile_depth, WorkflowProfileDepth::Smoke);
     assert!(matches!(artifact.status, Status::NotApplicable { .. }));
     assert!(artifact.claims.is_empty());
     assert!(
@@ -33,7 +36,8 @@ fn recommendation_is_not_target_measurement_evidence() {
 fn codex_agent_instructions_are_registry_derived_without_artifact_selection_heuristics() {
     let artifact = target_operating_contract_workflow_recommendation(WorkflowRecommendationInput {
         run_id: "LAB-RUN-test".to_string(),
-        goal: WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET.to_string(),
+        goal: WORKFLOW_PROFILE_SMOKE.to_string(),
+        profile_depth: None,
         target: "ssh://target55".to_string(),
         target_id: "target55".to_string(),
         target_class: "raspberry_pi_4".to_string(),
@@ -53,7 +57,8 @@ fn codex_agent_instructions_are_registry_derived_without_artifact_selection_heur
 fn collect_plan_steps_are_argv_arrays_and_not_measurement_evidence() {
     let artifact = target_operating_contract_collect_plan(WorkflowCollectPlanInput {
         run_id: "LAB-RUN-test".to_string(),
-        goal: WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET.to_string(),
+        goal: WORKFLOW_PROFILE_SMOKE.to_string(),
+        profile_depth: None,
         target: "ssh://target55".to_string(),
         target_id: "target55".to_string(),
         target_class: "raspberry_pi_4".to_string(),
@@ -73,6 +78,8 @@ fn collect_plan_steps_are_argv_arrays_and_not_measurement_evidence() {
     .unwrap();
 
     assert_eq!(artifact.kind, Kind::WorkflowCollectPlan);
+    assert_eq!(artifact.payload.effective_profile, WORKFLOW_PROFILE_SMOKE);
+    assert_eq!(artifact.payload.profile_depth, WorkflowProfileDepth::Smoke);
     assert!(matches!(artifact.status, Status::NotApplicable { .. }));
     assert!(artifact.claims.is_empty());
     assert!(!artifact.payload.packaging_is_target_evidence);

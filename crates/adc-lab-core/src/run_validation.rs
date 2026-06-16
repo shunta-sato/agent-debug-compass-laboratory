@@ -8,6 +8,9 @@ use crate::fsutil::read_json;
 use crate::ids::{new_id, now_unix_ms};
 use crate::probe::LoadPayload;
 use crate::workflow::WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023;
+use crate::workflow_profile::{
+    measured_validation_profile, supported_validation_profile, WORKFLOW_PROFILE_LEGACY_FULLSET,
+};
 use crate::{LabError, LabResult, RunContext};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -16,7 +19,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub const FULLSET_PROFILE: &str = "target-operating-contract-fullset";
+pub const FULLSET_PROFILE: &str = WORKFLOW_PROFILE_LEGACY_FULLSET;
 pub const LEGACY_RUN_VALIDATION_MISSING_RUN_SET_ID: &str =
     "legacy_run_validation_missing_run_set_identity";
 
@@ -236,6 +239,19 @@ pub fn validate_fullset_run(
 pub fn validate_fullset_run_set(
     input: RunValidationInput,
 ) -> LabResult<Artifact<RunValidationPayload>> {
+    validate_profile_run_set(input, FULLSET_PROFILE, FULLSET_PROFILE)
+}
+
+pub fn validate_profile_run_set(
+    input: RunValidationInput,
+    profile: &str,
+    validation_profile: &str,
+) -> LabResult<Artifact<RunValidationPayload>> {
+    if !supported_validation_profile(profile) || !supported_validation_profile(validation_profile) {
+        return Err(LabError::Validation(format!(
+            "unsupported validation profile {profile}/{validation_profile}"
+        )));
+    }
     let mut runs = vec![input.subject_run.clone()];
     runs.extend(input.include_runs.clone());
     let index = ValidationIndex::load_runs(&runs)?;
@@ -275,14 +291,14 @@ pub fn validate_fullset_run_set(
         target_id.clone(),
         envelope_status(&overall_validity),
         RunValidationPayload {
-            profile: FULLSET_PROFILE.to_string(),
+            profile: profile.to_string(),
             requested_governors: requested_governors.clone(),
             workflow_recommendation_ref: input.workflow_recommendation_ref,
             collect_plan_ref: input.collect_plan_ref,
             collect_plan_digest: input.collect_plan_digest,
             subject_run_set_id,
             included_run_refs,
-            validation_profile: FULLSET_PROFILE.to_string(),
+            validation_profile: validation_profile.to_string(),
             workflow_id: WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023.to_string(),
             expected_governors: requested_governors,
             target_id,
@@ -311,7 +327,10 @@ pub fn validate_fullset_run_set(
         } else {
             DataQualityLevel::Degraded
         },
-        notes: vec!["target operating contract full-set validation".to_string()],
+        notes: vec![
+            "target operating contract validation".to_string(),
+            format!("requested profile: {profile}; effective profile: {validation_profile}"),
+        ],
     };
     Ok(artifact)
 }
@@ -927,8 +946,9 @@ pub fn run_set_identity_for_runs(runs: &[RunContext]) -> LabResult<RunSetIdentit
 
 pub fn is_measured_fullset_validation(artifact: &Artifact<RunValidationPayload>) -> bool {
     matches!(artifact.status, Status::Measured)
-        && artifact.payload.profile == FULLSET_PROFILE
-        && artifact.payload.validation_profile == FULLSET_PROFILE
+        && supported_validation_profile(&artifact.payload.profile)
+        && (measured_validation_profile(&artifact.payload.validation_profile)
+            || artifact.payload.validation_profile == FULLSET_PROFILE)
         && artifact.payload.workflow_id == WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023
         && artifact.payload.has_run_set_identity()
         && artifact.payload.overall_validity == GovernorValidity::Measured

@@ -37,6 +37,14 @@ MTIME_ARTIFACT_RE = re.compile(
     r"\bmtime\b.*\b(plan|approval|lease|artifact|control)\b|\b(plan|approval|lease|artifact|control)\b.*\bmtime\b",
     re.IGNORECASE,
 )
+LEGACY_FULLSET_PROFILE_ARG_RE = re.compile(
+    r"--(goal|profile)\s+target-operating-contract-fullset",
+    re.IGNORECASE,
+)
+PROFILE_DEPTH_ARG_RE = re.compile(
+    r"--profile-depth\s+(smoke|characterization-full)",
+    re.IGNORECASE,
+)
 NEGATIVE_CONTEXT_RE = re.compile(
     r"\b(do not|don't|must not|must never|never|not use|forbid|forbidden|avoid|reject|guard|heuristic|unsafe|stale|failure mode|without teaching|without shell-level|no public docs|no longer)\b",
     re.IGNORECASE,
@@ -79,6 +87,14 @@ def matches_bad_artifact_heuristic(line: str) -> bool:
     )
 
 
+def legacy_fullset_without_depth(lines: list[str], index: int) -> bool:
+    if not LEGACY_FULLSET_PROFILE_ARG_RE.search(lines[index]):
+        return False
+    start = max(0, index - 3)
+    end = min(len(lines), index + 8)
+    return not PROFILE_DEPTH_ARG_RE.search("\n".join(lines[start:end]))
+
+
 def main() -> int:
     violations: list[str] = []
     for root in SCAN_ROOTS:
@@ -91,10 +107,16 @@ def main() -> int:
                     violations.append(
                         f"{path.relative_to(ROOT)}:{index + 1}: {line.strip()}"
                     )
+                if legacy_fullset_without_depth(lines, index) and not is_negative_context(
+                    lines, index
+                ):
+                    violations.append(
+                        f"{path.relative_to(ROOT)}:{index + 1}: {line.strip()}"
+                    )
     if violations:
         print("docs artifact heuristic guard: fail")
         print(
-            "Do not teach Agents to select plan/approval/control artifacts by filename order, mtimes, or latest/newest wording."
+            "Do not teach Agents to select plan/approval/control artifacts by filename order, mtimes, latest/newest wording, or legacy fullset profile examples without --profile-depth."
         )
         for violation in violations:
             print(violation)
