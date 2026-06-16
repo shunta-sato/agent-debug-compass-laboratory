@@ -578,8 +578,10 @@ struct ValidateRunCommand {
     run: PathBuf,
     #[arg(long = "include-run")]
     include_runs: Vec<PathBuf>,
-    #[arg(long, default_value = "target-operating-contract-fullset")]
+    #[arg(long, default_value = "target-operating-contract-smoke")]
     profile: String,
+    #[arg(long = "profile-depth")]
+    profile_depth: Option<String>,
     #[arg(long = "expected-governors", value_delimiter = ',')]
     expected_governors: Vec<String>,
     #[arg(long = "workflow-recommendation")]

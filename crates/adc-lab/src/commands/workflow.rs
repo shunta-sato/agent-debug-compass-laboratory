@@ -10,8 +10,10 @@ pub(crate) enum WorkflowCommand {
 
 #[derive(Debug, Args)]
 pub(crate) struct WorkflowRecommendCommand {
-    #[arg(long, default_value = "target-operating-contract-fullset")]
+    #[arg(long, default_value = DEFAULT_WORKFLOW_PROFILE)]
     goal: String,
+    #[arg(long = "profile-depth")]
+    profile_depth: Option<String>,
     #[arg(long, default_value = "local")]
     target: String,
     #[arg(long, default_value = "local-target")]
@@ -33,6 +35,8 @@ pub(crate) fn command_workflow(command: WorkflowCommand) -> Result<()> {
 }
 
 fn command_workflow_recommend(args: WorkflowRecommendCommand) -> Result<()> {
+    let profile_depth = parse_workflow_profile_depth(args.profile_depth.as_deref())?;
+    warn_legacy_workflow_profile(&args.goal);
     validate_workflow_goal(&args.goal)?;
     let run = match args.run_dir.clone() {
         Some(path) => Some(create_or_open_run(Some(path))?),
@@ -46,6 +50,7 @@ fn command_workflow_recommend(args: WorkflowRecommendCommand) -> Result<()> {
         target_operating_contract_workflow_recommendation(WorkflowRecommendationInput {
             run_id,
             goal: args.goal,
+            profile_depth,
             target: args.target,
             target_id: args.target_id,
             target_class: args.target_class,

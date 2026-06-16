@@ -423,14 +423,20 @@
     "WorkflowCollectPlanPayload": {
       "type": "object",
       "required": [
+        "claim_boundary",
         "continuation_semantics",
         "controller_adc_lab",
+        "coverage",
+        "effective_profile",
         "expected_final_artifacts",
         "goal",
         "packaging_failure_blocks_handoff",
         "packaging_is_target_evidence",
         "planned_run_dir",
+        "profile_depth",
+        "profile_summary",
         "recommendation_mode",
+        "safety_caps",
         "source_of_truth_chain",
         "steps",
         "target",
@@ -439,6 +445,9 @@
         "workflow_id"
       ],
       "properties": {
+        "claim_boundary": {
+          "type": "string"
+        },
         "continuation_semantics": {
           "type": "array",
           "items": {
@@ -447,6 +456,12 @@
         },
         "controller_adc_lab": {
           "$ref": "#/definitions/BuildInfo"
+        },
+        "coverage": {
+          "type": "string"
+        },
+        "effective_profile": {
+          "type": "string"
         },
         "expected_final_artifacts": {
           "type": "array",
@@ -466,8 +481,17 @@
         "planned_run_dir": {
           "type": "string"
         },
+        "profile_depth": {
+          "$ref": "#/definitions/WorkflowProfileDepth"
+        },
+        "profile_summary": {
+          "type": "string"
+        },
         "recommendation_mode": {
           "$ref": "#/definitions/WorkflowRecommendationMode"
+        },
+        "safety_caps": {
+          "type": "string"
         },
         "source_of_truth_chain": {
           "type": "array",
@@ -613,6 +637,13 @@
         }
       },
       "additionalProperties": false
+    },
+    "WorkflowProfileDepth": {
+      "type": "string",
+      "enum": [
+        "smoke",
+        "characterization-full"
+      ]
     },
     "WorkflowRecommendationMode": {
       "type": "string",

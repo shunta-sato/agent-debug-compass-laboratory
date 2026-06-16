@@ -2,9 +2,8 @@ use crate::evidence::{
     claim_definition, ArtifactMeta, Claim, Decision, EvidenceStore, Kind, Status,
 };
 use crate::probe::{CompositePayload, LoadPayload, ObservationPayload, PressurePayload};
-use crate::run_validation::{
-    is_measured_fullset_validation, RunValidationPayload, FULLSET_PROFILE,
-};
+use crate::run_validation::{is_measured_fullset_validation, RunValidationPayload};
+use crate::workflow_profile::supported_validation_profile;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -132,7 +131,7 @@ fn run_validation_measured(store: &EvidenceStore) -> bool {
             all_fullset_validations_measured = false;
             continue;
         };
-        if artifact.payload.profile != FULLSET_PROFILE {
+        if !supported_validation_profile(&artifact.payload.profile) {
             continue;
         }
         saw_fullset_validation = true;

@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
+pub(super) const DEFAULT_WORKFLOW_PROFILE: &str = WORKFLOW_PROFILE_SMOKE;
+
 #[derive(Debug, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct ArtifactOutput<T: Serialize> {
@@ -190,6 +192,21 @@ pub(super) fn safe_artifact_id(value: &str, fallback: &str) -> String {
         fallback.to_string()
     } else {
         sanitized
+    }
+}
+
+pub(super) fn parse_workflow_profile_depth(
+    value: Option<&str>,
+) -> Result<Option<WorkflowProfileDepth>> {
+    Ok(value.map(WorkflowProfileDepth::parse).transpose()?)
+}
+
+pub(super) fn warn_legacy_workflow_profile(profile: &str) {
+    if profile == WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET {
+        eprintln!(
+            "warning: `target-operating-contract-fullset` is compatibility syntax. \
+Prefer `target-operating-contract-smoke` or `target-characterization-full`."
+        );
     }
 }
 

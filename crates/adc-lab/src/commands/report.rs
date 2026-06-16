@@ -10,13 +10,9 @@ struct OperatingContractGateResult {
 }
 
 pub(crate) fn command_report_validate_run(args: ValidateRunCommand) -> Result<()> {
-    if args.profile != FULLSET_PROFILE {
-        bail!(
-            "unsupported validation profile {}; expected {}",
-            args.profile,
-            FULLSET_PROFILE
-        );
-    }
+    let profile_depth = parse_workflow_profile_depth(args.profile_depth.as_deref())?;
+    warn_legacy_workflow_profile(&args.profile);
+    let profile = resolve_workflow_profile(&args.profile, profile_depth)?;
     let run = existing_run_context(args.run);
     let include_runs = args
         .include_runs
@@ -38,17 +34,21 @@ pub(crate) fn command_report_validate_run(args: ValidateRunCommand) -> Result<()
         .as_deref()
         .map(digest_file_sha256)
         .transpose()?;
-    let validation = validate_fullset_run_set(RunValidationInput {
-        subject_run: run.clone(),
-        include_runs,
-        requested_governors: args.expected_governors.clone(),
-        workflow_recommendation_ref,
-        collect_plan_ref,
-        collect_plan_digest,
-        target_id: Some(args.target_id.clone()),
-        target_class: Some(args.target_class.clone()),
-        allow_version_skew: args.allow_version_skew,
-    })?;
+    let validation = validate_profile_run_set(
+        RunValidationInput {
+            subject_run: run.clone(),
+            include_runs,
+            requested_governors: args.expected_governors.clone(),
+            workflow_recommendation_ref,
+            collect_plan_ref,
+            collect_plan_digest,
+            target_id: Some(args.target_id.clone()),
+            target_class: Some(args.target_class.clone()),
+            allow_version_skew: args.allow_version_skew,
+        },
+        &profile.requested_profile,
+        &profile.effective_profile,
+    )?;
     let validation_path = args
         .out
         .unwrap_or_else(|| run.run_dir.join("reports/run_validation.v2.json"));
@@ -293,12 +293,11 @@ fn operating_contract_validation_gate(
     if validation.payload.included_run_refs != expected_identity.included_run_refs {
         reasons.push("included_run_refs do not match current run set".to_string());
     }
-    if validation.payload.profile != FULLSET_PROFILE
-        || validation.payload.validation_profile != FULLSET_PROFILE
+    if !supported_validation_profile(&validation.payload.profile)
+        || !(measured_validation_profile(&validation.payload.validation_profile)
+            || validation.payload.validation_profile == FULLSET_PROFILE)
     {
-        reasons.push(
-            "validation profile does not match target-operating-contract-fullset".to_string(),
-        );
+        reasons.push("validation profile is not a supported workflow profile".to_string());
     }
     if validation.payload.workflow_id != WORKFLOW_ID_TARGET_OPERATING_CONTRACT_FULLSET_V023 {
         reasons.push(format!(

@@ -23,6 +23,8 @@ pub mod suitability;
 pub mod target;
 pub mod toolchain;
 pub mod workflow;
+pub mod workflow_profile;
+pub mod workflow_render;
 pub mod workload;
 
 pub use audit::*;
@@ -49,4 +51,6 @@ pub use suitability::*;
 pub use target::*;
 pub use toolchain::*;
 pub use workflow::*;
+pub use workflow_profile::*;
+pub use workflow_render::*;
 pub use workload::*;

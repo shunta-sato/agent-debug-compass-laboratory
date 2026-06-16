@@ -11,8 +11,10 @@ pub(crate) enum AgentCommand {
 
 #[derive(Debug, Args)]
 pub(crate) struct AgentInstructionsCommand {
-    #[arg(long, default_value = "target-operating-contract-fullset")]
+    #[arg(long, default_value = DEFAULT_WORKFLOW_PROFILE)]
     goal: String,
+    #[arg(long = "profile-depth")]
+    profile_depth: Option<String>,
     #[arg(long, default_value = "local")]
     target: String,
     #[arg(long, default_value = "local-target")]
@@ -37,6 +39,8 @@ enum AgentInstructionsFormatArg {
 struct AgentInstructionsOutput {
     instructions_path: String,
     goal: String,
+    effective_profile: String,
+    profile_depth: WorkflowProfileDepth,
     workflow_id: String,
     adc_lab_version: String,
     expected_outputs: Vec<String>,
@@ -50,6 +54,8 @@ pub(crate) fn command_agent(command: AgentCommand) -> Result<()> {
 }
 
 fn command_agent_instructions(args: AgentInstructionsCommand) -> Result<()> {
+    let profile_depth = parse_workflow_profile_depth(args.profile_depth.as_deref())?;
+    warn_legacy_workflow_profile(&args.goal);
     validate_workflow_goal(&args.goal)?;
     match args.format {
         AgentInstructionsFormatArg::Codex => {}
@@ -59,6 +65,7 @@ fn command_agent_instructions(args: AgentInstructionsCommand) -> Result<()> {
         target_operating_contract_workflow_recommendation(WorkflowRecommendationInput {
             run_id: new_id("WORKFLOW-OFFLINE"),
             goal: args.goal,
+            profile_depth,
             target: args.target,
             target_id: args.target_id,
             target_class: args.target_class,
@@ -69,6 +76,8 @@ fn command_agent_instructions(args: AgentInstructionsCommand) -> Result<()> {
     print_json(&AgentInstructionsOutput {
         instructions_path: path_ref(&args.out),
         goal: recommendation.payload.goal,
+        effective_profile: recommendation.payload.effective_profile,
+        profile_depth: recommendation.payload.profile_depth,
         workflow_id: recommendation.payload.workflow_id,
         adc_lab_version: recommendation.payload.controller_adc_lab.version,
         expected_outputs: recommendation.payload.expected_outputs,

@@ -11,8 +11,10 @@ pub(crate) enum CollectCommand {
 
 #[derive(Debug, Args)]
 pub(crate) struct CollectPlanCommand {
-    #[arg(long, default_value = "target-operating-contract-fullset")]
+    #[arg(long, default_value = DEFAULT_WORKFLOW_PROFILE)]
     goal: String,
+    #[arg(long = "profile-depth")]
+    profile_depth: Option<String>,
     #[arg(long, default_value = "local")]
     target: String,
     #[arg(long, default_value = "local-target")]
@@ -37,6 +39,8 @@ struct CollectPlanOutput {
     collect_plan_path: String,
     agent_instructions_path: String,
     workflow_id: String,
+    effective_profile: String,
+    profile_depth: WorkflowProfileDepth,
     planned_run_dir: String,
     step_count: usize,
     expected_final_artifacts: Vec<String>,
@@ -49,6 +53,8 @@ pub(crate) fn command_collect(command: CollectCommand) -> Result<()> {
 }
 
 fn command_collect_plan(args: CollectPlanCommand) -> Result<()> {
+    let profile_depth = parse_workflow_profile_depth(args.profile_depth.as_deref())?;
+    warn_legacy_workflow_profile(&args.goal);
     let planned_run_dir = args
         .run_dir
         .clone()
@@ -60,6 +66,7 @@ fn command_collect_plan(args: CollectPlanCommand) -> Result<()> {
     let plan = target_operating_contract_collect_plan(WorkflowCollectPlanInput {
         run_id: run_id_from_run_dir(&planned_run_dir),
         goal: args.goal,
+        profile_depth,
         target: args.target,
         target_id: args.target_id,
         target_class: args.target_class,
@@ -82,6 +89,8 @@ fn command_collect_plan(args: CollectPlanCommand) -> Result<()> {
         collect_plan_path: path_ref(&args.out),
         agent_instructions_path: path_ref(&args.agent_instructions_out),
         workflow_id: plan.payload.workflow_id.clone(),
+        effective_profile: plan.payload.effective_profile.clone(),
+        profile_depth: plan.payload.profile_depth,
         planned_run_dir: plan.payload.planned_run_dir.clone(),
         step_count: plan.payload.steps.len(),
         expected_final_artifacts: plan.payload.expected_final_artifacts.clone(),
