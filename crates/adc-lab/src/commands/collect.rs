@@ -23,6 +23,8 @@ pub(crate) struct CollectPlanCommand {
     target_class: String,
     #[arg(long = "expected-governors", value_delimiter = ',')]
     expected_governors: Vec<String>,
+    #[arg(long = "network-endpoint")]
+    network_endpoint: Option<String>,
     #[arg(long)]
     run_dir: Option<PathBuf>,
     #[arg(long)]
@@ -81,6 +83,7 @@ fn command_collect_plan(args: CollectPlanCommand) -> Result<()> {
         suitability_policy_path: path_ref(&suitability_policy_path),
         expected_governors: args.expected_governors,
         recommendation_mode: WorkflowRecommendationMode::OfflineRecommendation,
+        network_endpoint: args.network_endpoint,
     })?;
     write_json_pretty(&args.out, &plan)?;
     let instructions = render_collect_plan_agent_instructions(&plan);

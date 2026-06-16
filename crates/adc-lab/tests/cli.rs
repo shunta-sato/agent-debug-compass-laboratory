@@ -830,7 +830,7 @@ fn workflow_recommend_characterization_full_declares_cpu_thermal_slice_boundary(
     assert!(value["payload"]["profile_summary"]
         .as_str()
         .unwrap()
-        .contains("CPU/thermal characterization slice"));
+        .contains("CPU/thermal characterization plus pressure/composite coverage"));
     assert!(value["payload"]["profile_summary"]
         .as_str()
         .unwrap()
@@ -838,11 +838,15 @@ fn workflow_recommend_characterization_full_declares_cpu_thermal_slice_boundary(
     assert!(value["payload"]["claim_boundary"]
         .as_str()
         .unwrap()
-        .contains("not production, 24h safety"));
+        .contains("counter-only network evidence does not prove bounded transfer"));
     assert!(value["payload"]["coverage"]
         .as_str()
         .unwrap()
         .contains("1/2/4 worker 60s CPU ladder"));
+    assert!(value["payload"]["coverage"]
+        .as_str()
+        .unwrap()
+        .contains("endpoint-backed network transfer when --network-endpoint is supplied"));
     assert!(value["payload"]["safety_caps"]
         .as_str()
         .unwrap()
@@ -890,10 +894,14 @@ fn collect_plan_characterization_full_emits_cpu_thermal_steps() {
         .as_str()
         .unwrap()
         .contains("4-worker 300s sustained bounded load"));
+    assert!(plan.payload["coverage"]
+        .as_str()
+        .unwrap()
+        .contains("bounded pressure map"));
     assert!(plan.payload["claim_boundary"]
         .as_str()
         .unwrap()
-        .contains("not production, 24h safety"));
+        .contains("counter-only network evidence does not prove bounded transfer"));
 
     let steps = plan.payload["steps"].as_array().unwrap();
     for step_id in [
@@ -911,6 +919,14 @@ fn collect_plan_characterization_full_emits_cpu_thermal_steps() {
         "cooldown_before_sustained_bounded_load",
         "sustained_bounded_load_300s",
         "cooldown_after_sustained_load",
+        "pressure_latency_jitter",
+        "pressure_observer_pressure",
+        "pressure_memory_pressure",
+        "pressure_storage_io",
+        "pressure_cpu_pressure",
+        "pressure_thermal_pressure",
+        "pressure_network_counter_only",
+        "composite_memory_storage_jitter",
     ] {
         step_by_id(steps, step_id);
     }
@@ -924,6 +940,14 @@ fn collect_plan_characterization_full_emits_cpu_thermal_steps() {
     assert!(
         step_index(steps, "cpu_repeatability_4_worker_3")
             < step_index(steps, "sustained_bounded_load_300s")
+    );
+    assert!(
+        step_index(steps, "cooldown_after_sustained_load")
+            < step_index(steps, "pressure_latency_jitter")
+    );
+    assert!(
+        step_index(steps, "pressure_network_counter_only")
+            < step_index(steps, "composite_memory_storage_jitter")
     );
 
     let assert_observe_step = |step_id: &str, duration: &str| {
@@ -1023,9 +1047,79 @@ fn collect_plan_characterization_full_emits_cpu_thermal_steps() {
             .as_str()
             .is_some_and(|note| note.contains("cooldown_expectation"))));
 
+    let assert_pressure_step = |step_id: &str, kind: &str| {
+        let step = step_by_id(steps, step_id);
+        let argv = step["command_argv"].as_array().unwrap();
+        assert!(argv.iter().any(|arg| arg.as_str() == Some("pressure")));
+        assert!(argv.iter().any(|arg| arg.as_str() == Some("run")));
+        assert_eq!(argv_values(argv, "--kind"), vec![kind.to_string()]);
+        assert_eq!(argv_values(argv, "--duration"), vec!["5s".to_string()]);
+        assert_eq!(argv_values(argv, "--workers"), vec!["1".to_string()]);
+        assert!(step["expected_artifact_paths_or_globs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|path| path
+                .as_str()
+                .is_some_and(|path| path.contains(&format!("pressure/{kind}.*.v2.json")))));
+        assert!(step["validation_after_step"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|note| note.as_str().is_some_and(|note| note.contains(kind))));
+    };
+    assert_pressure_step("pressure_latency_jitter", "latency_jitter");
+    assert_pressure_step("pressure_observer_pressure", "observer_pressure");
+    assert_pressure_step("pressure_memory_pressure", "memory_pressure");
+    assert_pressure_step("pressure_storage_io", "storage_io");
+    assert_pressure_step("pressure_cpu_pressure", "cpu_pressure");
+    assert_pressure_step("pressure_thermal_pressure", "thermal_pressure");
+    assert_pressure_step("pressure_network_counter_only", "network_io");
+
+    let network_counter_step = step_by_id(steps, "pressure_network_counter_only");
+    let network_counter_argv = network_counter_step["command_argv"].as_array().unwrap();
+    assert!(argv_values(network_counter_argv, "--network-endpoint").is_empty());
+    assert_eq!(
+        network_counter_step["claim_gate"],
+        "network_counter_only_not_bounded_transfer"
+    );
+    assert!(network_counter_step["validation_after_step"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|note| note
+            .as_str()
+            .is_some_and(|note| note.contains("counter-only network_io"))));
+    assert!(steps
+        .iter()
+        .all(|step| step["step_id"] != "pressure_network_endpoint_backed"));
+
+    let composite_step = step_by_id(steps, "composite_memory_storage_jitter");
+    let composite_argv = composite_step["command_argv"].as_array().unwrap();
+    assert!(composite_argv
+        .iter()
+        .any(|arg| arg.as_str() == Some("composite")));
+    assert_eq!(
+        argv_values(composite_argv, "--scenario"),
+        vec!["memory_storage_jitter".to_string()]
+    );
+    assert_eq!(
+        composite_step["claim_gate"],
+        "memory_storage_jitter_requires_measured_composite"
+    );
+    assert!(composite_step["validation_after_step"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|note| note
+            .as_str()
+            .is_some_and(|note| note.contains("remain blocked"))));
+
     let instructions = fs::read_to_string(instructions_out).unwrap();
     assert!(instructions.contains("effective_profile: `target-characterization-full`"));
     assert!(instructions.contains("sustained_bounded_load_300s"));
+    assert!(instructions.contains("pressure_network_counter_only"));
+    assert!(instructions.contains("composite_memory_storage_jitter"));
     assert!(instructions.contains("does not support 24h"));
     assert!(instructions.contains("optional approved 900s profile disabled by default"));
     for forbidden in [
@@ -1046,6 +1140,71 @@ fn collect_plan_characterization_full_emits_cpu_thermal_steps() {
             "collect instructions must not contain {forbidden}"
         );
     }
+}
+
+#[test]
+fn collect_plan_characterization_full_emits_endpoint_backed_network_when_configured() {
+    let temp = tempfile::tempdir().unwrap();
+    let run_dir = temp.path().join("run");
+    let out = run_dir.join("workflows/collect_plan.v2.json");
+    let instructions_out = run_dir.join("workflows/collect_plan.md");
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "collect",
+            "plan",
+            "--goal",
+            "target-characterization-full",
+            "--target",
+            "local",
+            "--target-id",
+            "local-target",
+            "--target-class",
+            "developer_host",
+            "--network-endpoint",
+            "127.0.0.1:9000",
+            "--run-dir",
+            run_dir.to_str().unwrap(),
+            "--out",
+            out.to_str().unwrap(),
+            "--agent-instructions-out",
+            instructions_out.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success();
+
+    let plan: Artifact<serde_json::Value> =
+        serde_json::from_slice(&fs::read(&out).unwrap()).unwrap();
+    let steps = plan.payload["steps"].as_array().unwrap();
+    let counter_step = step_by_id(steps, "pressure_network_counter_only");
+    let endpoint_step = step_by_id(steps, "pressure_network_endpoint_backed");
+    let counter_argv = counter_step["command_argv"].as_array().unwrap();
+    let endpoint_argv = endpoint_step["command_argv"].as_array().unwrap();
+    assert!(argv_values(counter_argv, "--network-endpoint").is_empty());
+    assert_eq!(
+        argv_values(endpoint_argv, "--network-endpoint"),
+        vec!["127.0.0.1:9000".to_string()]
+    );
+    assert_eq!(
+        argv_values(endpoint_argv, "--network-bytes"),
+        vec!["1048576".to_string()]
+    );
+    assert_eq!(
+        endpoint_step["claim_gate"],
+        "endpoint_backed_bounded_transfer_required_for_network_claims"
+    );
+    assert!(endpoint_step["validation_after_step"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|note| note
+            .as_str()
+            .is_some_and(|note| note.contains("bounded transfer completes"))));
+    assert!(
+        step_index(steps, "pressure_network_counter_only")
+            < step_index(steps, "pressure_network_endpoint_backed")
+    );
 }
 
 #[test]

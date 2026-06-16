@@ -111,6 +111,13 @@ argv arrays plus expected artifact kinds and continuation rules; execute those
 argv entries as typed commands, and stop rather than inventing missing workflow
 surfaces.
 
+For `--goal target-characterization-full`, `collect plan` emits a pressure
+coverage map in addition to CPU/thermal steps. Pass
+`--network-endpoint <host:port>` only when an explicit receiver is available; the
+plan keeps counter-only `network_io` and endpoint-backed bounded transfer as
+separate steps so downstream claims cannot treat rx/tx counters as transfer
+evidence.
+
 ## Privileged operating-point workflow
 
 ```sh

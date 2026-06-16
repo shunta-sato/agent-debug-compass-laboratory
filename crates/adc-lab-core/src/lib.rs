@@ -24,6 +24,7 @@ pub mod target;
 pub mod toolchain;
 pub mod workflow;
 mod workflow_characterization;
+mod workflow_pressure;
 pub mod workflow_profile;
 pub mod workflow_render;
 pub mod workload;
