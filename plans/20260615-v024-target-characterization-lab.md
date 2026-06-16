@@ -676,7 +676,7 @@ Detailed acceptance criteria:
         mismatched target pressure artifacts, and typed `Status::NotApplicable`.
   - [x] Run review-fix verification.
 - [x] PR 7: Target-local executor ergonomics.
-- [ ] PR 8: Constraints self-check persistence and docs.
+- [x] PR 8: Constraints self-check persistence and docs.
   - [x] Create fresh branch from `origin/main` after PR #70 merge.
   - [x] Add `constraints self-check --out` for persisted
         `report.constraints_check` artifacts.
@@ -689,8 +689,13 @@ Detailed acceptance criteria:
   - [x] Add PR8 workflow-contract review report.
   - [x] Run focused tests and full verification.
   - [x] Commit, push, and open PR.
-- [ ] Final: Update Outcomes with artifact review criteria and v0.2.4
+- [x] Final: Update Outcomes with artifact review criteria and v0.2.4
       target55 rerun readiness.
+  - [x] Create fresh branch from `origin/main` after PR #71 merge.
+  - [x] Add final v0.2.4 workflow-contract review / release-readiness report.
+  - [x] Record target55 rerun readiness and artifact review criteria status.
+  - [x] Run final local release-readiness verification.
+  - [ ] Commit, push, and open PR.
 
 ## PR Phases
 
@@ -1356,40 +1361,42 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   when `--out` targets a run `reports/` directory. Rationale: run-directory
   artifacts should preserve the no-claim-without-audit posture, while
   stdout-only or ad hoc offline checks should remain lightweight.
+- 2026-06-16: Treat release binary creation and target55 execution as
+  post-merge release gates, not as work inside the final readiness PR.
+  Rationale: this PR should not create unpublished release artifacts or run
+  target experiments from a branch binary; it records the exact readiness
+  criteria and generated workflow entrypoints to use after merge/release.
 
 ## Handoff
 
 Base branch:
-`origin/main` after PR #70 is merged (`dfaa5eb`).
+`origin/main` after PR #71 is merged (`1d46e84`).
 
 Current implementation branch:
-`codex/v024-pr8-constraints-self-check`.
+`codex/v024-final-readiness`.
 
 Status:
-PR #70 is merged. PR8 is open as draft PR #71 from fresh branch
-`codex/v024-pr8-constraints-self-check` based on merge commit `dfaa5eb`. The
-implementation adds `constraints self-check --out`, records the persisted
-`report.constraints_check` path in generated collect plans, and keeps generated
-constraints self-check semantics separate from downstream candidate-content
-checks. Focused tests and full `make verify` passed locally. GitHub CI is
-pending on the latest pushed head.
+PR #71 is merged. The final readiness branch records the v0.2.4 implementation
+series as complete, adds the final workflow-contract review /
+release-readiness report, and marks release binary creation plus target55
+execution as post-merge release gates. Local final verification passed.
 
 Reviewed implementation commit:
-`c7fbe644da487a0b514f35c25f1e028998db49d1`.
+none yet.
 
 Review-fix implementation commit:
 none.
 
 Latest pushed commit:
-this ExecPlan handoff update commit on PR #71.
+none yet for final readiness.
 
 Current PR:
-https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/71
+none yet.
 
 Next steps:
-1. Wait for GitHub CI.
-2. Address review comments if any.
-3. Mark PR #71 Ready for review when CI is green.
+1. Commit, push, and open draft PR.
+2. After merge, cut release artifacts and run target55 workflow-authority
+   rerun from release binaries.
 
 Required process:
 every implementation PR must include
@@ -1742,3 +1749,39 @@ PR 8 quality gate:
 - Required artifacts present: ExecPlan updated, PR8 workflow-contract review
   report added, implementation-economy audit recorded, focused constraints /
   collect-plan regressions and full verification green.
+
+Final readiness verification:
+
+- `cargo run -p adc-lab -- collect plan --help`: pass; current CLI exposes
+  `--goal`, `--profile-depth`, `--target`, `--target-id`, `--target-class`,
+  `--expected-governors`, `--network-endpoint`, `--run-dir`, `--out`, and
+  `--agent-instructions-out`.
+- `cargo run -p adc-lab -- workflow recommend --help`: pass; current CLI
+  exposes profile-aware workflow recommendation inputs.
+- Temporary target55 smoke collect-plan generation: pass
+  (`effective_profile=target-operating-contract-smoke`, `profile_depth=smoke`,
+  target-local guide present, workload demand present, constraints self-check
+  present, persisted constraints-check final artifact present).
+- Temporary target55 characterization-full collect-plan generation with a
+  sample endpoint: pass (`effective_profile=target-characterization-full`,
+  `profile_depth=characterization-full`, target-local guide present, workload
+  demand present, constraints self-check present, counter-only and
+  endpoint-backed network steps present).
+- `make verify`: pass (`file budgets: enforced checked=60 violations=0`; CLI
+  55 tests; safety invariant tests 10 + 19; schema ledger ok; docs artifact
+  heuristic guard ok; command smoke host fallback ok).
+- `make schemas-check`: pass (`schema ledger: ok top_level=0
+  no_schema_wire=31 maintained_by_hand=0`).
+- `make docs-smoke`: pass (`docs artifact heuristic guard: ok`).
+
+Final readiness quality gate:
+
+- Decision: submit.
+- Findings: 0 from final workflow-contract review report
+  `reports/workflow-contract-review/v024-final-release-readiness.md`.
+- Release readiness status: implementation PR series complete through PR8;
+  local gates green; final release binary, `SHA256SUMS`, release manifest, and
+  target55 runs are deliberately deferred to the post-merge release gate.
+- Artifact Review Criteria status: recorded and ready for the target55 run; any
+  unanswered criterion must be marked blocked/deferred with reason in the run
+  handoff rather than inferred from summaries.
