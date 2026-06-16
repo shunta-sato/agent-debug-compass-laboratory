@@ -11,6 +11,9 @@ pub use crate::workflow_profile::{
     WORKFLOW_PROFILE_LEGACY_FULLSET as WORKFLOW_GOAL_TARGET_OPERATING_CONTRACT_FULLSET,
     WORKFLOW_PROFILE_SMOKE,
 };
+use crate::workflow_target_local::{
+    target_local_execution_guide, WorkflowTargetLocalExecutionGuide,
+};
 use crate::{LabError, LabResult, TargetSpec, TargetTransport};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -118,6 +121,8 @@ pub struct WorkflowCollectPlanPayload {
     pub source_of_truth_chain: Vec<String>,
     pub steps: Vec<WorkflowCollectPlanStep>,
     pub continuation_semantics: Vec<WorkflowContinuationRule>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_local_execution_guide: Option<WorkflowTargetLocalExecutionGuide>,
     pub expected_final_artifacts: Vec<String>,
     pub packaging_is_target_evidence: bool,
     pub packaging_failure_blocks_handoff: bool,
@@ -1232,6 +1237,10 @@ pub fn target_operating_contract_collect_plan(
             source_of_truth_chain: source_of_truth_chain(),
             steps,
             continuation_semantics: continuation_semantics(),
+            target_local_execution_guide: target_local_execution_guide(
+                target_is_ssh,
+                &target_spec.endpoint,
+            ),
             expected_final_artifacts: vec![
                 input.workflow_recommendation_path,
                 input.collect_plan_path,

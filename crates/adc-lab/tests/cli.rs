@@ -460,6 +460,41 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
         summary["value"]["payload"]["packaging_is_target_evidence"],
         false
     );
+    let guide = &summary["value"]["payload"]["target_local_execution_guide"];
+    assert_eq!(guide["applies_to_execution_location"], "target_local");
+    assert_eq!(
+        guide["working_directory_policy"],
+        "target_local_repository_root"
+    );
+    assert_eq!(guide["path_prepend"][0], "$HOME/.local/bin");
+    assert!(guide["env"].as_array().unwrap().iter().any(|env| {
+        env["name"] == "PATH"
+            && env["value"]
+                .as_str()
+                .unwrap()
+                .starts_with("$HOME/.local/bin:")
+    }));
+    assert!(guide["ssh_invocation_template"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item == "target55"));
+    for category in [
+        "command_not_found",
+        "path_missing",
+        "permission_denied",
+        "helper_unavailable",
+        "version_skew",
+    ] {
+        assert!(
+            guide["failure_diagnostics"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|diagnostic| diagnostic["category"] == category),
+            "target-local guide missing diagnostic category {category}"
+        );
+    }
 
     let plan: Artifact<serde_json::Value> =
         serde_json::from_slice(&fs::read(&out).unwrap()).unwrap();
@@ -787,6 +822,12 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
     assert!(instructions.contains("adc-lab-target"));
     assert!(instructions.contains("~/.local/bin"));
     assert!(instructions.contains("non-interactive SSH PATH"));
+    assert!(instructions.contains("Target-Local Execution Guide"));
+    assert!(instructions.contains("path_prepend: `$HOME/.local/bin"));
+    assert!(instructions.contains("quote each remote arg independently"));
+    assert!(instructions.contains("permission_denied"));
+    assert!(instructions.contains("helper_unavailable"));
+    assert!(instructions.contains("version_skew"));
     assert!(instructions.contains("stage_target_local_workload_plan"));
     assert!(instructions.contains("prepare_target_local_workload_retrieval_parent"));
     assert!(instructions.contains("reset_target_local_workload_retrieval_destination"));
@@ -1260,6 +1301,7 @@ fn collect_plan_local_does_not_emit_include_run_for_validation_or_contract() {
     let validation_step = step_by_id(steps, "run_validation");
     let operating_contract_step = step_by_id(steps, "operating_contract");
     let workload_step = step_by_id(steps, "workload_demand");
+    assert!(plan.payload.get("target_local_execution_guide").is_none());
     assert_eq!(workload_step["execution_location"], "controller");
     assert_eq!(workload_step["requires_target_local"], false);
     for ssh_only_step in [

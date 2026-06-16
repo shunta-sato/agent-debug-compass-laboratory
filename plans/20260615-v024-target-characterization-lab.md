@@ -675,7 +675,7 @@ Detailed acceptance criteria:
   - [x] Add negative regressions for pressure-like JSON, non-v2 pressure JSON,
         mismatched target pressure artifacts, and typed `Status::NotApplicable`.
   - [x] Run review-fix verification.
-- [ ] PR 7: Target-local executor ergonomics.
+- [x] PR 7: Target-local executor ergonomics.
 - [ ] PR 8: Constraints self-check persistence and docs.
 - [ ] Final: Update Outcomes with artifact review criteria and v0.2.4
       target55 rerun readiness.
@@ -1045,6 +1045,33 @@ Acceptance:
 
 - A-070 through A-073.
 
+PR 7 dev-workflow route:
+
+- Risk route: normal for this PR. It changes generated collect-plan workflow
+  payload/instructions and runner diagnostics, but does not execute target-local
+  commands, add a remote shell framework, or relax claim gates.
+- Definition of Done: SSH collect plans include a machine-readable
+  `target_local_execution_guide`; generated instructions render the guide
+  without filename-order fallback; runner failure diagnostics classify
+  command-not-found/PATH, permission denied, helper unavailable, and version
+  skew boundaries; local collect plans do not emit SSH-only guides; `make verify`
+  passes.
+- Test List: core collect-plan guide shape; CLI-written JSON guide and Markdown
+  rendering; local collect-plan omission; command-not-found/path diagnostic;
+  permission-denied diagnostic; generated schema drift.
+- Complexity Budget: changed production files <= 5; new modules <= 1
+  DTO/guide module only; no executor layer; new helper functions <= 4;
+  production diff target <= 220 lines; `workflow.rs` must remain under the
+  enforced 1500-line file budget.
+
+PR 7 implementation-economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `WorkflowTargetLocalExecutionGuide` DTO family | Makes target-local PATH, argv semantics, SSH invocation template, and failure categories schema-checked instead of Markdown-only prose. | keep | Core and CLI tests assert the guide shape; generated schema updated. |
+| `workflow_target_local` module | Keeps PR7 DTO/guide construction out of already budget-sensitive `workflow.rs` without adding execution behavior. | keep | `workflow.rs` is 1400/1500 after the split; file-budget check remains available through `make verify`. |
+| SSH runner failure category helpers | Converts opaque SSH runner failures into stable command-not-found/path/permission diagnostic categories. | keep | Safety-invariant tests cover command-not-found/path and permission-denied cases. |
+
 ### PR 8: Constraints Self-Check Persistence and Docs
 
 Scope:
@@ -1279,49 +1306,46 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   `Artifact<PressurePayload>` with matching target identity. Rationale:
   suitability is claim-producing, so pressure-like JSON, non-v2 envelopes, and
   other-target artifacts must not make required dimensions non-unknown.
+- 2026-06-16: Split PR7 target-local execution guide DTO/building into
+  `workflow_target_local` instead of growing `workflow.rs`. Rationale:
+  target-local ergonomics need schema-checked structure, but `workflow.rs` must
+  stay under the enforced file budget and this split does not add an executor or
+  remote shell framework.
 
 ## Handoff
 
 Base branch:
-`origin/main` after PR #68 is merged (`0b9577c3b726`).
+`origin/main` after PR #69 is merged (`adad04545f3d`).
 
 Current implementation branch:
-`codex/v024-pr6-suitability-linkage`.
+`codex/v024-pr7-target-local-ergonomics`.
 
 Status:
-PR #68 is merged. PR6 implementation is on a fresh branch from merge commit
-`0b9577c3b726`. The current implementation links suitability storage, network,
-and latency dimensions to existing v2 pressure artifact payload semantics. Matching
-storage and latency pressure evidence becomes non-unknown but remains marginal;
-endpoint-backed bounded network transfer becomes non-unknown but remains
-marginal without network thresholds; counter-only network evidence and missing
-required latency remain unknown and block `selection_ready`. The resource
-sufficiency matrix is in `crates/adc-lab-core/tests/suitability.rs`, and
-production `suitability.rs` is back under the enforced file budget. Focused
-tests and full `make verify` passed locally. Draft PR #69 is open; CI should be
-checked on the latest pushed head before Ready for review. PR #69 review
-requested typed v2 pressure artifact validation plus target_id matching; both
-review blockers are fixed locally, and review-fix `make verify` passed.
-Review-fix implementation commit `a62e5c0c4cd20ec893e1ad6857462b3984f02487`
-has been pushed to PR #69.
+PR #69 is merged. PR7 implementation is in progress on a fresh branch from
+merge commit `adad04545f3d`. The current uncommitted changes add
+`workflow.collect_plan.payload.target_local_execution_guide` for SSH plans,
+render that guide into generated collect-plan instructions, classify SSH runner
+version-check failures with stable `failure_category` and `path_diagnostic`
+fields, and update the generated collect-plan schema. Focused core/CLI/safety
+tests and full `make verify` passed locally. Implementation is complete; commit,
+push, and draft PR publication are pending.
 
 Reviewed implementation commit:
-`9831b1b0de478efbaa00049d7465400ced4b113e`.
+none yet for PR7.
 
 Review-fix implementation commit:
-`a62e5c0c4cd20ec893e1ad6857462b3984f02487`.
+none.
 
 Latest pushed commit:
-this status-only ExecPlan handoff update commit on
-`codex/v024-pr6-suitability-linkage`.
+none for PR7; uncommitted changes exist.
 
 Current PR:
-https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/69
+not opened yet.
 
 Next steps:
-1. Wait for PR #69 CI on the latest pushed head.
-2. Request review after CI is green.
-3. Merge after review approval and CI success.
+1. Commit and push `codex/v024-pr7-target-local-ergonomics`.
+2. Open a draft PR for PR7.
+3. Update this Handoff with the PR URL and latest pushed commit.
 
 Required process:
 every implementation PR must include

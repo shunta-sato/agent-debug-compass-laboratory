@@ -263,11 +263,67 @@ exit 127
         .assert()
         .failure()
         .stderr(contains("ssh target runner version failed"))
+        .stderr(contains("failure_category=command_not_found"))
+        .stderr(contains(
+            "path_diagnostic=non_interactive_path_missing_or_runner_not_installed",
+        ))
         .stderr(contains("tried_runner=adc-lab-target"))
         .stderr(contains("default_runner=adc-lab-target"))
         .stderr(contains("ADC_LAB_TARGET_RUNNER"))
         .stderr(contains("~/.local/bin/adc-lab-target"))
         .stderr(contains("non-interactive SSH PATH"));
+}
+
+#[cfg(unix)]
+#[test]
+fn contract_validation_ssh_runner_permission_denied_has_specific_diagnostic() {
+    let temp = tempfile::tempdir().unwrap();
+    let bin_dir = temp.path().join("bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    let ssh_path = bin_dir.join("ssh");
+    fs::write(
+        &ssh_path,
+        r#"#!/bin/sh
+echo "Permission denied" >&2
+exit 126
+"#,
+    )
+    .unwrap();
+    fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o755)).unwrap();
+    let old_path = std::env::var_os("PATH").unwrap_or_default();
+    let path_env = format!("{}:{}", bin_dir.display(), old_path.to_string_lossy());
+    let run_dir = temp.path().join("run");
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .env("PATH", path_env)
+        .env(
+            "ADC_LAB_TARGET_RUNNER",
+            "/home/demo/.local/bin/adc-lab-target",
+        )
+        .args([
+            "load",
+            "cpu",
+            "--target",
+            "ssh://target55",
+            "--workers",
+            "1",
+            "--duration",
+            "1s",
+            "--run-dir",
+            run_dir.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .failure()
+        .stderr(contains("ssh target runner version failed"))
+        .stderr(contains("failure_category=permission_denied"))
+        .stderr(contains(
+            "path_diagnostic=runner_permission_or_ssh_access_denied",
+        ))
+        .stderr(contains(
+            "tried_runner=/home/demo/.local/bin/adc-lab-target",
+        ));
 }
 
 #[cfg(unix)]

@@ -104,6 +104,38 @@ fn collect_plan_steps_are_argv_arrays_and_not_measurement_evidence() {
     let governor_step = step_by_id(&artifact, "governor_sweep_run");
     assert_eq!(governor_step.execution_location, "target_local");
     assert!(!governor_step.requires_controller);
+    let guide = artifact
+        .payload
+        .target_local_execution_guide
+        .as_ref()
+        .expect("ssh collect plan must include target-local execution guide");
+    assert_eq!(guide.applies_to_execution_location, "target_local");
+    assert_eq!(
+        guide.working_directory_policy,
+        "target_local_repository_root"
+    );
+    assert_eq!(guide.path_prepend[0], "$HOME/.local/bin");
+    assert!(guide
+        .argv_semantics
+        .contains("preserve command_argv as ordered arguments"));
+    assert!(guide
+        .ssh_invocation_template
+        .contains(&"target55".to_string()));
+    for category in [
+        "command_not_found",
+        "path_missing",
+        "permission_denied",
+        "helper_unavailable",
+        "version_skew",
+    ] {
+        assert!(
+            guide
+                .failure_diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.category == category),
+            "missing target-local diagnostic category {category}"
+        );
+    }
     let target_arg_index = governor_step
         .command_argv
         .iter()
@@ -150,6 +182,12 @@ fn collect_plan_steps_are_argv_arrays_and_not_measurement_evidence() {
 
     let instructions = render_collect_plan_agent_instructions(&artifact);
     assert!(instructions.contains("argv: `["));
+    assert!(instructions.contains("Target-Local Execution Guide"));
+    assert!(instructions.contains("path_prepend: `$HOME/.local/bin"));
+    assert!(instructions.contains("quote each remote arg independently"));
+    assert!(instructions.contains("permission_denied"));
+    assert!(instructions.contains("helper_unavailable"));
+    assert!(instructions.contains("version_skew"));
     assert!(instructions.contains("Do not fall back to a static prompt"));
     assert_no_artifact_selection_heuristics(&instructions, "generated collect instructions");
 }
