@@ -688,7 +688,7 @@ Detailed acceptance criteria:
   - [x] Update docs for persisted self-check handoff output.
   - [x] Add PR8 workflow-contract review report.
   - [x] Run focused tests and full verification.
-  - [ ] Commit, push, and open PR.
+  - [x] Commit, push, and open PR.
 - [ ] Final: Update Outcomes with artifact review criteria and v0.2.4
       target55 rerun readiness.
 
@@ -1366,28 +1366,30 @@ Current implementation branch:
 `codex/v024-pr8-constraints-self-check`.
 
 Status:
-PR #70 is merged. PR8 is in local implementation on a fresh branch from
-`origin/main`. The implementation adds `constraints self-check --out`, records
-the persisted `report.constraints_check` path in generated collect plans, and
-keeps generated constraints self-check semantics separate from downstream
-candidate-content checks. Focused tests and final verification are pending.
+PR #70 is merged. PR8 is open as draft PR #71 from fresh branch
+`codex/v024-pr8-constraints-self-check` based on merge commit `dfaa5eb`. The
+implementation adds `constraints self-check --out`, records the persisted
+`report.constraints_check` path in generated collect plans, and keeps generated
+constraints self-check semantics separate from downstream candidate-content
+checks. Focused tests and full `make verify` passed locally. GitHub CI is
+pending on the latest pushed head.
 
 Reviewed implementation commit:
-none yet.
+`c7fbe644da487a0b514f35c25f1e028998db49d1`.
 
 Review-fix implementation commit:
 none.
 
 Latest pushed commit:
-none yet for PR8.
+this ExecPlan handoff update commit on PR #71.
 
 Current PR:
-none yet.
+https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/71
 
 Next steps:
-1. Run focused PR8 tests.
-2. Run `make verify`.
-3. Commit, push, and open draft PR for PR8.
+1. Wait for GitHub CI.
+2. Address review comments if any.
+3. Mark PR #71 Ready for review when CI is green.
 
 Required process:
 every implementation PR must include
