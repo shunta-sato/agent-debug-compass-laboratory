@@ -523,7 +523,7 @@ The point is to keep the Agent honest.
 | Operating point experiment | `adc-lab control governor-sweep prepare`, approve the sweep policy, `adc-lab control governor-sweep run`, then `adc-lab report validate-run`. |
 | Operating contract generation | `adc-lab report operating-contract --validation ... --strict-fullset ...` when controlled-governor full-set claims matter. |
 | Local workload suitability | `adc-lab workload run`, `adc-lab decide suitability`, and `adc-lab constraints generate`. |
-| Constraint lint | `adc-lab constraints check-candidate ...` for downstream content; use `adc-lab constraints self-check ...` for generated constraints artifacts/instructions. |
+| Constraint lint | `adc-lab constraints check-candidate ...` for downstream content; use `adc-lab constraints self-check --out ...` to persist generated constraints self-check evidence. |
 
 Local workload suitability decisions can produce meet / marginal / fail /
 unknown for one target/workload/policy evidence body, but they still cannot say:

@@ -353,7 +353,7 @@ enum ConstraintsCommand {
     Generate(ConstraintsGenerateCommand),
     Check(ConstraintsCheckCommand),
     CheckCandidate(ConstraintsCheckPathCommand),
-    SelfCheck(ConstraintsCheckPathCommand),
+    SelfCheck(ConstraintsSelfCheckCommand),
 }
 
 #[derive(Debug, Args)]
@@ -386,6 +386,18 @@ struct ConstraintsCheckPathCommand {
     constraints: PathBuf,
     #[arg(long)]
     path: PathBuf,
+    #[arg(long)]
+    json: bool,
+}
+
+#[derive(Debug, Args)]
+struct ConstraintsSelfCheckCommand {
+    #[arg(long)]
+    constraints: PathBuf,
+    #[arg(long)]
+    path: PathBuf,
+    #[arg(long)]
+    out: Option<PathBuf>,
     #[arg(long)]
     json: bool,
 }

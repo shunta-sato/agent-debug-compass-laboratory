@@ -19,7 +19,8 @@ an operator-facing path; the stable contract is the envelope `kind`.
 | `report operating-contract` | `reports/evidence_ref_resolution.v2.json` | `report.evidence_ref_resolution` |
 | `decide suitability --out ...` | `reports/suitability.v2.json` | `report.suitability` |
 | `constraints generate --out ...` | `reports/constraints.v2.json` | `report.constraints` |
-| `constraints check-candidate --json`, `constraints self-check --json` | stdout | `report.constraints_check` |
+| `constraints check-candidate --json` | stdout | `report.constraints_check` |
+| `constraints self-check --out ... --json` | `reports/constraints_check.v2.json` | `report.constraints_check` |
 | `observe` v2 sidecar | `observations/<artifact-label-or-observe>.<artifact_id>.v2.json` | `observation` |
 | `load cpu` | `load/cpu.<result_id>.v2.json` | `load` |
 | `pressure run` | `pressure/<kind>.<result_id>.v2.json` | `pressure` |
@@ -383,7 +384,9 @@ not treated as downstream positive claim text:
 ```sh
 adc-lab constraints self-check \
   --constraints lab/runs/LAB-RUN-workload-.../reports/constraints.v2.json \
-  --path lab/runs/LAB-RUN-workload-.../reports/agent_constraints.md
+  --path lab/runs/LAB-RUN-workload-.../reports/agent_constraints.md \
+  --out lab/runs/LAB-RUN-workload-.../reports/constraints_check.v2.json \
+  --json
 ```
 
 `adc-lab constraints check` remains a compatibility alias and prints a warning.

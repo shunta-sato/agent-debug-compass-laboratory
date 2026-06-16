@@ -67,12 +67,13 @@ pub(crate) fn command_constraints_check_candidate(args: ConstraintsCheckPathComm
     )
 }
 
-pub(crate) fn command_constraints_self_check(args: ConstraintsCheckPathCommand) -> Result<()> {
+pub(crate) fn command_constraints_self_check(args: ConstraintsSelfCheckCommand) -> Result<()> {
     let constraints = read_constraints_artifact(&args.constraints, "constraints self-check")?;
-    command_constraints_check_mode(
+    command_constraints_check_mode_with_out(
         &constraints,
         &args.path,
         ConstraintCheckMode::GeneratedConstraints,
+        args.out.as_deref(),
     )
 }
 
@@ -92,7 +93,34 @@ fn command_constraints_check_mode(
     path: &Path,
     mode: ConstraintCheckMode,
 ) -> Result<()> {
+    command_constraints_check_mode_with_out(constraints, path, mode, None)
+}
+
+fn command_constraints_check_mode_with_out(
+    constraints: &Artifact<ConstraintsPayload>,
+    path: &Path,
+    mode: ConstraintCheckMode,
+    out: Option<&Path>,
+) -> Result<()> {
     let result = check_constraints_v2(constraints, path, mode)?;
+    if let Some(out) = out {
+        write_json_pretty(out, &result)?;
+        if let Some(run) = run_context_for_report_artifact(out, &result.run_id) {
+            append_audit_event(
+                &run,
+                AuditInput {
+                    target_id: result.target_id.clone(),
+                    actor: Actor::codex(),
+                    operation: "constraints.self_check".to_string(),
+                    operation_id: Some(result.id.clone()),
+                    risk_tier: RiskTier::Tier0ReadOnlyObservation,
+                    approval_ref: None,
+                    restore_lease_ref: None,
+                    result: result.payload.status.clone(),
+                },
+            )?;
+        }
+    }
     print_json(&result)?;
     if result.payload.status == "fail" {
         anyhow::bail!("constraint check failed");
