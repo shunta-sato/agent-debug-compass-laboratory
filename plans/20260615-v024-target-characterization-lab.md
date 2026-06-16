@@ -64,20 +64,24 @@ Out of scope:
 
 ## Assumptions / Base
 
-- Base branch: `origin/main` after PR #62 and agent-instructions-playbook PR
-  #57 are merged.
-- Current implementation branch: `codex/v024-pr1-evidence-ref-resolution`.
-- Phase 0 branch was created fresh from updated `origin/main`.
-- Release identity: v0.2.4 is a product release after v0.2.3.1; Cargo package
-  versions remain decoupled unless release tooling requires otherwise.
-- Existing surfaces available from v0.2.3.1:
+- Base branch for the final readiness PR: `origin/main` after PR #71 is merged.
+- Current implementation branch: `codex/v024-final-readiness`.
+- Series status: PR1 through PR8 are merged. This PR is final
+  release-readiness documentation / workflow-contract review only.
+- Release gate status: release binary creation, `SHA256SUMS` /
+  `release-manifest.json` verification, and target55 release-binary rerun are
+  post-merge release gates.
+- Release identity: v0.2.4 is ready to cut after this final readiness PR merges
+  and the post-merge release gates pass. Cargo package versions remain
+  decoupled unless release tooling requires otherwise.
+- Surfaces available from the completed v0.2.4 series:
   - `workflow recommend`
   - `agent instructions`
   - `collect plan`
   - multi-run `report validate-run --include-run`
   - `report operating-contract --validation --strict-fullset`
   - `constraints check-candidate`
-  - `constraints self-check`
+  - `constraints self-check --out`
   - generated schemas and schema ledger
   - docs heuristic guard
 - `collect run` remains deferred unless explicitly re-scoped by a later
@@ -190,44 +194,27 @@ visible in downstream claims.
 
 ### Profile Model
 
-Introduce explicit workflow depth labels:
+Final explicit workflow depth labels:
 
 - `target-operating-contract-smoke`: setup and workflow correctness profile.
   It includes runner preflight, read-only identity, short seed probes, and
   governor-validation smoke. Its generated text must state that it is not deep
   target characterization.
-- `target-characterization-full`: bounded deeper characterization profile. PR 4
-  makes the CPU/thermal slice executable: repeated observation, CPU ladder,
-  repeatability, sustained bounded load, cooldown, and safety caps. PR 5/6/8
-  still own pressure/composite coverage, endpoint-backed network, suitability
-  dimension linkage, constraints, and persisted self-check depth.
+- `target-characterization-full`: bounded deeper characterization profile.
+  PR4 through PR8 completed CPU/thermal, pressure/composite/network coverage,
+  suitability dimension linkage, target-local execution guide, and persisted
+  constraints self-check. Release-binary target55 execution remains a
+  post-merge release gate.
 - `suitability-focused`: optional later profile for a known workload and known
   evidence set. Defer unless the first two profiles need the distinction.
 
-Compatibility decision moved to Phase 0:
+Compatibility decision completed in Phase 0:
 
-- Whether the existing `target-operating-contract-fullset` remains as a
-  compatibility alias for smoke, is deprecated with warning text, or is mapped
-  to one of the new profile ids.
-
-Phase 0 compatibility decision must happen before PR 2:
-
-```text
-Option A:
-  target-operating-contract-fullset remains as compatibility alias to smoke.
-
-Option B:
-  target-operating-contract-fullset maps to target-characterization-full.
-
-Option C:
-  target-operating-contract-fullset remains accepted but emits deprecation
-  warning and requires explicit --profile-depth smoke|characterization-full.
-```
-
-Recommended decision: Option C. Rationale: v0.2.3.1 fullset is closer to a
-workflow/governor-validation smoke profile than v0.2.4 deep characterization.
-Keeping the name while changing depth would make old and new runs difficult to
-compare and would let Agents over-read the older profile.
+- Option C was adopted: `target-operating-contract-fullset` remains accepted
+  only when `--profile-depth smoke|characterization-full` disambiguates the
+  requested depth. Rationale: v0.2.3.1 fullset behavior was closer to
+  workflow/governor-validation smoke than v0.2.4 deep characterization, and
+  silently changing the meaning would let Agents over-read older runs.
 
 ### Included-Run Evidence Refs
 
@@ -676,7 +663,7 @@ Detailed acceptance criteria:
         mismatched target pressure artifacts, and typed `Status::NotApplicable`.
   - [x] Run review-fix verification.
 - [x] PR 7: Target-local executor ergonomics.
-- [ ] PR 8: Constraints self-check persistence and docs.
+- [x] PR 8: Constraints self-check persistence and docs.
   - [x] Create fresh branch from `origin/main` after PR #70 merge.
   - [x] Add `constraints self-check --out` for persisted
         `report.constraints_check` artifacts.
@@ -689,8 +676,13 @@ Detailed acceptance criteria:
   - [x] Add PR8 workflow-contract review report.
   - [x] Run focused tests and full verification.
   - [x] Commit, push, and open PR.
-- [ ] Final: Update Outcomes with artifact review criteria and v0.2.4
+- [x] Final: Update Outcomes with artifact review criteria and v0.2.4
       target55 rerun readiness.
+  - [x] Create fresh branch from `origin/main` after PR #71 merge.
+  - [x] Add final v0.2.4 workflow-contract review / release-readiness report.
+  - [x] Record target55 rerun readiness and artifact review criteria status.
+  - [x] Run final local release-readiness verification.
+  - [x] Commit, push, and open PR.
 
 ## PR Phases
 
@@ -1152,6 +1144,20 @@ Before tagging v0.2.4:
 - Artifact Review Criteria below recorded against the target55 run or marked
   blocked/deferred with reason
 
+Post-merge release gate checklist:
+
+- Cut v0.2.4 release binaries.
+- Verify `release-manifest.json` includes `adc-lab` and `adc-lab-target`.
+- Verify `SHA256SUMS`.
+- Install or select the controller release binary and verify its version.
+- Verify target55 `adc-lab`, `adc-lab-target`, and helper versions from the
+  release install path; keep controller and target versions separate if they
+  differ.
+- Run the smoke profile from release binaries.
+- Optionally run `target-characterization-full` with an explicit endpoint and
+  explicit duration/risk budget.
+- Package the archive and SHA-256 checksum for supervisor review.
+
 ## Artifact Review Criteria
 
 A v0.2.4 target55 artifact is successful only if it can answer:
@@ -1356,40 +1362,46 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   when `--out` targets a run `reports/` directory. Rationale: run-directory
   artifacts should preserve the no-claim-without-audit posture, while
   stdout-only or ad hoc offline checks should remain lightweight.
+- 2026-06-16: Treat release binary creation and target55 execution as
+  post-merge release gates, not as work inside the final readiness PR.
+  Rationale: this PR should not create unpublished release artifacts or run
+  target experiments from a branch binary; it records the exact readiness
+  criteria and generated workflow entrypoints to use after merge/release.
 
 ## Handoff
 
 Base branch:
-`origin/main` after PR #70 is merged (`dfaa5eb`).
+`origin/main` after PR #71 is merged (`1d46e84`).
 
 Current implementation branch:
-`codex/v024-pr8-constraints-self-check`.
+`codex/v024-final-readiness`.
 
 Status:
-PR #70 is merged. PR8 is open as draft PR #71 from fresh branch
-`codex/v024-pr8-constraints-self-check` based on merge commit `dfaa5eb`. The
-implementation adds `constraints self-check --out`, records the persisted
-`report.constraints_check` path in generated collect plans, and keeps generated
-constraints self-check semantics separate from downstream candidate-content
-checks. Focused tests and full `make verify` passed locally. GitHub CI is
-pending on the latest pushed head.
+PR #71 is merged. Final readiness is open as draft PR #72 from fresh branch
+`codex/v024-final-readiness` based on merge commit `1d46e84`. The branch records
+the v0.2.4 implementation series as complete, adds the final workflow-contract
+review / release-readiness report, and marks release binary creation plus
+target55 execution as post-merge release gates. Local final verification passed.
+GitHub CI is pending on the latest pushed head.
 
 Reviewed implementation commit:
-`c7fbe644da487a0b514f35c25f1e028998db49d1`.
+`1aab599864ffa9871a9555a532b767888f0a66ae`.
 
 Review-fix implementation commit:
 none.
 
 Latest pushed commit:
-this ExecPlan handoff update commit on PR #71.
+this ExecPlan handoff update commit on PR #72.
 
 Current PR:
-https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/71
+https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/72
 
 Next steps:
 1. Wait for GitHub CI.
 2. Address review comments if any.
-3. Mark PR #71 Ready for review when CI is green.
+3. Mark PR #72 Ready for review when CI is green.
+4. After merge, cut release artifacts and run target55 workflow-authority
+   rerun from release binaries.
 
 Required process:
 every implementation PR must include
@@ -1742,3 +1754,39 @@ PR 8 quality gate:
 - Required artifacts present: ExecPlan updated, PR8 workflow-contract review
   report added, implementation-economy audit recorded, focused constraints /
   collect-plan regressions and full verification green.
+
+Final readiness verification:
+
+- `cargo run -p adc-lab -- collect plan --help`: pass; current CLI exposes
+  `--goal`, `--profile-depth`, `--target`, `--target-id`, `--target-class`,
+  `--expected-governors`, `--network-endpoint`, `--run-dir`, `--out`, and
+  `--agent-instructions-out`.
+- `cargo run -p adc-lab -- workflow recommend --help`: pass; current CLI
+  exposes profile-aware workflow recommendation inputs.
+- Temporary target55 smoke collect-plan generation: pass
+  (`effective_profile=target-operating-contract-smoke`, `profile_depth=smoke`,
+  target-local guide present, workload demand present, constraints self-check
+  present, persisted constraints-check final artifact present).
+- Temporary target55 characterization-full collect-plan generation with a
+  sample endpoint: pass (`effective_profile=target-characterization-full`,
+  `profile_depth=characterization-full`, target-local guide present, workload
+  demand present, constraints self-check present, counter-only and
+  endpoint-backed network steps present).
+- `make verify`: pass (`file budgets: enforced checked=60 violations=0`; CLI
+  55 tests; safety invariant tests 10 + 19; schema ledger ok; docs artifact
+  heuristic guard ok; command smoke host fallback ok).
+- `make schemas-check`: pass (`schema ledger: ok top_level=0
+  no_schema_wire=31 maintained_by_hand=0`).
+- `make docs-smoke`: pass (`docs artifact heuristic guard: ok`).
+
+Final readiness quality gate:
+
+- Decision: submit.
+- Findings: 0 from final workflow-contract review report
+  `reports/workflow-contract-review/v024-final-release-readiness.md`.
+- Release readiness status: implementation PR series complete through PR8;
+  local gates green; final release binary, `SHA256SUMS`, release manifest, and
+  target55 runs are deliberately deferred to the post-merge release gate.
+- Artifact Review Criteria status: recorded and ready for the target55 run; any
+  unanswered criterion must be marked blocked/deferred with reason in the run
+  handoff rather than inferred from summaries.
