@@ -312,12 +312,23 @@ pub fn write_observation_artifact_v2(
     run_dir: &Path,
     result: ObservationResult,
 ) -> LabResult<String> {
+    write_observation_artifact_v2_with_label(store, run_dir, result, None)
+}
+
+pub fn write_observation_artifact_v2_with_label(
+    store: &mut EvidenceStore,
+    run_dir: &Path,
+    result: ObservationResult,
+    artifact_label: Option<&str>,
+) -> LabResult<String> {
     let artifact = observation_artifact_v2(run_id_from_run_dir(run_dir), result);
-    store.write(
-        run_dir,
-        Path::new("observations/observe.v2.json"),
-        &artifact,
-    )
+    let label = artifact_label.unwrap_or("observe");
+    let relative = format!(
+        "observations/{}.{}.v2.json",
+        safe_file_segment(label),
+        safe_file_segment(&artifact.id)
+    );
+    store.write(run_dir, Path::new(&relative), &artifact)
 }
 
 pub fn write_load_artifact_v2(

@@ -150,11 +150,14 @@ fn observe_step(
             duration,
             "--sample-interval",
             "1s",
+            "--artifact-label",
+            step_id,
             "--run-dir",
             run_dir,
             "--json",
         ],
         vec!["observation"],
+        vec![format!("{run_dir}/observations/{step_id}.*.v2.json")],
         "cpu_thermal_context_not_claim_producing",
         vec![GovernorValidity::Measured, GovernorValidity::Insufficient],
         vec![GovernorValidity::Refused, GovernorValidity::Unknown],
@@ -182,7 +185,7 @@ fn load_step(
         format!(
             "duration={duration}; workers={workers}; abort_temp_c={THERMAL_ABORT_C}C; cooldown_expectation={cooldown_expectation}"
         ),
-        "thermal abort threshold and operator abort handling bound this experiment".to_string(),
+        "thermal abort threshold, worker count, and duration bound this experiment".to_string(),
     ];
     let claim_gate = if duration == "300s" {
         notes.push(
@@ -214,6 +217,7 @@ fn load_step(
             "--json",
         ],
         vec!["load"],
+        Vec::new(),
         claim_gate,
         vec![GovernorValidity::Measured, GovernorValidity::Insufficient],
         vec![GovernorValidity::Refused, GovernorValidity::Contaminated],
@@ -228,6 +232,7 @@ fn step<S>(
     phase: &str,
     command_argv: Vec<S>,
     expected_artifact_kinds: Vec<&str>,
+    expected_artifact_paths_or_globs: Vec<String>,
     claim_gate: &str,
     continue_on: Vec<GovernorValidity>,
     stop_on: Vec<GovernorValidity>,
@@ -251,7 +256,7 @@ where
             .into_iter()
             .map(str::to_string)
             .collect(),
-        expected_artifact_paths_or_globs: Vec::new(),
+        expected_artifact_paths_or_globs,
         claim_gate: claim_gate.to_string(),
         continue_on,
         stop_on,

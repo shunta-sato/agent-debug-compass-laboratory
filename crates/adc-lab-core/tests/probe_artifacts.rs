@@ -1,10 +1,11 @@
 use adc_lab_core::{
     claim, create_or_open_run, evaluate_rules, write_composite_artifact_v2, write_load_artifact_v2,
-    write_observation_artifact_v2, write_pressure_artifact_v2, write_workload_artifact_v2,
-    Artifact, CompositeBoundaryResult, Decision, EvidenceRefResolutionKind, EvidenceStore, Kind,
-    LoadRestoreOnAbortStatus, LoadResult, LoadSafetyMonitorResult, ObservationResult, Pred,
-    PressurePayload, Rule, RunSetSourceRole, Signal, Status, WorkloadDataQuality, WorkloadDemand,
-    WorkloadDemandProfile, WorkloadDemandScope, WorkloadExecutionMode, WorkloadSystemContext,
+    write_observation_artifact_v2, write_observation_artifact_v2_with_label,
+    write_pressure_artifact_v2, write_workload_artifact_v2, Artifact, CompositeBoundaryResult,
+    Decision, EvidenceRefResolutionKind, EvidenceStore, Kind, LoadRestoreOnAbortStatus, LoadResult,
+    LoadSafetyMonitorResult, ObservationResult, Pred, PressurePayload, Rule, RunSetSourceRole,
+    Signal, Status, WorkloadDataQuality, WorkloadDemand, WorkloadDemandProfile,
+    WorkloadDemandScope, WorkloadExecutionMode, WorkloadSystemContext,
     WorkloadTargetConditionedResponse,
 };
 use std::{fs, path::Path};
@@ -156,6 +157,52 @@ fn load_v2_sidecars_keep_each_result_id() {
         .path()
         .join("load/cpu.LOAD-RESULT-002.v2.json")
         .exists());
+}
+
+#[test]
+fn observation_v2_sidecars_keep_each_artifact_label() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+
+    let baseline_ref = write_observation_artifact_v2_with_label(
+        &mut store,
+        temp.path(),
+        observation(),
+        Some("observe_baseline_60s"),
+    )
+    .unwrap();
+    let cooldown_ref = write_observation_artifact_v2_with_label(
+        &mut store,
+        temp.path(),
+        observation(),
+        Some("cooldown_after_sustained_load"),
+    )
+    .unwrap();
+
+    let reopened = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
+    assert_eq!(reopened.iter(Kind::Observation).count(), 2);
+    assert_ne!(baseline_ref, cooldown_ref);
+    assert_eq!(
+        reopened.resolve_evidence_ref(&baseline_ref).classification,
+        EvidenceRefResolutionKind::Resolvable
+    );
+    assert_eq!(
+        reopened.resolve_evidence_ref(&cooldown_ref).classification,
+        EvidenceRefResolutionKind::Resolvable
+    );
+
+    let observation_names = fs::read_dir(temp.path().join("observations"))
+        .unwrap()
+        .flatten()
+        .filter_map(|entry| entry.file_name().to_str().map(str::to_string))
+        .collect::<Vec<_>>();
+    assert!(observation_names
+        .iter()
+        .any(|name| name.starts_with("observe_baseline_60s.") && name.ends_with(".v2.json")));
+    assert!(observation_names.iter().any(|name| {
+        name.starts_with("cooldown_after_sustained_load.") && name.ends_with(".v2.json")
+    }));
+    assert!(!temp.path().join("observations/observe.v2.json").exists());
 }
 
 #[test]

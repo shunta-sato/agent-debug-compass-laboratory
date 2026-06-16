@@ -926,6 +926,27 @@ fn collect_plan_characterization_full_emits_cpu_thermal_steps() {
             < step_index(steps, "sustained_bounded_load_300s")
     );
 
+    let assert_observe_step = |step_id: &str, duration: &str| {
+        let step = step_by_id(steps, step_id);
+        let argv = step["command_argv"].as_array().unwrap();
+        assert_eq!(argv_values(argv, "--duration"), vec![duration.to_string()]);
+        assert_eq!(
+            argv_values(argv, "--artifact-label"),
+            vec![step_id.to_string()]
+        );
+        assert!(step["expected_artifact_paths_or_globs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|path| path
+                .as_str()
+                .is_some_and(|path| path.contains(&format!("observations/{step_id}.*.v2.json")))));
+    };
+    assert_observe_step("observe_baseline_60s", "60s");
+    assert_observe_step("observe_baseline_300s", "300s");
+    assert_observe_step("cooldown_after_ladder", "60s");
+    assert_observe_step("cooldown_after_sustained_load", "120s");
+
     let assert_load_step = |step_id: &str, workers: &str, duration: &str| {
         let step = step_by_id(steps, step_id);
         let argv = step["command_argv"].as_array().unwrap();
@@ -943,6 +964,20 @@ fn collect_plan_characterization_full_emits_cpu_thermal_steps() {
                     && note.contains("abort_temp_c=75C")
                     && note.contains("cooldown_expectation="))
             ));
+        assert!(step["validation_after_step"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|note| note.as_str().is_some_and(
+                |note| note.contains("thermal abort threshold, worker count, and duration")
+            )));
+        assert!(step["validation_after_step"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|note| note
+                .as_str()
+                .is_none_or(|note| !note.contains("operator abort handling"))));
     };
     assert_load_step("cpu_ladder_1_worker_60s", "1", "60s");
     assert_load_step("cpu_ladder_2_worker_60s", "2", "60s");
@@ -2000,6 +2035,46 @@ fn inventory_local_writes_artifact() {
         .stdout(contains("target_inventory.json"));
     assert!(temp.path().join("inventory/target_inventory.json").exists());
     assert!(temp.path().join("audit.jsonl").exists());
+}
+
+#[test]
+fn observe_artifact_label_preserves_repeated_v2_sidecars() {
+    let temp = tempfile::tempdir().unwrap();
+    for label in ["observe_baseline_60s", "cooldown_after_sustained_load"] {
+        Command::cargo_bin("adc-lab")
+            .unwrap()
+            .args([
+                "observe",
+                "--target",
+                "local",
+                "--duration",
+                "0ms",
+                "--sample-interval",
+                "1ms",
+                "--artifact-label",
+                label,
+                "--run-dir",
+                temp.path().to_str().unwrap(),
+                "--json",
+            ])
+            .assert()
+            .success()
+            .stdout(contains("observations/observe.json"));
+    }
+
+    assert!(temp.path().join("observations/observe.json").exists());
+    let observation_names = fs::read_dir(temp.path().join("observations"))
+        .unwrap()
+        .flatten()
+        .filter_map(|entry| entry.file_name().to_str().map(str::to_string))
+        .collect::<Vec<_>>();
+    assert!(observation_names
+        .iter()
+        .any(|name| name.starts_with("observe_baseline_60s.") && name.ends_with(".v2.json")));
+    assert!(observation_names.iter().any(|name| {
+        name.starts_with("cooldown_after_sustained_load.") && name.ends_with(".v2.json")
+    }));
+    assert!(!temp.path().join("observations/observe.v2.json").exists());
 }
 
 #[test]

@@ -25,20 +25,20 @@
 
 | Step | Execution location | argv | Required env | Expected artifact | Stop/continue |
 | --- | --- | --- | --- | --- | --- |
-| `observe_baseline_60s` | controller | `["adc-lab","observe","--target",target,"--duration","60s","--sample-interval","1s","--run-dir",run_dir,"--json"]` | installed controller `adc-lab`; target transport from `--target` | `observation` | continue on measured/insufficient; stop on refused/unknown |
-| `observe_baseline_300s` | controller | `["adc-lab","observe","--target",target,"--duration","300s","--sample-interval","1s","--run-dir",run_dir,"--json"]` | installed controller `adc-lab`; target transport from `--target` | `observation` | continue on measured/insufficient; stop on refused/unknown |
+| `observe_baseline_60s` | controller | `["adc-lab","observe","--target",target,"--duration","60s","--sample-interval","1s","--artifact-label","observe_baseline_60s","--run-dir",run_dir,"--json"]` | installed controller `adc-lab`; target transport from `--target` | `observations/observe_baseline_60s.*.v2.json` | continue on measured/insufficient; stop on refused/unknown |
+| `observe_baseline_300s` | controller | `["adc-lab","observe","--target",target,"--duration","300s","--sample-interval","1s","--artifact-label","observe_baseline_300s","--run-dir",run_dir,"--json"]` | installed controller `adc-lab`; target transport from `--target` | `observations/observe_baseline_300s.*.v2.json` | continue on measured/insufficient; stop on refused/unknown |
 | `cpu_ladder_1_worker_60s` | controller | `["adc-lab","load","cpu","--target",target,"--workers","1","--duration","60s","--abort-temp-c","75","--run-dir",run_dir,"--json"]` | load support and thermal surface when available | `load` | continue on measured/insufficient; stop on refused/contaminated |
 | `cpu_ladder_2_worker_60s` | controller | same as above with `--workers 2` | load support and thermal surface when available | `load` | continue on measured/insufficient; stop on refused/contaminated |
 | `cpu_ladder_4_worker_60s` | controller | same as above with `--workers 4` | load support and thermal surface when available | `load` | continue on measured/insufficient; stop on refused/contaminated |
-| repeatability/cooldown | controller | three `--workers 4 --duration 60s --abort-temp-c 75` load steps with 60s observe cooldowns | same as ladder | `load` / `observation` | contaminated load cannot feed downstream claims |
+| repeatability/cooldown | controller | three `--workers 4 --duration 60s --abort-temp-c 75` load steps with labeled 60s observe cooldowns | same as ladder | `load` / labeled `observation` sidecars | contaminated load cannot feed downstream claims |
 | `sustained_bounded_load_300s` | controller | `["adc-lab","load","cpu","--target",target,"--workers","4","--duration","300s","--abort-temp-c","75","--run-dir",run_dir,"--json"]` | load support and thermal abort | `load` | claim gate is `sustained_300s_not_24h_safety` |
-| `cooldown_after_sustained_load` | controller | `["adc-lab","observe","--target",target,"--duration","120s","--sample-interval","1s","--run-dir",run_dir,"--json"]` | installed controller `adc-lab`; target transport from `--target` | `observation` | cooldown context only |
+| `cooldown_after_sustained_load` | controller | `["adc-lab","observe","--target",target,"--duration","120s","--sample-interval","1s","--artifact-label","cooldown_after_sustained_load","--run-dir",run_dir,"--json"]` | installed controller `adc-lab`; target transport from `--target` | `observations/cooldown_after_sustained_load.*.v2.json` | cooldown context only |
 
 ## Producer/consumer consistency
 
 | Producer | Artifact | Consumer | Required identity match | Result |
 | --- | --- | --- | --- | --- |
-| CPU/thermal steps | `load`, `observation` artifacts in the planned run dir | `report validate-run`, `report operating-contract` | same `--run`, `target_id`, workflow profile | pass |
+| CPU/thermal steps | `load`, uniquely labeled `observation` artifacts in the planned run dir | `report validate-run`, `report operating-contract` | same `--run`, `target_id`, workflow profile | pass |
 | `collect plan` | `workflow.collect_plan` | `report validate-run --collect-plan` | explicit path generated in plan | pass |
 | `report validate-run` | `report.run_validation` | `report operating-contract --validation` | existing run-set/target/profile checks | unchanged/pass |
 | `constraints` | `report.constraints` and markdown | `constraints self-check` | explicit generated paths | unchanged/pass |
@@ -71,20 +71,20 @@
 - filename-order artifact selection: absent from generated instructions and tests.
 - mtime/latest/newest artifact inference: absent.
 - stale prompt fallback: unchanged prohibition from agent instructions.
-- raw co-presence as causal evidence: unchanged validation chain; CPU/thermal primitive artifacts do not bypass `report.run_validation`.
+- raw co-presence as causal evidence: unchanged validation chain; CPU/thermal primitive artifacts do not bypass `report.run_validation`; repeated observations are preserved as labeled sidecars instead of selected by latest file ordering.
 
 ## Claim Boundaries
 
 - Workflow authority artifacts: recommendation and collect plan remain not measurement evidence.
 - Validation artifacts: unchanged source-of-truth link before operating contract.
-- Measurement artifacts: CPU/thermal load/observation steps are bounded evidence only.
+- Measurement artifacts: CPU/thermal load/observation steps are bounded evidence only; repeated/cooldown observations are reviewable through `observations/<step_id>.<artifact_id>.v2.json`.
 - Blocked claims: `sustained_bounded_load_300s` carries `sustained_300s_not_24h_safety`; operating rules still require at least 900s plus thermal pressure effect before sustained thermal soak can even become provisional.
 
 ## Findings
 
 | ID | Severity | Finding | Required fix |
 | --- | --- | --- | --- |
-| none | n/a | No unresolved workflow-contract findings. | n/a |
+| none | n/a | PR #67 review blockers addressed: labeled observation sidecars preserve repeated/cooldown artifacts, and load notes no longer claim operator abort handling. | n/a |
 
 ## Decision
 

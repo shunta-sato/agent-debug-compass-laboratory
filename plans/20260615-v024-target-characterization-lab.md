@@ -629,6 +629,11 @@ Detailed acceptance criteria:
   - [x] Add PR4 workflow-contract review report.
   - [x] Run full verification.
   - [x] Commit, push, and open PR.
+  - [x] Address PR #67 review blocker: preserve repeated/cooldown observation
+        v2 artifacts with labeled unique sidecars.
+  - [x] Address PR #67 review blocker: align load safety note with actual argv
+        by removing the operator-abort claim.
+  - [x] Run review-fix verification.
 - [ ] PR 5: Pressure / composite / endpoint-backed network coverage.
 - [ ] PR 6: Suitability dimension linkage.
 - [ ] PR 7: Target-local executor ergonomics.
@@ -861,7 +866,8 @@ PR 4 implementation-economy budget:
 - Changed files target: 5 production/test/plan/report files plus this plan.
 - New modules target: 1 internal core module.
 - New helpers target: 3 local helper functions inside that module.
-- Public schema/API target: 0 new schema fields or public CLI flags.
+- Public schema/API target: 0 new schema fields; at most 1 optional
+  `observe --artifact-label` CLI flag for collect-plan artifact identity.
 - Line budget: keep `workflow.rs` under 1500; new module under 300; tests
   focused on A-020 through A-023.
 
@@ -871,12 +877,15 @@ PR 4 implementation-economy audit:
 |---|---|---|---|
 | `workflow_characterization.rs` | Keeps the long CPU/thermal step list out of `workflow.rs`, preserving the enforced file budget and avoiding a second public workflow layer. | keep | `check-file-budgets.py --enforce` passes with 0 violations; focused CLI tests assert the generated steps. |
 | `cpu_thermal_characterization_steps` | Provides one internal owner for PR4 CPU/thermal argv construction so smoke steps remain unchanged and PR5 pressure expansion has a clear boundary. | keep | `collect_plan_characterization_full_emits_cpu_thermal_steps` checks ordering, argv, duration/worker/abort/cooldown notes, and 300s-not-24h claim gate. |
+| `write_observation_artifact_v2_with_label` | Preserves repeated/cooldown observation sidecars without teaching filename-order selection; collect-plan steps pass their own labels. | keep | `observation_v2_sidecars_keep_each_artifact_label` verifies distinct resolvable refs and labeled paths. |
+| `observe --artifact-label` | Lets generated collect plans bind observation sidecar paths to step ids while keeping existing `observe` calls compatible. | keep | CLI characterization test asserts each observation step passes its step id and expected glob. |
 
 Budget note:
 
 `workflow.rs` remains the workflow authority entrypoint; the new module is
 private and only returns `WorkflowCollectPlanStep` values. No generated schema
-shape changed.
+shape changed. PR #67 review added one optional CLI flag and one sidecar writer
+helper to make repeated observation artifacts durable and reviewable.
 
 ### PR 5: Pressure / Composite / Endpoint-Backed Network Coverage
 
@@ -1114,10 +1123,16 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   `workflow_characterization.rs` rather than extending `workflow.rs` inline.
   Rationale: the explicit ladder/repeatability/cooldown sequence is long and
   would erode the 1500-line file budget in the workflow authority module.
-- 2026-06-16: Leave observation expected paths empty for the new repeated
-  observe steps. Rationale: the current observe command writes fixed
-  `observations/observe.json` and `observations/observe.v2.json`; PR4 should not
-  teach downstream Agents to infer multiple observations from filename order.
+- 2026-06-16: Add `observe --artifact-label` and write v2 observation sidecars
+  to `observations/<label>.<artifact_id>.v2.json` while keeping the v1
+  `observations/observe.json` latest output. Rationale: repeated/cooldown
+  observations must survive in the archive as reviewable artifacts, and the
+  generated collect plan must not rely on filename order or a single latest
+  path.
+- 2026-06-16: Do not add `--operator-abort-file` to PR4 CPU/thermal load steps.
+  Rationale: deterministic target-local abort paths would require another
+  controller/SSH path decision; PR4 already has explicit duration, worker count,
+  and thermal abort bounds.
 
 ## Handoff
 
@@ -1138,17 +1153,22 @@ step metadata explicitly state that 300s bounded evidence does not support 24h
 sustained safety and that the optional approved 900s profile remains disabled
 by default. PR5 pressure/network and PR6 suitability linkage remain deferred.
 Focused tests, file-budget enforcement, docs smoke, core workflow tests, and
-full `make verify` have passed locally. Draft PR #67 is open.
+full `make verify` passed locally before review. PR #67 review requested two
+blocking fixes; both are implemented and verified locally: labeled unique
+observation v2 sidecars, and corrected load safety notes. Draft PR #67 is open.
 
 Reviewed implementation commit:
 `8ef4c2bdf3f91b98fe974200a513d6aa2769fb9c`.
+
+Latest pushed commit:
+`3f52ef3233fb7e0d37771fbf18b5f387e29cce14`.
 
 Current PR:
 https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/67
 
 Next steps:
-1. Wait for PR #67 CI.
-2. Address review comments if any, then mark Ready for review.
+1. Commit and push the PR #67 review-fix commit.
+2. Request re-review after CI remains green.
 3. Continue to PR 5 after merge.
 
 Required process:
@@ -1332,3 +1352,29 @@ PR 4 quality gate:
 - Draft PR opened: #67
   (`https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/67`) at
   implementation head `8ef4c2bdf3f91b98fe974200a513d6aa2769fb9c`.
+
+PR #67 review-fix verification:
+
+- `cargo test -p adc-lab-core --test probe_artifacts observation_v2_sidecars_keep_each_artifact_label -- --nocapture`:
+  pass.
+- `cargo test -p adc-lab --test cli observe_artifact_label_preserves_repeated_v2_sidecars -- --nocapture`:
+  pass.
+- `cargo test -p adc-lab --test cli characterization_full -- --nocapture`:
+  pass (2 tests).
+- `cargo test -p adc-lab --test cli collect_plan_ -- --nocapture`: pass (3
+  tests).
+- `cargo test -p adc-lab-core --test workflow -- --nocapture`: pass (3 tests).
+- `python3 scripts/ci/check-file-budgets.py --enforce`: pass (`file budgets:
+  enforced checked=58 violations=0`).
+- `make docs-smoke`: pass (`docs artifact heuristic guard: ok`).
+- `make verify`: pass (`file budgets: enforced checked=58 violations=0`; CLI
+  53 tests; probe artifact tests 6; docs artifact heuristic guard ok; command
+  smoke host fallback ok).
+
+PR #67 review-fix quality gate:
+
+- Decision: submit.
+- Findings addressed: repeated/cooldown observations now write labeled unique
+  v2 sidecars, collect-plan observation steps include `--artifact-label` and
+  expected globs, and load safety notes only claim duration/worker/thermal
+  bounds actually present in argv.

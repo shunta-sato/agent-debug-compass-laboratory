@@ -573,6 +573,8 @@ pub fn target_operating_contract_collect_plan(
                 "30s",
                 "--sample-interval",
                 "1s",
+                "--artifact-label",
+                "observe_baseline",
                 "--run-dir",
                 &input.planned_run_dir,
                 "--json",
@@ -584,7 +586,7 @@ pub fn target_operating_contract_collect_plan(
             vec!["observation"],
             vec![
                 format!("{}/observations/observe.json", input.planned_run_dir),
-                format!("{}/observations/observe.v2.json", input.planned_run_dir),
+                format!("{}/observations/observe_baseline.*.v2.json", input.planned_run_dir),
             ],
             "baseline_observation_required",
             vec![GovernorValidity::Measured, GovernorValidity::Insufficient],

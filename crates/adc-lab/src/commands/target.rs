@@ -64,7 +64,12 @@ pub(crate) fn command_observe(args: ObserveCommand) -> Result<()> {
     let path = run.run_dir.join("observations/observe.json");
     write_json_artifact(&run, &path, &observation)?;
     let mut store = evidence_store_for_run(&run)?;
-    write_observation_artifact_v2(&mut store, &run.run_dir, observation.clone())?;
+    write_observation_artifact_v2_with_label(
+        &mut store,
+        &run.run_dir,
+        observation.clone(),
+        args.artifact_label.as_deref(),
+    )?;
     append_audit_event(
         &run,
         AuditInput {
