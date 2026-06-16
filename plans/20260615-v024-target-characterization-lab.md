@@ -667,7 +667,7 @@ Detailed acceptance criteria:
   - [x] Move suitability tests to an integration test to preserve file budgets.
   - [x] Add PR6 workflow-contract review report.
   - [x] Run full verification.
-  - [ ] Commit, push, and open PR.
+  - [x] Commit, push, and open PR.
 - [ ] PR 7: Target-local executor ergonomics.
 - [ ] PR 8: Constraints self-check persistence and docs.
 - [ ] Final: Update Outcomes with artifact review criteria and v0.2.4
@@ -1287,20 +1287,23 @@ marginal without network thresholds; counter-only network evidence and missing
 required latency remain unknown and block `selection_ready`. The resource
 sufficiency matrix is in `crates/adc-lab-core/tests/suitability.rs`, and
 production `suitability.rs` is back under the enforced file budget. Focused
-tests and full `make verify` passed locally.
+tests and full `make verify` passed locally. Draft PR #69 is open; CI should be
+checked on the latest pushed head before Ready for review.
 
 Reviewed implementation commit:
-pending.
+`9831b1b0de478efbaa00049d7465400ced4b113e`.
 
 Latest pushed commit:
-pending.
+this status-only ExecPlan handoff update commit on
+`codex/v024-pr6-suitability-linkage`.
 
 Current PR:
-pending.
+https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/69
 
 Next steps:
-1. Commit, push, and open draft PR.
+1. Wait for PR #69 CI on the latest pushed head.
 2. Request review after CI is green.
+3. Merge after review approval and CI success.
 
 Required process:
 every implementation PR must include
@@ -1588,3 +1591,6 @@ PR 6 quality gate:
 - Required artifacts present: ExecPlan updated, PR6 workflow-contract review
   report added, implementation-economy audit recorded, focused resource
   sufficiency regressions and full verification green.
+- Draft PR opened: #69
+  (`https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/69`) at
+  reviewed implementation head `9831b1b0de478efbaa00049d7465400ced4b113e`.
