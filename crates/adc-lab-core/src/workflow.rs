@@ -3,6 +3,7 @@ use crate::contracts::BuildInfo;
 use crate::evidence::{Artifact, DataQuality, DataQualityLevel, Kind, Status};
 use crate::ids::{new_id, now_unix_ms};
 use crate::run_validation::GovernorValidity;
+use crate::workflow_characterization::cpu_thermal_characterization_steps;
 use crate::workflow_profile::{resolve_workflow_profile, supported_validation_profile};
 pub use crate::workflow_profile::{
     WorkflowProfileDepth, WORKFLOW_PROFILE_CHARACTERIZATION_FULL,
@@ -272,12 +273,6 @@ pub fn target_operating_contract_collect_plan(
     input: WorkflowCollectPlanInput,
 ) -> LabResult<Artifact<WorkflowCollectPlanPayload>> {
     let profile = resolve_workflow_profile(&input.goal, input.profile_depth)?;
-    if profile.depth == WorkflowProfileDepth::CharacterizationFull {
-        return Err(LabError::Validation(
-            "target-characterization-full collect plan is not implemented until PR 4/5/6; use target-operating-contract-smoke for executable handoff now"
-                .to_string(),
-        ));
-    }
     let target_spec = TargetSpec::parse(&input.target)?;
     let target_is_ssh = matches!(target_spec.transport, TargetTransport::Ssh);
     let governors = if input.expected_governors.is_empty() {
@@ -519,7 +514,10 @@ pub fn target_operating_contract_collect_plan(
             false,
             false,
             vec!["lab.target_inventory.v1"],
-            vec![format!("{}/inventory/target_inventory.json", input.planned_run_dir)],
+            vec![format!(
+                "{}/inventory/target_inventory.json",
+                input.planned_run_dir
+            )],
             "read_only_inventory_required",
             vec![GovernorValidity::Measured, GovernorValidity::Insufficient],
             vec![GovernorValidity::Refused, GovernorValidity::Unknown],
@@ -554,6 +552,15 @@ pub fn target_operating_contract_collect_plan(
             vec!["tool availability claims require this read-only artifact".to_string()],
             "Collect read-only toolchain inventory before workload or pressure claims.",
         ),
+    ];
+
+    if profile.depth == WorkflowProfileDepth::CharacterizationFull {
+        steps.extend(cpu_thermal_characterization_steps(
+            &input.target,
+            &input.planned_run_dir,
+        ));
+    } else {
+        steps.extend(vec![
         collect_step(
             "observe_baseline",
             "read_only",
@@ -566,6 +573,8 @@ pub fn target_operating_contract_collect_plan(
                 "30s",
                 "--sample-interval",
                 "1s",
+                "--artifact-label",
+                "observe_baseline",
                 "--run-dir",
                 &input.planned_run_dir,
                 "--json",
@@ -577,7 +586,7 @@ pub fn target_operating_contract_collect_plan(
             vec!["observation"],
             vec![
                 format!("{}/observations/observe.json", input.planned_run_dir),
-                format!("{}/observations/observe.v2.json", input.planned_run_dir),
+                format!("{}/observations/observe_baseline.*.v2.json", input.planned_run_dir),
             ],
             "baseline_observation_required",
             vec![GovernorValidity::Measured, GovernorValidity::Insufficient],
@@ -616,6 +625,10 @@ pub fn target_operating_contract_collect_plan(
             ],
             "Run a bounded CPU load seed so full-set coverage includes load evidence.",
         ),
+        ]);
+    }
+
+    steps.extend(vec![
         collect_step(
             "pressure_probe_set",
             "pressure",
@@ -645,7 +658,7 @@ pub fn target_operating_contract_collect_plan(
             vec![GovernorValidity::Measured, GovernorValidity::Insufficient],
             vec![GovernorValidity::Refused, GovernorValidity::Contaminated],
             vec!["run additional pressure kinds only through typed plan revisions".to_string()],
-            "Run the first bounded pressure probe in the full-set coverage map.",
+            "Run the first bounded pressure probe; PR5 expands pressure coverage.",
         ),
         collect_step(
             "composite_probe",
@@ -1038,7 +1051,7 @@ pub fn target_operating_contract_collect_plan(
             vec!["record checksum stdout in the handoff notes".to_string()],
             "Create a checksum for the handoff archive; stdout is the handoff record.",
         ),
-    ];
+    ]);
 
     if target_is_ssh {
         let workload_insert_index = steps

@@ -123,6 +123,8 @@ struct ObserveCommand {
     #[arg(long, value_delimiter = ',')]
     signals: Vec<Signal>,
     #[arg(long)]
+    artifact_label: Option<String>,
+    #[arg(long)]
     run_dir: Option<PathBuf>,
     #[arg(long)]
     json: bool,

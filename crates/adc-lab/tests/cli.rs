@@ -801,7 +801,7 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
 }
 
 #[test]
-fn workflow_recommend_characterization_full_declares_planned_depth_boundary() {
+fn workflow_recommend_characterization_full_declares_cpu_thermal_slice_boundary() {
     let output = Command::cargo_bin("adc-lab")
         .unwrap()
         .args([
@@ -830,19 +830,27 @@ fn workflow_recommend_characterization_full_declares_planned_depth_boundary() {
     assert!(value["payload"]["profile_summary"]
         .as_str()
         .unwrap()
-        .contains("planned bounded deeper target characterization"));
+        .contains("CPU/thermal characterization slice"));
     assert!(value["payload"]["profile_summary"]
         .as_str()
         .unwrap()
-        .contains("fail-closed until PR 4/5/6"));
+        .contains("300s-not-24h"));
     assert!(value["payload"]["claim_boundary"]
         .as_str()
         .unwrap()
-        .contains("does not claim deep coverage"));
+        .contains("not production, 24h safety"));
+    assert!(value["payload"]["coverage"]
+        .as_str()
+        .unwrap()
+        .contains("1/2/4 worker 60s CPU ladder"));
+    assert!(value["payload"]["safety_caps"]
+        .as_str()
+        .unwrap()
+        .contains("optional approved 900s profile disabled by default"));
 }
 
 #[test]
-fn collect_plan_characterization_full_fails_closed_until_profile_steps_exist() {
+fn collect_plan_characterization_full_emits_cpu_thermal_steps() {
     let temp = tempfile::tempdir().unwrap();
     let run_dir = temp.path().join("run");
     let out = run_dir.join("workflows/collect_plan.v2.json");
@@ -869,11 +877,175 @@ fn collect_plan_characterization_full_fails_closed_until_profile_steps_exist() {
             "--json",
         ])
         .assert()
-        .failure()
-        .stderr(contains(
-            "target-characterization-full collect plan is not implemented until PR 4/5/6",
-        ))
-        .stderr(contains("target-operating-contract-smoke"));
+        .success();
+
+    let plan: Artifact<serde_json::Value> =
+        serde_json::from_slice(&fs::read(&out).unwrap()).unwrap();
+    assert_eq!(
+        plan.payload["effective_profile"],
+        "target-characterization-full"
+    );
+    assert_eq!(plan.payload["profile_depth"], "characterization-full");
+    assert!(plan.payload["coverage"]
+        .as_str()
+        .unwrap()
+        .contains("4-worker 300s sustained bounded load"));
+    assert!(plan.payload["claim_boundary"]
+        .as_str()
+        .unwrap()
+        .contains("not production, 24h safety"));
+
+    let steps = plan.payload["steps"].as_array().unwrap();
+    for step_id in [
+        "observe_baseline_60s",
+        "observe_baseline_300s",
+        "cpu_ladder_1_worker_60s",
+        "cpu_ladder_2_worker_60s",
+        "cpu_ladder_4_worker_60s",
+        "cooldown_after_ladder",
+        "cpu_repeatability_4_worker_1",
+        "cooldown_after_repeatability_1",
+        "cpu_repeatability_4_worker_2",
+        "cooldown_after_repeatability_2",
+        "cpu_repeatability_4_worker_3",
+        "cooldown_before_sustained_bounded_load",
+        "sustained_bounded_load_300s",
+        "cooldown_after_sustained_load",
+    ] {
+        step_by_id(steps, step_id);
+    }
+    assert!(
+        step_index(steps, "observe_baseline_60s") < step_index(steps, "cpu_ladder_1_worker_60s")
+    );
+    assert!(
+        step_index(steps, "cpu_ladder_4_worker_60s")
+            < step_index(steps, "cpu_repeatability_4_worker_1")
+    );
+    assert!(
+        step_index(steps, "cpu_repeatability_4_worker_3")
+            < step_index(steps, "sustained_bounded_load_300s")
+    );
+
+    let assert_observe_step = |step_id: &str, duration: &str| {
+        let step = step_by_id(steps, step_id);
+        let argv = step["command_argv"].as_array().unwrap();
+        assert_eq!(argv_values(argv, "--duration"), vec![duration.to_string()]);
+        assert_eq!(
+            argv_values(argv, "--artifact-label"),
+            vec![step_id.to_string()]
+        );
+        assert!(step["expected_artifact_paths_or_globs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|path| path
+                .as_str()
+                .is_some_and(|path| path.contains(&format!("observations/{step_id}.*.v2.json")))));
+    };
+    assert_observe_step("observe_baseline_60s", "60s");
+    assert_observe_step("observe_baseline_300s", "300s");
+    assert_observe_step("cooldown_after_ladder", "60s");
+    assert_observe_step("cooldown_after_sustained_load", "120s");
+
+    let assert_load_step = |step_id: &str, workers: &str, duration: &str| {
+        let step = step_by_id(steps, step_id);
+        let argv = step["command_argv"].as_array().unwrap();
+        assert_eq!(argv_values(argv, "--workers"), vec![workers.to_string()]);
+        assert_eq!(argv_values(argv, "--duration"), vec![duration.to_string()]);
+        assert_eq!(argv_values(argv, "--abort-temp-c"), vec!["75".to_string()]);
+        assert!(argv.iter().any(|arg| arg.as_str() == Some("load")));
+        assert!(step["validation_after_step"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(
+                |note| note.as_str().is_some_and(|note| note.contains("duration=")
+                    && note.contains("workers=")
+                    && note.contains("abort_temp_c=75C")
+                    && note.contains("cooldown_expectation="))
+            ));
+        assert!(step["validation_after_step"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|note| note.as_str().is_some_and(
+                |note| note.contains("thermal abort threshold, worker count, and duration")
+            )));
+        assert!(step["validation_after_step"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|note| note
+                .as_str()
+                .is_none_or(|note| !note.contains("operator abort handling"))));
+    };
+    assert_load_step("cpu_ladder_1_worker_60s", "1", "60s");
+    assert_load_step("cpu_ladder_2_worker_60s", "2", "60s");
+    assert_load_step("cpu_ladder_4_worker_60s", "4", "60s");
+    assert_load_step("cpu_repeatability_4_worker_1", "4", "60s");
+    assert_load_step("cpu_repeatability_4_worker_2", "4", "60s");
+    assert_load_step("cpu_repeatability_4_worker_3", "4", "60s");
+    assert_load_step("sustained_bounded_load_300s", "4", "300s");
+
+    let sustained_step = step_by_id(steps, "sustained_bounded_load_300s");
+    assert_eq!(
+        sustained_step["claim_gate"],
+        "sustained_300s_not_24h_safety"
+    );
+    assert!(sustained_step["validation_after_step"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|note| note
+            .as_str()
+            .is_some_and(|note| note.contains("does not support 24h"))));
+    assert!(sustained_step["validation_after_step"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|note| note
+            .as_str()
+            .is_some_and(|note| note.contains("900s profile remains disabled"))));
+
+    let cooldown_step = step_by_id(steps, "cooldown_after_sustained_load");
+    assert_eq!(
+        argv_values(
+            cooldown_step["command_argv"].as_array().unwrap(),
+            "--duration"
+        ),
+        vec!["120s".to_string()]
+    );
+    assert!(cooldown_step["validation_after_step"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|note| note
+            .as_str()
+            .is_some_and(|note| note.contains("cooldown_expectation"))));
+
+    let instructions = fs::read_to_string(instructions_out).unwrap();
+    assert!(instructions.contains("effective_profile: `target-characterization-full`"));
+    assert!(instructions.contains("sustained_bounded_load_300s"));
+    assert!(instructions.contains("does not support 24h"));
+    assert!(instructions.contains("optional approved 900s profile disabled by default"));
+    for forbidden in [
+        "PLAN-*.json",
+        "APPROVAL-*.json",
+        "LEASE-*.json",
+        "tail -n 1",
+        "ls -t",
+        "find ",
+        "mtime",
+        "newest",
+        "latest plan",
+        "latest approval",
+        "latest lease",
+    ] {
+        assert!(
+            !instructions.contains(forbidden),
+            "collect instructions must not contain {forbidden}"
+        );
+    }
 }
 
 #[test]
@@ -1863,6 +2035,46 @@ fn inventory_local_writes_artifact() {
         .stdout(contains("target_inventory.json"));
     assert!(temp.path().join("inventory/target_inventory.json").exists());
     assert!(temp.path().join("audit.jsonl").exists());
+}
+
+#[test]
+fn observe_artifact_label_preserves_repeated_v2_sidecars() {
+    let temp = tempfile::tempdir().unwrap();
+    for label in ["observe_baseline_60s", "cooldown_after_sustained_load"] {
+        Command::cargo_bin("adc-lab")
+            .unwrap()
+            .args([
+                "observe",
+                "--target",
+                "local",
+                "--duration",
+                "0ms",
+                "--sample-interval",
+                "1ms",
+                "--artifact-label",
+                label,
+                "--run-dir",
+                temp.path().to_str().unwrap(),
+                "--json",
+            ])
+            .assert()
+            .success()
+            .stdout(contains("observations/observe.json"));
+    }
+
+    assert!(temp.path().join("observations/observe.json").exists());
+    let observation_names = fs::read_dir(temp.path().join("observations"))
+        .unwrap()
+        .flatten()
+        .filter_map(|entry| entry.file_name().to_str().map(str::to_string))
+        .collect::<Vec<_>>();
+    assert!(observation_names
+        .iter()
+        .any(|name| name.starts_with("observe_baseline_60s.") && name.ends_with(".v2.json")));
+    assert!(observation_names.iter().any(|name| {
+        name.starts_with("cooldown_after_sustained_load.") && name.ends_with(".v2.json")
+    }));
+    assert!(!temp.path().join("observations/observe.v2.json").exists());
 }
 
 #[test]

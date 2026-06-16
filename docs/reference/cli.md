@@ -20,6 +20,7 @@ an operator-facing path; the stable contract is the envelope `kind`.
 | `decide suitability --out ...` | `reports/suitability.v2.json` | `report.suitability` |
 | `constraints generate --out ...` | `reports/constraints.v2.json` | `report.constraints` |
 | `constraints check-candidate --json`, `constraints self-check --json` | stdout | `report.constraints_check` |
+| `observe` v2 sidecar | `observations/<artifact-label-or-observe>.<artifact_id>.v2.json` | `observation` |
 | `load cpu` | `load/cpu.<result_id>.v2.json` | `load` |
 | `pressure run` | `pressure/<kind>.<result_id>.v2.json` | `pressure` |
 | `pressure composite` | `composite/<scenario>.<result_id>.v2.json` | `composite` |
