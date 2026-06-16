@@ -126,9 +126,9 @@ fn profile_for_depth(requested_profile: String, depth: WorkflowProfileDepth) -> 
             requested_profile,
             effective_profile: WORKFLOW_PROFILE_CHARACTERIZATION_FULL.to_string(),
             depth,
-            summary: "characterization-full profile: CPU/thermal characterization slice with explicit duration, worker, thermal abort, cooldown, and 300s-not-24h boundaries; pressure/network/suitability expansion remains staged for later v0.2.4 PRs",
-            claim_boundary: "characterization-full collect plans are not production, 24h safety, battery safety, target selection, or real workload performance evidence; PR4 CPU/thermal evidence does not claim pressure/network/storage suitability coverage",
-            coverage: "coverage in PR4: 60s and 300s passive observations, 1/2/4 worker 60s CPU ladder, three 4-worker 60s repeatability trials with cooldown, 4-worker 300s sustained bounded load, cooldown observation, default 75C thermal abort; pressure/composite and endpoint-backed network remain PR5",
+            summary: "characterization-full profile: CPU/thermal characterization plus pressure/composite coverage with explicit duration, worker, thermal abort, cooldown, network endpoint, and 300s-not-24h boundaries; suitability linkage remains staged for later v0.2.4 PRs",
+            claim_boundary: "characterization-full collect plans are not production, 24h safety, battery safety, target selection, or real workload performance evidence; pressure presence alone does not prove coupling, and counter-only network evidence does not prove bounded transfer",
+            coverage: "coverage in PR5: 60s and 300s passive observations, 1/2/4 worker 60s CPU ladder, three 4-worker 60s repeatability trials with cooldown, 4-worker 300s sustained bounded load, cooldown observation, bounded pressure map for latency_jitter/observer_pressure/memory_pressure/storage_io/cpu_pressure/thermal_pressure/network_io, endpoint-backed network transfer when --network-endpoint is supplied, and memory_storage_jitter composite probe",
             safety_caps: "safety caps: 75C thermal abort by default, explicit durations and worker counts, cooldown observations, approval-bound governor control, restore validation, no arbitrary root shell; optional approved 900s profile disabled by default",
         },
     }

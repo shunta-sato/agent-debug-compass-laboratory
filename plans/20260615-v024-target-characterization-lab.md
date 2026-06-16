@@ -615,7 +615,7 @@ Detailed acceptance criteria:
   - [x] Add PR3 workflow-contract review report.
   - [x] Run full verification.
   - [x] Commit, push, and open PR.
-- [ ] PR 4: Deep CPU / thermal characterization profile.
+- [x] PR 4: Deep CPU / thermal characterization profile.
   - [x] Create fresh branch from `origin/main` after PR #66 merge.
   - [x] Replace characterization-full collect-plan fail-closed behavior with
         CPU/thermal argv steps only.
@@ -634,7 +634,26 @@ Detailed acceptance criteria:
   - [x] Address PR #67 review blocker: align load safety note with actual argv
         by removing the operator-abort claim.
   - [x] Run review-fix verification.
+  - [x] Merge PR #67.
 - [ ] PR 5: Pressure / composite / endpoint-backed network coverage.
+  - [x] Create fresh branch from `origin/main` after PR #67 merge.
+  - [x] Inspect existing pressure/composite CLI and operating-contract rules.
+  - [x] Add characterization-full pressure coverage map steps.
+  - [x] Separate counter-only `network_io` from optional endpoint-backed transfer
+        in collect-plan argv.
+  - [x] Preserve composite coupling claim boundary in generated step metadata.
+  - [x] Add focused CLI regression tests for A-030 through A-033.
+  - [x] Add PR5 workflow-contract review report.
+  - [x] Run focused tests and full verification.
+  - [x] Commit, push, and open PR.
+  - [x] Address PR #68 review blocker: add `not_applicable` to pressure and
+        composite characterization continuation rules.
+  - [x] Address PR #68 review blocker: update workflow-contract review decision
+        from `submit pending verification` to `submit`.
+  - [x] Render collect-plan `continue_on` / `stop_on` in generated markdown
+        instructions so `not_applicable` is visible in the handoff.
+  - [x] Run review-fix verification.
+  - [x] Commit and push PR #68 review-fix commit.
 - [ ] PR 6: Suitability dimension linkage.
 - [ ] PR 7: Target-local executor ergonomics.
 - [ ] PR 8: Constraints self-check persistence and docs.
@@ -899,6 +918,46 @@ Acceptance:
 
 - A-030 through A-033.
 
+PR 5 dev-workflow route:
+
+- Risk: normal Agent-facing workflow-contract change. It changes generated
+  collect-plan argv and adds one optional collect-plan CLI input for existing
+  pressure `--network-endpoint` support, but does not add a new executor,
+  privileged operation, pressure primitive, or claim relaxation.
+- Triggered branches: execution-plan update, implementation-economy,
+  agent-workflow-contract-review, focused CLI workflow tests, rules regression
+  confirmation, file-budget enforcement, full `make verify`.
+- Non-triggered branches: no concurrency, no UI, no arbitrary remote command,
+  no target-local daemon/hot path.
+
+PR 5 implementation-economy budget:
+
+- Changed production files target: 5 or fewer, plus tests, docs, plan, and
+  workflow-contract review report.
+- New modules target: 1 internal core module.
+- New helpers target: bounded to the module-local step builders needed to keep
+  `workflow.rs` under 1500 lines.
+- Public schema/API target: no new artifact schema fields; one optional
+  `collect plan --network-endpoint` flag to feed existing `pressure run
+  --network-endpoint`.
+- Line budget: keep `workflow.rs` under 1500; new module under 300; tests focus
+  on A-030 through A-033.
+
+PR 5 implementation-economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `workflow_pressure.rs` | Keeps the pressure/composite coverage map out of `workflow.rs`, preserving the workflow authority file budget and avoiding another public workflow layer. | keep | Focused CLI tests assert characterization-full pressure step ids, argv, expected artifact globs, network separation, and composite claim gate. |
+| `pressure_composite_characterization_steps` | Provides one internal owner for pressure/composite argv construction so smoke steps remain unchanged and PR6 suitability linkage has a stable boundary. | keep | `collect_plan_characterization_full_emits_cpu_thermal_steps` now covers pressure map ordering and claim-boundary metadata. |
+| `collect plan --network-endpoint` | Lets the workflow authority generate endpoint-backed transfer argv only when an explicit receiver is configured, instead of teaching Agents to hand-write network probe steps. | keep | CLI endpoint regression asserts counter-only and endpoint-backed `network_io` steps remain distinct. |
+
+Budget note:
+
+`pressure run` and `pressure composite` already own the measurement primitives and
+artifact schemas. PR5 only routes existing typed commands into
+`target-characterization-full` collect plans and keeps network counter-only
+evidence separate from endpoint-backed bounded transfer evidence.
+
 ### PR 6: Suitability Dimension Linkage
 
 Scope:
@@ -1133,43 +1192,55 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   Rationale: deterministic target-local abort paths would require another
   controller/SSH path decision; PR4 already has explicit duration, worker count,
   and thermal abort bounds.
+- 2026-06-16: Implement PR5 pressure/composite coverage as generated collect-plan
+  argv over existing `pressure run` / `pressure composite` commands, not new
+  pressure primitives. Rationale: the missing v0.2.4 behavior is workflow
+  authority coverage, while pressure artifacts and conservative rules already
+  distinguish measured, insufficient, not_applicable, endpoint-backed network,
+  and composite coupling states.
+- 2026-06-16: Add optional `collect plan --network-endpoint` only for
+  characterization-full endpoint-backed network steps. Rationale: counter-only
+  `network_io` must remain executable without a receiver, and bounded transfer
+  claims require an explicit endpoint instead of inferred rx/tx deltas.
 
 ## Handoff
 
 Base branch:
-`origin/main` after PR #66 is merged (`3581da4d28ad`).
+`origin/main` after PR #67 is merged (`579766000b8d`).
 
 Current implementation branch:
-`codex/v024-pr4-deep-cpu-thermal`.
+`codex/v024-pr5-pressure-network`.
 
 Status:
-PR #66 is merged. PR 4 implementation is in progress on a fresh branch from
-merge commit `3581da4d28ad`. The current implementation makes
-`target-characterization-full` collect-plan generation executable for the
-CPU/thermal slice only: 60s and 300s observations, 1/2/4 worker 60s CPU ladder,
-three 4-worker 60s repeatability trials with cooldown observations, a 4-worker
-300s sustained bounded load, and final cooldown. Profile text and generated
-step metadata explicitly state that 300s bounded evidence does not support 24h
-sustained safety and that the optional approved 900s profile remains disabled
-by default. PR5 pressure/network and PR6 suitability linkage remain deferred.
-Focused tests, file-budget enforcement, docs smoke, core workflow tests, and
-full `make verify` passed locally before review. PR #67 review requested two
-blocking fixes; both are implemented and verified locally: labeled unique
-observation v2 sidecars, and corrected load safety notes. Draft PR #67 is open.
+PR #67 is merged. PR5 implementation is on a fresh branch from merge commit
+`579766000b8d`. The current implementation extends
+`target-characterization-full` collect-plan generation from the PR4 CPU/thermal
+slice into pressure/composite coverage: latency/jitter, observer pressure,
+memory pressure, storage I/O, CPU pressure, thermal pressure, counter-only
+network I/O, optional endpoint-backed network transfer when
+`--network-endpoint` is supplied, and memory/storage/jitter composite probing.
+The generated step metadata keeps counter-only network evidence separate from
+bounded transfer evidence and keeps coupling claims blocked unless composite
+evidence is measured. Focused tests, schema/docs/file-budget checks, and full
+`make verify` passed locally. PR #68 review requested two small fixes; both are
+addressed: pressure/composite steps now preserve `not_applicable`, generated
+markdown renders `continue_on` / `stop_on`, and the workflow-contract review
+decision is `submit`. Review-fix verification passed locally. Draft PR #68 is
+open.
 
 Reviewed implementation commit:
-`8ef4c2bdf3f91b98fe974200a513d6aa2769fb9c`.
+`4d667f77faf3922aee94802f6163dd65fede3b2b`.
 
 Latest pushed commit:
-`3f52ef3233fb7e0d37771fbf18b5f387e29cce14`.
+this PR #68 review-fix commit on `codex/v024-pr5-pressure-network`.
 
 Current PR:
-https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/67
+https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/68
 
 Next steps:
-1. Commit and push the PR #67 review-fix commit.
-2. Request re-review after CI remains green.
-3. Continue to PR 5 after merge.
+1. Wait for PR #68 CI on the review-fix commit.
+2. Request re-review.
+3. Merge after review approval and CI success.
 
 Required process:
 every implementation PR must include
@@ -1378,3 +1449,57 @@ PR #67 review-fix quality gate:
   v2 sidecars, collect-plan observation steps include `--artifact-label` and
   expected globs, and load safety notes only claim duration/worker/thermal
   bounds actually present in argv.
+
+PR 5 focused verification:
+
+- `cargo test -p adc-lab --test cli collect_plan_characterization_full -- --nocapture`:
+  pass (2 tests).
+- `cargo test -p adc-lab-core --test rules_engine -- --nocapture`: pass (14 tests).
+- `cargo test -p adc-lab-core --test workflow -- --nocapture`: pass (3 tests).
+- `python3 scripts/ci/check-file-budgets.py --enforce`: pass (`file budgets:
+  enforced checked=59 violations=0`; `workflow.rs` 1391/1500;
+  `workflow_pressure.rs` 273 lines).
+- `make docs-smoke`: pass (`docs artifact heuristic guard: ok`).
+- `make schemas-check`: pass (`schema ledger: ok top_level=0 no_schema_wire=31
+  maintained_by_hand=0`).
+- First `make verify`: failed at clippy for useless `Into::into` conversion in
+  `workflow_pressure.rs`; fixed by passing the `Vec<String>` directly.
+- `cargo fmt --all --check`: pass after the clippy fix.
+- `git diff --check`: pass.
+- `make verify`: pass (`file budgets: enforced checked=59 violations=0`; CLI
+  54 tests; safety invariant tests 9 + 19; schema ledger ok; docs artifact
+  heuristic guard ok; command smoke host fallback ok).
+
+PR 5 quality gate:
+
+- Decision: submit.
+- Findings: 0 from workflow-contract review report
+  `reports/workflow-contract-review/v024-pr5-pressure-network.md`.
+- Required artifacts present: ExecPlan updated, PR5 workflow-contract review
+  report added, implementation-economy audit recorded, focused regression tests
+  and full verification green.
+
+PR #68 review-fix verification:
+
+- `cargo fmt --all --check`: pass.
+- First `cargo test -p adc-lab --test cli collect_plan_characterization_full -- --nocapture`:
+  failed because generated markdown did not render `not_applicable`; fixed by
+  rendering each step's `continue_on` and `stop_on` lists.
+- `cargo test -p adc-lab --test cli collect_plan_characterization_full -- --nocapture`:
+  pass (2 tests).
+- `python3 scripts/ci/check-file-budgets.py --enforce`: pass (`file budgets:
+  enforced checked=59 violations=0`).
+- `make docs-smoke`: pass (`docs artifact heuristic guard: ok`).
+- `cargo test -p adc-lab-core --test workflow -- --nocapture`: pass (3 tests).
+- `cargo test -p adc-lab-core --test rules_engine -- --nocapture`: pass (14 tests).
+- `git diff --check`: pass.
+- `make verify`: pass (`file budgets: enforced checked=59 violations=0`; CLI
+  54 tests; safety invariant tests 9 + 19; schema ledger ok; docs artifact
+  heuristic guard ok; command smoke host fallback ok).
+
+PR #68 review-fix quality gate:
+
+- Decision: submit.
+- Findings addressed: `not_applicable` is now in generated pressure/composite
+  continuation rules; generated collect-plan markdown exposes continuation
+  outcomes; workflow-contract review report decision is `submit`.

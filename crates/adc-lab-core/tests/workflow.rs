@@ -74,6 +74,7 @@ fn collect_plan_steps_are_argv_arrays_and_not_measurement_evidence() {
         suitability_policy_path: "/tmp/adc-lab-run/inputs/suitability_policy.yaml".to_string(),
         expected_governors: vec!["ondemand".to_string(), "performance".to_string()],
         recommendation_mode: WorkflowRecommendationMode::OfflineRecommendation,
+        network_endpoint: None,
     })
     .unwrap();
 
