@@ -294,6 +294,8 @@ pub fn target_operating_contract_collect_plan(
         "{}/included/target-local-governor-sweep",
         input.planned_run_dir
     );
+    let target_local_governor_scp_source =
+        format!("{}:{target_local_execution_run_dir}", target_spec.endpoint);
     let target_local_workload_execution_run_dir =
         format!("adc-lab-target-local-workload-{}", input.run_id);
     let target_local_workload_inputs_dir =
@@ -1207,6 +1209,92 @@ pub fn target_operating_contract_collect_plan(
                             .to_string(),
                     ],
                     "Retrieve the target-local workload demand run into the deterministic included-run path before suitability.",
+                ),
+            ],
+        );
+
+        let governor_retrieval_insert_index = steps
+            .iter()
+            .position(|step| step.step_id == "governor_sweep_run")
+            .map(|index| index + 1)
+            .unwrap_or(steps.len());
+        steps.splice(
+            governor_retrieval_insert_index..governor_retrieval_insert_index,
+            vec![
+                collect_step_at(
+                    "prepare_target_local_governor_retrieval_parent",
+                    "control",
+                    vec!["mkdir", "-p", &retrieved_target_local_parent_dir],
+                    "repository_root",
+                    "operator_handoff",
+                    true,
+                    false,
+                    false,
+                    false,
+                    Vec::<&str>::new(),
+                    vec![retrieved_target_local_parent_dir.clone()],
+                    "handoff_only_not_target_evidence",
+                    vec![GovernorValidity::NotApplicable],
+                    vec![GovernorValidity::Refused],
+                    vec!["create the included-run parent before governor sweep retrieval"
+                        .to_string()],
+                    "Create the included-run parent directory before retrieving target-local governor sweep evidence.",
+                ),
+                collect_step_at(
+                    "reset_target_local_governor_retrieval_destination",
+                    "control",
+                    vec!["rm", "-rf", &retrieved_target_local_run_dir],
+                    "repository_root",
+                    "operator_handoff",
+                    true,
+                    false,
+                    false,
+                    false,
+                    Vec::<&str>::new(),
+                    Vec::<String>::new(),
+                    "handoff_only_not_target_evidence",
+                    vec![GovernorValidity::NotApplicable],
+                    vec![GovernorValidity::Refused],
+                    vec![
+                        format!(
+                            "rerun policy: delete only the deterministic retrieved governor path {retrieved_target_local_run_dir} before scp"
+                        ),
+                        "this cleanup is controller-side handoff plumbing, not target evidence"
+                            .to_string(),
+                    ],
+                    "Reset only the deterministic retrieved governor sweep destination before scp so reruns keep the same layout.",
+                ),
+                collect_step_at(
+                    "retrieve_target_local_governor_sweep",
+                    "control",
+                    vec![
+                        "scp",
+                        "-r",
+                        &target_local_governor_scp_source,
+                        &retrieved_target_local_run_dir,
+                    ],
+                    "repository_root",
+                    "operator_handoff",
+                    true,
+                    true,
+                    false,
+                    false,
+                    vec![
+                        "report.run_validation",
+                        "control_result",
+                        "load",
+                        "lab.restore_lease.v1",
+                    ],
+                    vec![retrieved_target_local_run_dir.clone()],
+                    "governor_include_run_required_for_fullset_validation",
+                    vec![GovernorValidity::Measured, GovernorValidity::Insufficient],
+                    vec![GovernorValidity::Refused, GovernorValidity::Unknown],
+                    vec![
+                        "retrieval is a handoff step, not target measurement evidence".to_string(),
+                        "report validate-run and report operating-contract consume this exact include-run path".to_string(),
+                        "destination is removed before scp so existing directories cannot change the copied layout".to_string(),
+                    ],
+                    "Retrieve the target-local governor sweep run into the deterministic included-run path before validation.",
                 ),
             ],
         );

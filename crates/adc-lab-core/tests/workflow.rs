@@ -148,6 +148,68 @@ fn collect_plan_steps_are_argv_arrays_and_not_measurement_evidence() {
         .iter()
         .any(|arg| arg == "ssh://target55"));
 
+    let governor_retrieval_parent_step =
+        step_by_id(&artifact, "prepare_target_local_governor_retrieval_parent");
+    let reset_governor_retrieval_step = step_by_id(
+        &artifact,
+        "reset_target_local_governor_retrieval_destination",
+    );
+    let retrieve_governor_step = step_by_id(&artifact, "retrieve_target_local_governor_sweep");
+    let retrieved_governor_dir = "/tmp/adc-lab-run/included/target-local-governor-sweep";
+    assert!(
+        step_index(&artifact, "governor_sweep_run")
+            < step_index(&artifact, "prepare_target_local_governor_retrieval_parent")
+    );
+    assert!(
+        step_index(&artifact, "prepare_target_local_governor_retrieval_parent")
+            < step_index(
+                &artifact,
+                "reset_target_local_governor_retrieval_destination"
+            )
+    );
+    assert!(
+        step_index(
+            &artifact,
+            "reset_target_local_governor_retrieval_destination"
+        ) < step_index(&artifact, "retrieve_target_local_governor_sweep")
+    );
+    assert!(
+        step_index(&artifact, "retrieve_target_local_governor_sweep")
+            < step_index(&artifact, "run_validation")
+    );
+    assert_eq!(
+        governor_retrieval_parent_step.command_argv,
+        vec![
+            "mkdir".to_string(),
+            "-p".to_string(),
+            "/tmp/adc-lab-run/included".to_string()
+        ]
+    );
+    assert_eq!(
+        reset_governor_retrieval_step.command_argv,
+        vec![
+            "rm".to_string(),
+            "-rf".to_string(),
+            retrieved_governor_dir.to_string()
+        ]
+    );
+    assert_eq!(
+        retrieve_governor_step.command_argv,
+        vec![
+            "scp".to_string(),
+            "-r".to_string(),
+            "target55:adc-lab-target-local-LAB-RUN-test".to_string(),
+            retrieved_governor_dir.to_string()
+        ]
+    );
+    assert!(retrieve_governor_step
+        .expected_artifact_paths_or_globs
+        .contains(&retrieved_governor_dir.to_string()));
+    assert_eq!(
+        argv_values(&validation_step.command_argv, "--include-run"),
+        vec![retrieved_governor_dir.to_string()]
+    );
+
     let archive_step = step_by_id(&artifact, "archive");
     assert!(archive_step
         .command_argv
@@ -188,6 +250,7 @@ fn collect_plan_steps_are_argv_arrays_and_not_measurement_evidence() {
     assert!(instructions.contains("permission_denied"));
     assert!(instructions.contains("helper_unavailable"));
     assert!(instructions.contains("version_skew"));
+    assert!(instructions.contains("retrieve_target_local_governor_sweep"));
     assert!(instructions.contains("Do not fall back to a static prompt"));
     assert_no_artifact_selection_heuristics(&instructions, "generated collect instructions");
 }
@@ -202,6 +265,27 @@ fn step_by_id<'a>(
         .iter()
         .find(|step| step.step_id == step_id)
         .unwrap_or_else(|| panic!("collect plan missing full-set skeleton step {step_id}"))
+}
+
+fn step_index(artifact: &Artifact<WorkflowCollectPlanPayload>, step_id: &str) -> usize {
+    artifact
+        .payload
+        .steps
+        .iter()
+        .position(|step| step.step_id == step_id)
+        .unwrap_or_else(|| panic!("collect plan missing full-set skeleton step {step_id}"))
+}
+
+fn argv_values(argv: &[String], flag: &str) -> Vec<String> {
+    argv.windows(2)
+        .filter_map(|window| {
+            if window[0] == flag {
+                Some(window[1].clone())
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn assert_no_artifact_selection_heuristics(text: &str, label: &str) {
