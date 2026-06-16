@@ -126,10 +126,10 @@ fn profile_for_depth(requested_profile: String, depth: WorkflowProfileDepth) -> 
             requested_profile,
             effective_profile: WORKFLOW_PROFILE_CHARACTERIZATION_FULL.to_string(),
             depth,
-            summary: "characterization-full profile: bounded deeper target characterization with explicit duration, coverage, and safety caps",
-            claim_boundary: "characterization-full is still bounded laboratory evidence; production readiness, 24h safety, battery safety, and target selection remain blocked without matching downstream evidence",
-            coverage: "coverage: repeated observation, CPU ladder, sustained bounded load, pressure/composite coverage, endpoint-backed network where configured, target-local workload demand, suitability, constraints, and persisted self-check",
-            safety_caps: "safety caps: explicit duration limits, worker limits, thermal abort thresholds, cooldown expectations, approval-bound control, restore validation, and no arbitrary root shell",
+            summary: "characterization-full profile: planned bounded deeper target characterization; executable collect-plan generation is fail-closed until PR 4/5/6 implement the deep steps",
+            claim_boundary: "characterization-full selection is not measurement evidence and does not claim deep coverage until an executable collect plan contains matching duration, coverage, and safety-cap steps",
+            coverage: "planned coverage after PR 4/5/6: repeated observation, CPU ladder, sustained bounded load, pressure/composite coverage, endpoint-backed network where configured, target-local workload demand, suitability, constraints, and persisted self-check",
+            safety_caps: "planned safety caps after PR 4/5/6: explicit duration limits, worker limits, thermal abort thresholds, cooldown expectations, approval-bound control, restore validation, and no arbitrary root shell",
         },
     }
 }

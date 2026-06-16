@@ -801,7 +801,48 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
 }
 
 #[test]
-fn collect_plan_characterization_full_declares_depth_coverage_and_safety_caps() {
+fn workflow_recommend_characterization_full_declares_planned_depth_boundary() {
+    let output = Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "workflow",
+            "recommend",
+            "--goal",
+            "target-characterization-full",
+            "--target",
+            "local",
+            "--target-id",
+            "local-target",
+            "--target-class",
+            "developer_host",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let value: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        value["payload"]["effective_profile"],
+        "target-characterization-full"
+    );
+    assert_eq!(value["payload"]["profile_depth"], "characterization-full");
+    assert!(value["payload"]["profile_summary"]
+        .as_str()
+        .unwrap()
+        .contains("planned bounded deeper target characterization"));
+    assert!(value["payload"]["profile_summary"]
+        .as_str()
+        .unwrap()
+        .contains("fail-closed until PR 4/5/6"));
+    assert!(value["payload"]["claim_boundary"]
+        .as_str()
+        .unwrap()
+        .contains("does not claim deep coverage"));
+}
+
+#[test]
+fn collect_plan_characterization_full_fails_closed_until_profile_steps_exist() {
     let temp = tempfile::tempdir().unwrap();
     let run_dir = temp.path().join("run");
     let out = run_dir.join("workflows/collect_plan.v2.json");
@@ -828,51 +869,11 @@ fn collect_plan_characterization_full_declares_depth_coverage_and_safety_caps() 
             "--json",
         ])
         .assert()
-        .success();
-
-    let plan: Artifact<serde_json::Value> =
-        serde_json::from_slice(&fs::read(&out).unwrap()).unwrap();
-    assert_eq!(
-        plan.payload["effective_profile"],
-        "target-characterization-full"
-    );
-    assert_eq!(plan.payload["profile_depth"], "characterization-full");
-    for expected in [
-        "characterization-full profile",
-        "explicit duration",
-        "sustained bounded load",
-        "pressure/composite coverage",
-        "suitability",
-        "constraints",
-        "thermal abort thresholds",
-        "cooldown",
-        "no arbitrary root shell",
-    ] {
-        assert!(
-            plan.payload["profile_summary"]
-                .as_str()
-                .unwrap()
-                .contains(expected)
-                || plan.payload["coverage"]
-                    .as_str()
-                    .unwrap()
-                    .contains(expected)
-                || plan.payload["safety_caps"]
-                    .as_str()
-                    .unwrap()
-                    .contains(expected),
-            "characterization-full profile metadata missing {expected}"
-        );
-    }
-    let steps = plan.payload["steps"].as_array().unwrap();
-    let validation_step = step_by_id(steps, "run_validation");
-    assert_eq!(
-        argv_values(
-            validation_step["command_argv"].as_array().unwrap(),
-            "--profile"
-        ),
-        vec!["target-characterization-full".to_string()]
-    );
+        .failure()
+        .stderr(contains(
+            "target-characterization-full collect plan is not implemented until PR 4/5/6",
+        ))
+        .stderr(contains("target-operating-contract-smoke"));
 }
 
 #[test]

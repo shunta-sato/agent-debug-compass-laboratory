@@ -28,7 +28,8 @@
 | Requested profile | Required depth flag | Effective validation profile | Result |
 | --- | --- | --- | --- |
 | `target-operating-contract-smoke` | optional, must be `smoke` if supplied | `target-operating-contract-smoke` | pass |
-| `target-characterization-full` | optional, must be `characterization-full` if supplied | `target-characterization-full` | pass |
+| `target-characterization-full` recommendation | optional, must be `characterization-full` if supplied | `target-characterization-full` | pass; planned metadata only |
+| `target-characterization-full` collect plan | optional, must be `characterization-full` if supplied | n/a | fail closed until PR 4/5/6 implement matching deep steps |
 | `target-operating-contract-fullset` | required: `smoke` or `characterization-full` | selected by depth | compatibility only; warning emitted |
 | unsupported profile | n/a | n/a | fail closed |
 
@@ -37,8 +38,8 @@
 | Producer | Generated argv element | Consumer expectation | Result |
 | --- | --- | --- | --- |
 | smoke collect plan | `report validate-run --profile target-operating-contract-smoke` | validation payload records effective smoke profile | pass |
-| characterization-full collect plan | `report validate-run --profile target-characterization-full` | validation payload records full characterization profile | pass |
-| legacy fullset collect plan with depth | `workflow recommend --profile-depth <depth>` and `validate-run --profile <effective>` | old fullset name cannot silently choose depth | pass |
+| characterization-full collect plan | no argv emitted | deep coverage cannot be claimed before matching steps exist | fail closed |
+| legacy fullset collect plan with smoke depth | `workflow recommend --profile-depth smoke` and `validate-run --profile target-operating-contract-smoke` | old fullset name cannot silently choose depth | pass |
 | operating-contract step | `--validation reports/run_validation.v2.json --strict-fullset` | gate checks run set, workflow id, target id/class, supported profile, and measured validity | pass |
 
 ## Producer / Consumer Consistency
@@ -50,6 +51,7 @@
 | `report validate-run` | `payload.validation_profile` | operating-contract gate / rules | smoke, characterization-full, or legacy v0.2.3 compatibility | pass |
 | validation artifact | `subject_run_set_id` / `included_run_refs` | operating-contract gate | current run set identity | unchanged, pass |
 | validation artifact | `workflow_id` | operating-contract gate | `target-operating-contract-fullset.v0.2.3` workflow family | unchanged, pass |
+| public docs examples | workflow command examples | Agents | smoke profile or legacy fullset with explicit `--profile-depth` | pass |
 
 ## Claim Boundaries
 
@@ -60,7 +62,8 @@
   claims.
 - Characterization-full profile is still bounded laboratory evidence; it does
   not by itself authorize production readiness, 24h safety, battery safety, or
-  target selection.
+  target selection. In PR 3, it is recommendation metadata only; collect-plan
+  generation fails closed until PR 4/5/6 implement the matching deep steps.
 - Legacy `target-operating-contract-fullset` cannot be used without an explicit
   depth choice.
 
@@ -71,6 +74,9 @@
 - No hand-written shell harness fallback introduced.
 - No raw primitive control/load artifact is promoted to a controlled-governor
   claim without matching `report.run_validation`.
+- Public docs and scanned plans do not contain `--goal` or `--profile`
+  `target-operating-contract-fullset` examples unless nearby
+  `--profile-depth` is present.
 
 ## Verification Evidence
 
@@ -85,6 +91,10 @@
 - `make schemas-check`
 - `make docs-smoke`
 - `make verify`
+- review fix: `make docs-smoke`
+- review fix: `cargo test -p adc-lab --test cli workflow_ -- --nocapture`
+- review fix: `cargo test -p adc-lab --test cli collect_plan_ -- --nocapture`
+- review fix: `make verify`
 
 ## Findings
 

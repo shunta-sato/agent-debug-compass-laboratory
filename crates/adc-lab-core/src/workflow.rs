@@ -272,6 +272,12 @@ pub fn target_operating_contract_collect_plan(
     input: WorkflowCollectPlanInput,
 ) -> LabResult<Artifact<WorkflowCollectPlanPayload>> {
     let profile = resolve_workflow_profile(&input.goal, input.profile_depth)?;
+    if profile.depth == WorkflowProfileDepth::CharacterizationFull {
+        return Err(LabError::Validation(
+            "target-characterization-full collect plan is not implemented until PR 4/5/6; use target-operating-contract-smoke for executable handoff now"
+                .to_string(),
+        ));
+    }
     let target_spec = TargetSpec::parse(&input.target)?;
     let target_is_ssh = matches!(target_spec.transport, TargetTransport::Ssh);
     let governors = if input.expected_governors.is_empty() {

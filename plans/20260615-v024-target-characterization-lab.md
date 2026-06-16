@@ -196,11 +196,12 @@ Introduce explicit workflow depth labels:
   It includes runner preflight, read-only identity, short seed probes, and
   governor-validation smoke. Its generated text must state that it is not deep
   target characterization.
-- `target-characterization-full`: bounded deeper characterization profile. It
-  includes read-only identity, repeated observation, CPU/thermal ladder,
-  sustained bounded load, pressure/composite coverage, endpoint-backed network
-  where configured, target-local workload demand, suitability, constraints, and
-  persisted self-check.
+- `target-characterization-full`: planned bounded deeper characterization
+  profile. PR 3 may recommend and describe it, but executable collect-plan
+  generation must fail closed until PR 4/5/6 add matching read-only identity,
+  repeated observation, CPU/thermal ladder, sustained bounded load,
+  pressure/composite coverage, endpoint-backed network, target-local workload,
+  suitability, constraints, and persisted self-check steps.
 - `suitability-focused`: optional later profile for a known workload and known
   evidence set. Defer unless the first two profiles need the distinction.
 
@@ -606,7 +607,10 @@ Detailed acceptance criteria:
   - [x] Route `report validate-run`, operating-contract validation, run-report
         summaries, and rules predicates through supported workflow profiles.
   - [x] Add focused CLI regression tests for smoke, legacy-depth rejection, and
-        characterization-full coverage/safety metadata.
+        characterization-full planned metadata plus collect-plan fail-closed
+        behavior.
+  - [x] Update public docs examples to use smoke profile and extend docs-smoke
+        to reject legacy fullset examples without `--profile-depth`.
   - [x] Move workflow instruction rendering to `workflow_render.rs` to preserve
         enforced file budgets.
   - [x] Add PR3 workflow-contract review report.
@@ -801,7 +805,7 @@ PR 3 implementation-economy audit:
 
 | New abstraction | Justification | Decision | Evidence |
 |---|---|---|---|
-| `workflow_profile.rs` | Centralizes smoke vs characterization-full profile ids, compatibility resolution, and profile metadata so CLI/report/rules do not drift. | keep | Focused CLI tests assert smoke metadata, characterization-full metadata, and legacy fullset depth rejection. |
+| `workflow_profile.rs` | Centralizes smoke vs characterization-full profile ids, compatibility resolution, and profile metadata so CLI/report/rules do not drift. | keep | Focused CLI tests assert smoke metadata, characterization-full planned metadata, collect-plan fail-closed behavior, and legacy fullset depth rejection. |
 | `workflow_render.rs` | Moves generated instruction rendering out of `workflow.rs` after profile metadata expanded the module past the enforced budget. | keep | `check-file-budgets.py --enforce` reports 0 violations; `workflow.rs` is 1366/1500. |
 | `--profile-depth` CLI option | Makes legacy `target-operating-contract-fullset` compatibility explicit instead of silently mapping old fullset to smoke or deep characterization. | keep | `workflow_legacy_fullset_requires_profile_depth` fails closed without depth; legacy warning remains explicit. |
 
@@ -1045,6 +1049,13 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   adding a file-budget override. Rationale: generated markdown rendering is a
   separate responsibility from collect-plan construction and the move restores
   budget headroom.
+- 2026-06-16: Address PR #66 review by making
+  `target-characterization-full` collect-plan generation fail closed until PR
+  4/5/6 implement matching deep steps. Rationale: Agent-facing profile metadata
+  must not claim coverage that the actual generated argv steps cannot produce.
+- 2026-06-16: Extend docs-smoke to reject public legacy fullset CLI examples
+  without nearby `--profile-depth`. Rationale: public docs must remain
+  executable after legacy fullset was made fail-closed.
 
 ## Handoff
 
@@ -1059,10 +1070,16 @@ PR #65 is merged. PR 3 implementation is in progress on a fresh branch from
 merge commit `83d579c35e88`. The profile split implementation currently adds
 smoke and characterization-full profiles, explicit legacy `--profile-depth`
 handling, effective profile metadata in workflow artifacts, validation/rules
-profile routing, generated schema updates, and focused CLI regressions.
+profile routing, generated schema updates, focused CLI regressions, public docs
+example cleanup, and docs-smoke enforcement against stale legacy fullset
+examples. PR #66 review requested two fixes; both are implemented locally:
+public examples now use smoke, and characterization-full collect-plan generation
+fails closed until PR 4/5/6 add matching deep steps.
 Focused workflow/collect/validate-run/operating-contract tests, core and CLI
 full tests, schema drift check, docs smoke, file-budget enforcement, and
-`make verify` have passed locally. Draft PR #66 is open.
+`make verify` have passed locally. The PR #66 review fix has also passed
+focused tests, docs-smoke, and full `make verify`. Draft PR #66 is open; the
+review-fix commit is pending publication.
 
 Reviewed implementation commit:
 `778e3e33644bc417dc5f05df71c2861db94ddde7`.
@@ -1071,9 +1088,9 @@ Current PR:
 https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/66
 
 Next steps:
-1. Wait for PR #66 CI on the latest pushed head.
-2. Address review comments if any.
-3. Mark Ready for review after approval.
+1. Commit and push the PR #66 review fix.
+2. Wait for PR #66 CI on the latest pushed head.
+3. Request re-review after CI remains green.
 
 Required process:
 every implementation PR must include
@@ -1209,3 +1226,21 @@ PR 3 quality gate:
 - Draft PR opened: #66
   (`https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/66`) at
   implementation head `778e3e33644bc417dc5f05df71c2861db94ddde7`.
+
+PR #66 review-fix verification:
+
+- `make docs-smoke`: pass after public examples were updated and stale legacy
+  fullset example guard was added.
+- `cargo test -p adc-lab --test cli workflow_ -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli collect_plan_ -- --nocapture`: pass.
+- `cargo test -p adc-lab-core --test workflow -- --nocapture`: pass.
+- `git diff --check`: pass.
+- `make verify`: pass (`file budgets: enforced checked=57 violations=0`; CLI
+  52 tests; docs artifact heuristic guard ok).
+
+PR #66 review-fix quality gate:
+
+- Decision: submit.
+- Findings addressed: public CLI examples no longer use legacy fullset without
+  `--profile-depth`; characterization-full collect-plan generation now fails
+  closed until deep steps exist.

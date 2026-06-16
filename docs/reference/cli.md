@@ -77,30 +77,30 @@ surface instead of reusing a static prompt or writing a shell harness.
 
 ```sh
 adc-lab workflow recommend \
-  --goal target-operating-contract-fullset \
+  --goal target-operating-contract-smoke \
   --target ssh://target55 \
   --target-id target55 \
   --target-class raspberry_pi_4 \
-  --run-dir lab/runs/LAB-RUN-fullset \
+  --run-dir lab/runs/LAB-RUN-smoke \
   --json
 
 adc-lab agent instructions \
-  --goal target-operating-contract-fullset \
+  --goal target-operating-contract-smoke \
   --target ssh://target55 \
   --target-id target55 \
   --target-class raspberry_pi_4 \
   --format codex \
-  --out lab/runs/LAB-RUN-fullset/workflows/codex_instructions.md \
+  --out lab/runs/LAB-RUN-smoke/workflows/codex_instructions.md \
   --json
 
 adc-lab collect plan \
-  --goal target-operating-contract-fullset \
+  --goal target-operating-contract-smoke \
   --target ssh://target55 \
   --target-id target55 \
   --target-class raspberry_pi_4 \
-  --run-dir lab/runs/LAB-RUN-fullset \
-  --out lab/runs/LAB-RUN-fullset/workflows/collect_plan.v2.json \
-  --agent-instructions-out lab/runs/LAB-RUN-fullset/workflows/collect_plan.md \
+  --run-dir lab/runs/LAB-RUN-smoke \
+  --out lab/runs/LAB-RUN-smoke/workflows/collect_plan.v2.json \
+  --agent-instructions-out lab/runs/LAB-RUN-smoke/workflows/collect_plan.md \
   --json
 ```
 
@@ -176,7 +176,7 @@ unless `--allow-non-measured` is used for an exploratory dry run.
 adc-lab report validate-run \
   --run lab/runs/LAB-RUN-... \
   --include-run lab/runs/LAB-RUN-target-local-governor-sweep \
-  --profile target-operating-contract-fullset \
+  --profile target-operating-contract-smoke \
   --expected-governors ondemand,performance,powersave \
   --workflow-recommendation lab/runs/LAB-RUN-.../workflows/recommendation.v2.json \
   --collect-plan lab/runs/LAB-RUN-.../workflows/collect_plan.v2.json \
