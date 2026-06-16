@@ -628,7 +628,7 @@ Detailed acceptance criteria:
   - [x] Add focused CLI regression coverage for A-020 through A-023.
   - [x] Add PR4 workflow-contract review report.
   - [x] Run full verification.
-  - [ ] Commit, push, and open PR.
+  - [x] Commit, push, and open PR.
 - [ ] PR 5: Pressure / composite / endpoint-backed network coverage.
 - [ ] PR 6: Suitability dimension linkage.
 - [ ] PR 7: Target-local executor ergonomics.
@@ -1138,16 +1138,17 @@ step metadata explicitly state that 300s bounded evidence does not support 24h
 sustained safety and that the optional approved 900s profile remains disabled
 by default. PR5 pressure/network and PR6 suitability linkage remain deferred.
 Focused tests, file-budget enforcement, docs smoke, core workflow tests, and
-full `make verify` have passed locally.
+full `make verify` have passed locally. Draft PR #67 is open.
 
-Uncommitted changes exist.
+Reviewed implementation commit:
+`8ef4c2bdf3f91b98fe974200a513d6aa2769fb9c`.
 
 Current PR:
-not opened yet.
+https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/67
 
 Next steps:
-1. Commit, push, and open draft PR.
-2. Wait for CI and address review comments if any.
+1. Wait for PR #67 CI.
+2. Address review comments if any, then mark Ready for review.
 3. Continue to PR 5 after merge.
 
 Required process:
@@ -1328,3 +1329,6 @@ PR 4 quality gate:
 - Required artifacts present: ExecPlan updated, PR4 workflow-contract review
   report added, implementation-economy audit recorded, focused regression tests
   and full verification green.
+- Draft PR opened: #67
+  (`https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/67`) at
+  implementation head `8ef4c2bdf3f91b98fe974200a513d6aa2769fb9c`.
