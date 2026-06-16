@@ -126,10 +126,10 @@ fn profile_for_depth(requested_profile: String, depth: WorkflowProfileDepth) -> 
             requested_profile,
             effective_profile: WORKFLOW_PROFILE_CHARACTERIZATION_FULL.to_string(),
             depth,
-            summary: "characterization-full profile: planned bounded deeper target characterization; executable collect-plan generation is fail-closed until PR 4/5/6 implement the deep steps",
-            claim_boundary: "characterization-full selection is not measurement evidence and does not claim deep coverage until an executable collect plan contains matching duration, coverage, and safety-cap steps",
-            coverage: "planned coverage after PR 4/5/6: repeated observation, CPU ladder, sustained bounded load, pressure/composite coverage, endpoint-backed network where configured, target-local workload demand, suitability, constraints, and persisted self-check",
-            safety_caps: "planned safety caps after PR 4/5/6: explicit duration limits, worker limits, thermal abort thresholds, cooldown expectations, approval-bound control, restore validation, and no arbitrary root shell",
+            summary: "characterization-full profile: CPU/thermal characterization slice with explicit duration, worker, thermal abort, cooldown, and 300s-not-24h boundaries; pressure/network/suitability expansion remains staged for later v0.2.4 PRs",
+            claim_boundary: "characterization-full collect plans are not production, 24h safety, battery safety, target selection, or real workload performance evidence; PR4 CPU/thermal evidence does not claim pressure/network/storage suitability coverage",
+            coverage: "coverage in PR4: 60s and 300s passive observations, 1/2/4 worker 60s CPU ladder, three 4-worker 60s repeatability trials with cooldown, 4-worker 300s sustained bounded load, cooldown observation, default 75C thermal abort; pressure/composite and endpoint-backed network remain PR5",
+            safety_caps: "safety caps: 75C thermal abort by default, explicit durations and worker counts, cooldown observations, approval-bound governor control, restore validation, no arbitrary root shell; optional approved 900s profile disabled by default",
         },
     }
 }

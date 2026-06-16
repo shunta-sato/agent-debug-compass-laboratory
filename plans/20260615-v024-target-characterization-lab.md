@@ -196,12 +196,11 @@ Introduce explicit workflow depth labels:
   It includes runner preflight, read-only identity, short seed probes, and
   governor-validation smoke. Its generated text must state that it is not deep
   target characterization.
-- `target-characterization-full`: planned bounded deeper characterization
-  profile. PR 3 may recommend and describe it, but executable collect-plan
-  generation must fail closed until PR 4/5/6 add matching read-only identity,
-  repeated observation, CPU/thermal ladder, sustained bounded load,
-  pressure/composite coverage, endpoint-backed network, target-local workload,
-  suitability, constraints, and persisted self-check steps.
+- `target-characterization-full`: bounded deeper characterization profile. PR 4
+  makes the CPU/thermal slice executable: repeated observation, CPU ladder,
+  repeatability, sustained bounded load, cooldown, and safety caps. PR 5/6/8
+  still own pressure/composite coverage, endpoint-backed network, suitability
+  dimension linkage, constraints, and persisted self-check depth.
 - `suitability-focused`: optional later profile for a known workload and known
   evidence set. Defer unless the first two profiles need the distinction.
 
@@ -597,7 +596,7 @@ Detailed acceptance criteria:
         deterministic retrieval preparation steps.
   - [x] Run review-fix verification.
   - [x] Push review-fix commit.
-- [ ] PR 3: Profile split.
+- [x] PR 3: Profile split.
   - [x] Create fresh branch from `origin/main` after PR #65 merge.
   - [x] Add explicit smoke and characterization-full profile ids.
   - [x] Add effective profile/depth metadata to workflow recommendation and
@@ -617,6 +616,19 @@ Detailed acceptance criteria:
   - [x] Run full verification.
   - [x] Commit, push, and open PR.
 - [ ] PR 4: Deep CPU / thermal characterization profile.
+  - [x] Create fresh branch from `origin/main` after PR #66 merge.
+  - [x] Replace characterization-full collect-plan fail-closed behavior with
+        CPU/thermal argv steps only.
+  - [x] Add 60s and 300s passive observation steps.
+  - [x] Add 1/2/4 worker 60s CPU ladder steps with `--abort-temp-c 75`.
+  - [x] Add 3 x 4-worker 60s repeatability steps with cooldown observations.
+  - [x] Add 4-worker 300s sustained bounded load plus cooldown observation.
+  - [x] Preserve the boundary that 300s evidence does not support 24h sustained
+        safety and 900s remains optional/approved.
+  - [x] Add focused CLI regression coverage for A-020 through A-023.
+  - [x] Add PR4 workflow-contract review report.
+  - [x] Run full verification.
+  - [ ] Commit, push, and open PR.
 - [ ] PR 5: Pressure / composite / endpoint-backed network coverage.
 - [ ] PR 6: Suitability dimension linkage.
 - [ ] PR 7: Target-local executor ergonomics.
@@ -815,6 +827,12 @@ The profile split adds two small core modules rather than growing
 `workflow.rs`; `workflow.rs` is 1366 lines after the split, below the 1500-line
 budget. Public output schemas changed only for generated workflow artifacts.
 
+PR 3 review-fix note:
+
+- PR #66 intentionally left `target-characterization-full` collect-plan
+  generation fail-closed until PR 4 supplied matching deep steps. PR 4 replaces
+  that fail-closed behavior for the CPU/thermal slice only.
+
 ### PR 4: Deep CPU / Thermal Characterization Profile
 
 Scope:
@@ -826,6 +844,39 @@ Scope:
 Acceptance:
 
 - A-020 through A-023.
+
+PR 4 dev-workflow route:
+
+- Risk: normal Agent-facing workflow-contract change. It changes generated
+  collect-plan argv and profile metadata, but does not add a new executor,
+  privileged target action, schema field, or claim relaxation.
+- Triggered branches: execution-plan update, implementation-economy,
+  agent-workflow-contract-review, focused characterization tests, file-budget
+  enforcement, full `make verify`.
+- Non-triggered branches: no concurrency, no UI, no arbitrary remote command,
+  no target-local daemon/hot path.
+
+PR 4 implementation-economy budget:
+
+- Changed files target: 5 production/test/plan/report files plus this plan.
+- New modules target: 1 internal core module.
+- New helpers target: 3 local helper functions inside that module.
+- Public schema/API target: 0 new schema fields or public CLI flags.
+- Line budget: keep `workflow.rs` under 1500; new module under 300; tests
+  focused on A-020 through A-023.
+
+PR 4 implementation-economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `workflow_characterization.rs` | Keeps the long CPU/thermal step list out of `workflow.rs`, preserving the enforced file budget and avoiding a second public workflow layer. | keep | `check-file-budgets.py --enforce` passes with 0 violations; focused CLI tests assert the generated steps. |
+| `cpu_thermal_characterization_steps` | Provides one internal owner for PR4 CPU/thermal argv construction so smoke steps remain unchanged and PR5 pressure expansion has a clear boundary. | keep | `collect_plan_characterization_full_emits_cpu_thermal_steps` checks ordering, argv, duration/worker/abort/cooldown notes, and 300s-not-24h claim gate. |
+
+Budget note:
+
+`workflow.rs` remains the workflow authority entrypoint; the new module is
+private and only returns `WorkflowCollectPlanStep` values. No generated schema
+shape changed.
 
 ### PR 5: Pressure / Composite / Endpoint-Backed Network Coverage
 
@@ -1056,44 +1107,48 @@ A v0.2.4 target55 artifact is successful only if it can answer:
 - 2026-06-16: Extend docs-smoke to reject public legacy fullset CLI examples
   without nearby `--profile-depth`. Rationale: public docs must remain
   executable after legacy fullset was made fail-closed.
+- 2026-06-16: Make `target-characterization-full` executable for the PR4
+  CPU/thermal slice only. Rationale: PR4 can now satisfy A-020 through A-023
+  without claiming PR5 pressure/network depth or PR6 suitability linkage.
+- 2026-06-16: Put CPU/thermal collect-plan step construction in private
+  `workflow_characterization.rs` rather than extending `workflow.rs` inline.
+  Rationale: the explicit ladder/repeatability/cooldown sequence is long and
+  would erode the 1500-line file budget in the workflow authority module.
+- 2026-06-16: Leave observation expected paths empty for the new repeated
+  observe steps. Rationale: the current observe command writes fixed
+  `observations/observe.json` and `observations/observe.v2.json`; PR4 should not
+  teach downstream Agents to infer multiple observations from filename order.
 
 ## Handoff
 
 Base branch:
-`origin/main` after PR #65 is merged.
+`origin/main` after PR #66 is merged (`3581da4d28ad`).
 
 Current implementation branch:
-`codex/v024-pr3-profile-split`.
+`codex/v024-pr4-deep-cpu-thermal`.
 
 Status:
-PR #65 is merged. PR 3 implementation is in progress on a fresh branch from
-merge commit `83d579c35e88`. The profile split implementation currently adds
-smoke and characterization-full profiles, explicit legacy `--profile-depth`
-handling, effective profile metadata in workflow artifacts, validation/rules
-profile routing, generated schema updates, focused CLI regressions, public docs
-example cleanup, and docs-smoke enforcement against stale legacy fullset
-examples. PR #66 review requested two fixes; both are implemented locally:
-public examples now use smoke, and characterization-full collect-plan generation
-fails closed until PR 4/5/6 add matching deep steps.
-Focused workflow/collect/validate-run/operating-contract tests, core and CLI
-full tests, schema drift check, docs smoke, file-budget enforcement, and
-`make verify` have passed locally. The PR #66 review fix has also passed
-focused tests, docs-smoke, and full `make verify`. Draft PR #66 is open; the
-review-fix commit has been pushed.
+PR #66 is merged. PR 4 implementation is in progress on a fresh branch from
+merge commit `3581da4d28ad`. The current implementation makes
+`target-characterization-full` collect-plan generation executable for the
+CPU/thermal slice only: 60s and 300s observations, 1/2/4 worker 60s CPU ladder,
+three 4-worker 60s repeatability trials with cooldown observations, a 4-worker
+300s sustained bounded load, and final cooldown. Profile text and generated
+step metadata explicitly state that 300s bounded evidence does not support 24h
+sustained safety and that the optional approved 900s profile remains disabled
+by default. PR5 pressure/network and PR6 suitability linkage remain deferred.
+Focused tests, file-budget enforcement, docs smoke, core workflow tests, and
+full `make verify` have passed locally.
 
-Reviewed implementation commit:
-`778e3e33644bc417dc5f05df71c2861db94ddde7`.
-
-Latest review-fix commit:
-`605d144a3ef50caa5f8fe9663c0a8be709ef6fb8`.
+Uncommitted changes exist.
 
 Current PR:
-https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/66
+not opened yet.
 
 Next steps:
-1. Wait for PR #66 CI on the latest pushed head.
-2. Request re-review after CI remains green.
-3. Mark Ready for review after approval.
+1. Commit, push, and open draft PR.
+2. Wait for CI and address review comments if any.
+3. Continue to PR 5 after merge.
 
 Required process:
 every implementation PR must include
@@ -1249,3 +1304,27 @@ PR #66 review-fix quality gate:
   closed until deep steps exist.
 - Review-fix commit pushed:
   `605d144a3ef50caa5f8fe9663c0a8be709ef6fb8`.
+
+PR 4 focused verification:
+
+- `cargo test -p adc-lab --test cli characterization_full -- --nocapture`:
+  pass (2 tests).
+- `cargo test -p adc-lab-core --test workflow -- --nocapture`: pass (3 tests).
+- `python3 scripts/ci/check-file-budgets.py --enforce`: pass (`file budgets:
+  enforced checked=58 violations=0`).
+- `cargo test -p adc-lab --test cli collect_plan_ -- --nocapture`: pass (3
+  tests).
+- `cargo test -p adc-lab --test cli workflow_ -- --nocapture`: pass (5 tests).
+- `make docs-smoke`: pass (`docs artifact heuristic guard: ok`).
+- `make verify`: pass (`file budgets: enforced checked=58 violations=0`; CLI
+  52 tests; safety invariant tests 9 + 19; docs artifact heuristic guard ok;
+  command smoke host fallback ok).
+
+PR 4 quality gate:
+
+- Decision: submit.
+- Findings: 0 from workflow-contract review report
+  `reports/workflow-contract-review/v024-pr4-deep-cpu-thermal.md`.
+- Required artifacts present: ExecPlan updated, PR4 workflow-contract review
+  report added, implementation-economy audit recorded, focused regression tests
+  and full verification green.

@@ -23,6 +23,7 @@ pub mod suitability;
 pub mod target;
 pub mod toolchain;
 pub mod workflow;
+mod workflow_characterization;
 pub mod workflow_profile;
 pub mod workflow_render;
 pub mod workload;
