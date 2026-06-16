@@ -218,7 +218,7 @@ Commands:
 - [x] WBS 4: Update CLI/core tests and generated instruction expectations.
 - [x] WBS 5: Add workflow-contract review report.
 - [x] WBS 6: Run focused tests and `make verify`.
-- [ ] WBS 7: Update Outcomes/Handoff, commit, push, and open PR.
+- [x] WBS 7: Update Outcomes/Handoff, commit, push, and open PR.
 
 ## Surprises & Discoveries
 
@@ -282,17 +282,20 @@ Current branch: `codex/v0241-governor-sweep-retrieval`.
 Status:
 
 - Implementation complete.
+- Draft PR open: https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/73
+- Reviewed implementation commit: `ce49e506bc8265e5232fa978a5e3666aa7157cab`.
 - RCA report added at `reports/bug-reports/v0241-governor-sweep-retrieval.md`.
 - Workflow-contract review report added at
   `reports/workflow-contract-review/v0241-governor-sweep-retrieval.md` with
   decision `submit`.
 - Focused tests and `make verify` passed.
+- GitHub CI is pending/unknown at this handoff immediately after PR creation.
 - Known unrelated untracked files exist in the checkout; do not stage them.
 
 Next steps:
 
-1. Commit the intended files only.
-2. Push branch and open PR.
+1. Wait for GitHub CI and address review comments if any.
+2. Mark PR #73 ready for review after reviewer accepts the plan/report state.
 3. After merge/release v0.2.4.1, rerun the target55 workflow-authority prompt.
 
 ## Outcomes & Retrospective
