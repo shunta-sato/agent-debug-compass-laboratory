@@ -1079,18 +1079,21 @@ Focused workflow/collect/validate-run/operating-contract tests, core and CLI
 full tests, schema drift check, docs smoke, file-budget enforcement, and
 `make verify` have passed locally. The PR #66 review fix has also passed
 focused tests, docs-smoke, and full `make verify`. Draft PR #66 is open; the
-review-fix commit is pending publication.
+review-fix commit has been pushed.
 
 Reviewed implementation commit:
 `778e3e33644bc417dc5f05df71c2861db94ddde7`.
+
+Latest review-fix commit:
+`605d144a3ef50caa5f8fe9663c0a8be709ef6fb8`.
 
 Current PR:
 https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/66
 
 Next steps:
-1. Commit and push the PR #66 review fix.
-2. Wait for PR #66 CI on the latest pushed head.
-3. Request re-review after CI remains green.
+1. Wait for PR #66 CI on the latest pushed head.
+2. Request re-review after CI remains green.
+3. Mark Ready for review after approval.
 
 Required process:
 every implementation PR must include
@@ -1244,3 +1247,5 @@ PR #66 review-fix quality gate:
 - Findings addressed: public CLI examples no longer use legacy fullset without
   `--profile-depth`; characterization-full collect-plan generation now fails
   closed until deep steps exist.
+- Review-fix commit pushed:
+  `605d144a3ef50caa5f8fe9663c0a8be709ef6fb8`.
