@@ -1302,21 +1302,26 @@ tests and full `make verify` passed locally. Draft PR #69 is open; CI should be
 checked on the latest pushed head before Ready for review. PR #69 review
 requested typed v2 pressure artifact validation plus target_id matching; both
 review blockers are fixed locally, and review-fix `make verify` passed.
+Review-fix implementation commit `a62e5c0c4cd20ec893e1ad6857462b3984f02487`
+has been pushed to PR #69.
 
 Reviewed implementation commit:
 `9831b1b0de478efbaa00049d7465400ced4b113e`.
 
+Review-fix implementation commit:
+`a62e5c0c4cd20ec893e1ad6857462b3984f02487`.
+
 Latest pushed commit:
-pending review-fix push.
+this status-only ExecPlan handoff update commit on
+`codex/v024-pr6-suitability-linkage`.
 
 Current PR:
 https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/69
 
 Next steps:
-1. Commit and push the PR #69 review-fix commit.
-2. Wait for PR #69 CI on the latest pushed head.
-3. Request review after CI is green.
-4. Merge after review approval and CI success.
+1. Wait for PR #69 CI on the latest pushed head.
+2. Request review after CI is green.
+3. Merge after review approval and CI success.
 
 Required process:
 every implementation PR must include
