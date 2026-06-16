@@ -1321,31 +1321,32 @@ Current implementation branch:
 `codex/v024-pr7-target-local-ergonomics`.
 
 Status:
-PR #69 is merged. PR7 implementation is in progress on a fresh branch from
-merge commit `adad04545f3d`. The current uncommitted changes add
+PR #69 is merged. PR7 is open as draft PR #70 from fresh branch
+`codex/v024-pr7-target-local-ergonomics` based on merge commit
+`adad04545f3d`. The implementation adds
 `workflow.collect_plan.payload.target_local_execution_guide` for SSH plans,
-render that guide into generated collect-plan instructions, classify SSH runner
-version-check failures with stable `failure_category` and `path_diagnostic`
-fields, and update the generated collect-plan schema. Focused core/CLI/safety
-tests and full `make verify` passed locally. Implementation is complete; commit,
-push, and draft PR publication are pending.
+renders that guide into generated collect-plan instructions, classifies SSH
+runner version-check failures with stable `failure_category` and
+`path_diagnostic` fields, and updates the generated collect-plan schema. Focused
+core/CLI/safety tests and full `make verify` passed locally. GitHub CI is
+pending on the latest pushed head.
 
 Reviewed implementation commit:
-none yet for PR7.
+`1c026bab50f901095f39b57c516bb6c892cef9d7`.
 
 Review-fix implementation commit:
 none.
 
 Latest pushed commit:
-none for PR7; uncommitted changes exist.
+this status-only ExecPlan handoff update commit on PR #70.
 
 Current PR:
-not opened yet.
+https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/70
 
 Next steps:
-1. Commit and push `codex/v024-pr7-target-local-ergonomics`.
-2. Open a draft PR for PR7.
-3. Update this Handoff with the PR URL and latest pushed commit.
+1. Wait for PR #70 CI on the latest pushed head.
+2. Address review comments if any.
+3. Mark Ready for review after CI is green and review-ready.
 
 Required process:
 every implementation PR must include
