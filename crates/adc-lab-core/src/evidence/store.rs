@@ -84,7 +84,8 @@ impl EvidenceStore {
         };
         for run_dir in run_dirs {
             reject_symlink(run_dir)?;
-            store.scan_run_dir(run_dir, run_dir)?;
+            let logical_run_id = run_id_from_run_dir(run_dir);
+            store.scan_run_dir(run_dir, run_dir, &logical_run_id)?;
         }
         Ok(store)
     }
@@ -284,23 +285,33 @@ impl EvidenceStore {
         Ok(artifact_ref)
     }
 
-    fn scan_run_dir(&mut self, run_dir: &Path, current: &Path) -> LabResult<()> {
+    fn scan_run_dir(
+        &mut self,
+        run_dir: &Path,
+        current: &Path,
+        logical_run_id: &str,
+    ) -> LabResult<()> {
         for entry in fs::read_dir(current).with_path(current)? {
             let entry = entry.with_path(current)?;
             let path = entry.path();
             reject_symlink(&path)?;
             if path.is_dir() {
-                self.scan_run_dir(run_dir, &path)?;
+                self.scan_run_dir(run_dir, &path, logical_run_id)?;
                 continue;
             }
             if path.extension().and_then(|extension| extension.to_str()) == Some("json") {
-                self.index_json_if_v2(run_dir, &path)?;
+                self.index_json_if_v2(run_dir, &path, logical_run_id)?;
             }
         }
         Ok(())
     }
 
-    fn index_json_if_v2(&mut self, run_dir: &Path, path: &Path) -> LabResult<()> {
+    fn index_json_if_v2(
+        &mut self,
+        run_dir: &Path,
+        path: &Path,
+        logical_run_id: &str,
+    ) -> LabResult<()> {
         let bytes = fs::read(path).with_path(path)?;
         let value: serde_json::Value = serde_json::from_slice(&bytes).map_err(|source| {
             crate::LabError::Validation(format!(
@@ -315,6 +326,9 @@ impl EvidenceStore {
             return Ok(());
         }
         let header: ArtifactHeader = serde_json::from_value(value)?;
+        if belongs_to_nested_run_root(run_dir, path, &header.run_id, logical_run_id) {
+            return Ok(());
+        }
         let artifact_ref = artifact_uri_for_run(&header.run_id, run_dir, path)?;
         self.insert(ArtifactMeta {
             path: path.to_path_buf(),
@@ -342,6 +356,31 @@ fn relative_path_escapes_run(relative: &str) -> bool {
             Component::ParentDir | Component::RootDir | Component::Prefix(_)
         )
     })
+}
+
+fn belongs_to_nested_run_root(
+    run_dir: &Path,
+    path: &Path,
+    artifact_run_id: &str,
+    logical_run_id: &str,
+) -> bool {
+    if artifact_run_id == logical_run_id {
+        return false;
+    }
+    let Some(mut current) = path.parent().map(Path::to_path_buf) else {
+        return false;
+    };
+    while current.starts_with(run_dir) && current != run_dir {
+        if current.join("run_context.json").exists()
+            && run_id_from_run_dir(&current) == artifact_run_id
+        {
+            return true;
+        }
+        if !current.pop() {
+            break;
+        }
+    }
+    false
 }
 
 fn kind_key(kind: &Kind) -> String {
