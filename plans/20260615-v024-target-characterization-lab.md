@@ -1329,7 +1329,8 @@ renders that guide into generated collect-plan instructions, classifies SSH
 runner version-check failures with stable `failure_category` and
 `path_diagnostic` fields, and updates the generated collect-plan schema. Focused
 core/CLI/safety tests and full `make verify` passed locally. GitHub CI is
-pending on the latest pushed head.
+success on latest reviewed head `fc60b6bf0b6167c271c72488b1fa4fd114dcc812`.
+PR #70 is still draft and mergeable; Draft解除 is the remaining merge-prep step.
 
 Reviewed implementation commit:
 `1c026bab50f901095f39b57c516bb6c892cef9d7`.
@@ -1338,15 +1339,15 @@ Review-fix implementation commit:
 none.
 
 Latest pushed commit:
-this status-only ExecPlan handoff update commit on PR #70.
+this CI-status ExecPlan handoff update commit on PR #70.
 
 Current PR:
 https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/70
 
 Next steps:
-1. Wait for PR #70 CI on the latest pushed head.
-2. Address review comments if any.
-3. Mark Ready for review after CI is green and review-ready.
+1. Mark PR #70 Ready for review.
+2. Merge after final approval.
+3. Continue to PR8 constraints self-check persistence.
 
 Required process:
 every implementation PR must include
