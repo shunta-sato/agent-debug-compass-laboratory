@@ -117,7 +117,7 @@ Acceptance:
 - [x] WBS 3: Implement logical-run-id filter in `EvidenceStore` scanning.
 - [x] WBS 4: Add RCA and workflow-contract review reports.
 - [x] WBS 5: Run focused tests and `make verify`.
-- [ ] WBS 6: Commit, push, and open PR.
+- [x] WBS 6: Commit, push, and open PR.
 
 ## Decision Log
 
@@ -148,11 +148,16 @@ Acceptance:
 
 ## Handoff
 
-Status: implementation complete on `codex/v0242-evidence-ref-resolution`; local
+Current PR: #74.
+
+Reviewed implementation commit:
+`9b7637c56c43f664debd40fa1e40ade77911ea2a`
+
+Status: draft PR open from `codex/v0242-evidence-ref-resolution`; local
 verification passed.
 
 Next steps:
 
-1. Commit, push, and open a draft PR.
+1. Wait for GitHub CI.
 2. Address review comments.
-3. Merge after CI remains green.
+3. Mark Ready for review and merge after CI remains green.
