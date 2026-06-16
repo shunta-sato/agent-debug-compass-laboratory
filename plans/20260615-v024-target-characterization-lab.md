@@ -695,7 +695,7 @@ Detailed acceptance criteria:
   - [x] Add final v0.2.4 workflow-contract review / release-readiness report.
   - [x] Record target55 rerun readiness and artifact review criteria status.
   - [x] Run final local release-readiness verification.
-  - [ ] Commit, push, and open PR.
+  - [x] Commit, push, and open PR.
 
 ## PR Phases
 
@@ -1376,26 +1376,30 @@ Current implementation branch:
 `codex/v024-final-readiness`.
 
 Status:
-PR #71 is merged. The final readiness branch records the v0.2.4 implementation
-series as complete, adds the final workflow-contract review /
-release-readiness report, and marks release binary creation plus target55
-execution as post-merge release gates. Local final verification passed.
+PR #71 is merged. Final readiness is open as draft PR #72 from fresh branch
+`codex/v024-final-readiness` based on merge commit `1d46e84`. The branch records
+the v0.2.4 implementation series as complete, adds the final workflow-contract
+review / release-readiness report, and marks release binary creation plus
+target55 execution as post-merge release gates. Local final verification passed.
+GitHub CI is pending on the latest pushed head.
 
 Reviewed implementation commit:
-none yet.
+`1aab599864ffa9871a9555a532b767888f0a66ae`.
 
 Review-fix implementation commit:
 none.
 
 Latest pushed commit:
-none yet for final readiness.
+this ExecPlan handoff update commit on PR #72.
 
 Current PR:
-none yet.
+https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/72
 
 Next steps:
-1. Commit, push, and open draft PR.
-2. After merge, cut release artifacts and run target55 workflow-authority
+1. Wait for GitHub CI.
+2. Address review comments if any.
+3. Mark PR #72 Ready for review when CI is green.
+4. After merge, cut release artifacts and run target55 workflow-authority
    rerun from release binaries.
 
 Required process:
