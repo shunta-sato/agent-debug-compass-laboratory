@@ -1220,15 +1220,16 @@ Reviewed implementation commit:
 `4d667f77faf3922aee94802f6163dd65fede3b2b`.
 
 Latest pushed commit:
-`4d667f77faf3922aee94802f6163dd65fede3b2b`.
+this ExecPlan-only status update commit on
+`codex/v024-pr5-pressure-network`.
 
 Current PR:
 https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/68
 
 Next steps:
-1. Push this ExecPlan-only status update.
-2. Wait for PR #68 CI and review.
-3. Address review comments if any.
+1. Wait for PR #68 CI and review.
+2. Address review comments if any.
+3. Merge after review approval and CI success.
 
 Required process:
 every implementation PR must include
