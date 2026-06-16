@@ -646,6 +646,14 @@ Detailed acceptance criteria:
   - [x] Add PR5 workflow-contract review report.
   - [x] Run focused tests and full verification.
   - [x] Commit, push, and open PR.
+  - [x] Address PR #68 review blocker: add `not_applicable` to pressure and
+        composite characterization continuation rules.
+  - [x] Address PR #68 review blocker: update workflow-contract review decision
+        from `submit pending verification` to `submit`.
+  - [x] Render collect-plan `continue_on` / `stop_on` in generated markdown
+        instructions so `not_applicable` is visible in the handoff.
+  - [x] Run review-fix verification.
+  - [x] Commit and push PR #68 review-fix commit.
 - [ ] PR 6: Suitability dimension linkage.
 - [ ] PR 7: Target-local executor ergonomics.
 - [ ] PR 8: Constraints self-check persistence and docs.
@@ -1214,21 +1222,24 @@ network I/O, optional endpoint-backed network transfer when
 The generated step metadata keeps counter-only network evidence separate from
 bounded transfer evidence and keeps coupling claims blocked unless composite
 evidence is measured. Focused tests, schema/docs/file-budget checks, and full
-`make verify` passed locally. Draft PR #68 is open.
+`make verify` passed locally. PR #68 review requested two small fixes; both are
+addressed: pressure/composite steps now preserve `not_applicable`, generated
+markdown renders `continue_on` / `stop_on`, and the workflow-contract review
+decision is `submit`. Review-fix verification passed locally. Draft PR #68 is
+open.
 
 Reviewed implementation commit:
 `4d667f77faf3922aee94802f6163dd65fede3b2b`.
 
 Latest pushed commit:
-this ExecPlan-only status update commit on
-`codex/v024-pr5-pressure-network`.
+this PR #68 review-fix commit on `codex/v024-pr5-pressure-network`.
 
 Current PR:
 https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/68
 
 Next steps:
-1. Wait for PR #68 CI and review.
-2. Address review comments if any.
+1. Wait for PR #68 CI on the review-fix commit.
+2. Request re-review.
 3. Merge after review approval and CI success.
 
 Required process:
@@ -1467,3 +1478,28 @@ PR 5 quality gate:
 - Required artifacts present: ExecPlan updated, PR5 workflow-contract review
   report added, implementation-economy audit recorded, focused regression tests
   and full verification green.
+
+PR #68 review-fix verification:
+
+- `cargo fmt --all --check`: pass.
+- First `cargo test -p adc-lab --test cli collect_plan_characterization_full -- --nocapture`:
+  failed because generated markdown did not render `not_applicable`; fixed by
+  rendering each step's `continue_on` and `stop_on` lists.
+- `cargo test -p adc-lab --test cli collect_plan_characterization_full -- --nocapture`:
+  pass (2 tests).
+- `python3 scripts/ci/check-file-budgets.py --enforce`: pass (`file budgets:
+  enforced checked=59 violations=0`).
+- `make docs-smoke`: pass (`docs artifact heuristic guard: ok`).
+- `cargo test -p adc-lab-core --test workflow -- --nocapture`: pass (3 tests).
+- `cargo test -p adc-lab-core --test rules_engine -- --nocapture`: pass (14 tests).
+- `git diff --check`: pass.
+- `make verify`: pass (`file budgets: enforced checked=59 violations=0`; CLI
+  54 tests; safety invariant tests 9 + 19; schema ledger ok; docs artifact
+  heuristic guard ok; command smoke host fallback ok).
+
+PR #68 review-fix quality gate:
+
+- Decision: submit.
+- Findings addressed: `not_applicable` is now in generated pressure/composite
+  continuation rules; generated collect-plan markdown exposes continuation
+  outcomes; workflow-contract review report decision is `submit`.

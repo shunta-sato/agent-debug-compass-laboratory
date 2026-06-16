@@ -128,6 +128,18 @@ fn argv_values(argv: &[serde_json::Value], flag: &str) -> Vec<String> {
         .collect()
 }
 
+fn assert_continue_on_contains(step: &serde_json::Value, expected: &str) {
+    assert!(
+        step["continue_on"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value.as_str() == Some(expected)),
+        "step {} continue_on must contain {expected}",
+        step["step_id"].as_str().unwrap_or("<unknown>")
+    );
+}
+
 fn write_workload_plan(run_dir: &std::path::Path, adc_lab_bin: &std::path::Path) -> PathBuf {
     let plan_path = run_dir.join("workload.yaml");
     let working_directory = workspace_root();
@@ -1079,6 +1091,7 @@ fn collect_plan_characterization_full_emits_cpu_thermal_steps() {
     let network_counter_step = step_by_id(steps, "pressure_network_counter_only");
     let network_counter_argv = network_counter_step["command_argv"].as_array().unwrap();
     assert!(argv_values(network_counter_argv, "--network-endpoint").is_empty());
+    assert_continue_on_contains(network_counter_step, "not_applicable");
     assert_eq!(
         network_counter_step["claim_gate"],
         "network_counter_only_not_bounded_transfer"
@@ -1096,6 +1109,7 @@ fn collect_plan_characterization_full_emits_cpu_thermal_steps() {
 
     let composite_step = step_by_id(steps, "composite_memory_storage_jitter");
     let composite_argv = composite_step["command_argv"].as_array().unwrap();
+    assert_continue_on_contains(composite_step, "not_applicable");
     assert!(composite_argv
         .iter()
         .any(|arg| arg.as_str() == Some("composite")));
@@ -1120,6 +1134,7 @@ fn collect_plan_characterization_full_emits_cpu_thermal_steps() {
     assert!(instructions.contains("sustained_bounded_load_300s"));
     assert!(instructions.contains("pressure_network_counter_only"));
     assert!(instructions.contains("composite_memory_storage_jitter"));
+    assert!(instructions.contains("not_applicable"));
     assert!(instructions.contains("does not support 24h"));
     assert!(instructions.contains("optional approved 900s profile disabled by default"));
     for forbidden in [
@@ -1194,6 +1209,8 @@ fn collect_plan_characterization_full_emits_endpoint_backed_network_when_configu
         endpoint_step["claim_gate"],
         "endpoint_backed_bounded_transfer_required_for_network_claims"
     );
+    assert_continue_on_contains(counter_step, "not_applicable");
+    assert_continue_on_contains(endpoint_step, "not_applicable");
     assert!(endpoint_step["validation_after_step"]
         .as_array()
         .unwrap()

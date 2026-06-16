@@ -25,7 +25,7 @@
 
 | Step | Execution location | argv | Required env | Expected artifact | Stop/continue |
 | --- | --- | --- | --- | --- | --- |
-| `pressure_latency_jitter` | controller | `["adc-lab","pressure","run","--target",target,"--kind","latency_jitter","--duration","5s","--workers","1","--run-dir",run_dir,"--json"]` | controller `adc-lab`; target transport from `--target` | `pressure/latency_jitter.*.v2.json` | continue on measured/measured_partial/insufficient; stop on refused/contaminated |
+| `pressure_latency_jitter` | controller | `["adc-lab","pressure","run","--target",target,"--kind","latency_jitter","--duration","5s","--workers","1","--run-dir",run_dir,"--json"]` | controller `adc-lab`; target transport from `--target` | `pressure/latency_jitter.*.v2.json` | continue on measured/measured_partial/insufficient/not_applicable; stop on refused/contaminated |
 | `pressure_observer_pressure` | controller | same shape with `--kind observer_pressure` | same | `pressure/observer_pressure.*.v2.json` | observer pressure is explicit evidence, not zero-overhead proof |
 | `pressure_memory_pressure` | controller | same shape with `--kind memory_pressure` | same | `pressure/memory_pressure.*.v2.json` | memory effect must be observed before coupling can advance |
 | `pressure_storage_io` | controller | same shape with `--kind storage_io` | same | `pressure/storage_io.*.v2.json` | bounded storage probe only |
@@ -34,6 +34,10 @@
 | `pressure_network_counter_only` | controller | same shape with `--kind network_io` and no endpoint | same | `pressure/network_io.*.v2.json` | counter-only evidence cannot support bounded transfer claims |
 | `pressure_network_endpoint_backed` | controller | same shape with `--kind network_io --network-endpoint <host:port> --network-bytes 1048576` | explicit receiver endpoint | `pressure/network_io.*.v2.json` | emitted only when configured; still insufficient unless bounded transfer completes |
 | `composite_memory_storage_jitter` | controller | `["adc-lab","pressure","composite","--target",target,"--scenario","memory_storage_jitter","--duration","5s","--workers","1","--run-dir",run_dir,"--json"]` | controller `adc-lab`; target transport from `--target` | `composite/memory_storage_jitter.*.v2.json` | coupling claims remain blocked unless composite artifact is measured |
+
+The generated markdown instructions render each step's `continue_on` and
+`stop_on` lists. Pressure and composite characterization steps preserve
+`not_applicable` as an evidence boundary instead of leaving it ambiguous.
 
 ## Producer/Consumer Consistency
 
@@ -67,6 +71,9 @@
 - mtime/latest/newest artifact inference: absent.
 - endpoint-backed network: requires explicit `--network-endpoint`; no rx/tx counter inference.
 - composite coupling: requires measured composite evidence; artifact presence alone is not enough.
+- `not_applicable` is preserved as an evidence boundary and does not force an
+  Agent to abandon later claim-producing steps unless the step is a required
+  validation gate.
 
 ## Claim Boundaries
 
@@ -88,4 +95,4 @@
 
 ## Decision
 
-submit pending verification
+submit

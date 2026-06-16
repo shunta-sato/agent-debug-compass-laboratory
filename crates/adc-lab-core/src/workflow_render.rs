@@ -57,6 +57,14 @@ pub fn render_collect_plan_agent_instructions(
         ));
         out.push_str(&format!("- claim_gate: `{}`\n", step.claim_gate));
         out.push_str(&format!(
+            "- continue_on: `{}`\n",
+            serde_json::to_string(&step.continue_on).unwrap_or_else(|_| "[]".to_string())
+        ));
+        out.push_str(&format!(
+            "- stop_on: `{}`\n",
+            serde_json::to_string(&step.stop_on).unwrap_or_else(|_| "[]".to_string())
+        ));
+        out.push_str(&format!(
             "- argv: `{}`\n",
             serde_json::to_string(&step.command_argv).unwrap_or_else(|_| "[]".to_string())
         ));
