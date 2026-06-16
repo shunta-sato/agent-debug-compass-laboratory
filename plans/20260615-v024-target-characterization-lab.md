@@ -645,7 +645,7 @@ Detailed acceptance criteria:
   - [x] Add focused CLI regression tests for A-030 through A-033.
   - [x] Add PR5 workflow-contract review report.
   - [x] Run focused tests and full verification.
-  - [ ] Commit, push, and open PR.
+  - [x] Commit, push, and open PR.
 - [ ] PR 6: Suitability dimension linkage.
 - [ ] PR 7: Target-local executor ergonomics.
 - [ ] PR 8: Constraints self-check persistence and docs.
@@ -1204,8 +1204,8 @@ Current implementation branch:
 `codex/v024-pr5-pressure-network`.
 
 Status:
-PR #67 is merged. PR5 implementation is in progress on a fresh branch from
-merge commit `579766000b8d`. The current implementation extends
+PR #67 is merged. PR5 implementation is on a fresh branch from merge commit
+`579766000b8d`. The current implementation extends
 `target-characterization-full` collect-plan generation from the PR4 CPU/thermal
 slice into pressure/composite coverage: latency/jitter, observer pressure,
 memory pressure, storage I/O, CPU pressure, thermal pressure, counter-only
@@ -1214,21 +1214,21 @@ network I/O, optional endpoint-backed network transfer when
 The generated step metadata keeps counter-only network evidence separate from
 bounded transfer evidence and keeps coupling claims blocked unless composite
 evidence is measured. Focused tests, schema/docs/file-budget checks, and full
-`make verify` passed locally. PR publication is pending.
+`make verify` passed locally. Draft PR #68 is open.
 
 Reviewed implementation commit:
-not yet reviewed.
+`4d667f77faf3922aee94802f6163dd65fede3b2b`.
 
 Latest pushed commit:
-not yet pushed.
+`4d667f77faf3922aee94802f6163dd65fede3b2b`.
 
 Current PR:
-not yet opened.
+https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/68
 
 Next steps:
-1. Commit and push PR5.
-2. Open a draft PR for review.
-3. Update this handoff with the PR URL and latest head.
+1. Push this ExecPlan-only status update.
+2. Wait for PR #68 CI and review.
+3. Address review comments if any.
 
 Required process:
 every implementation PR must include
