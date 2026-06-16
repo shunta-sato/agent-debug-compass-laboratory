@@ -1883,7 +1883,7 @@ fn suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end() {
 fn suitability_and_constraints_refs_resolve_across_included_run_set() {
     let temp = tempfile::tempdir().unwrap();
     let primary = temp.path().join("primary");
-    let included = temp.path().join("included");
+    let included = primary.join("included/target-local-governor-sweep");
     fs::create_dir_all(primary.join("observations")).unwrap();
     fs::write(
         primary.join("observations/observe.json"),

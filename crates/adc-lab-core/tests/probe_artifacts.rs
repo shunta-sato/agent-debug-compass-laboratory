@@ -97,6 +97,49 @@ fn evidence_store_resolves_artifact_refs_across_opened_run_set() {
 }
 
 #[test]
+fn evidence_store_indexes_nested_include_run_only_under_its_own_root() {
+    let temp = tempfile::tempdir().unwrap();
+    let primary = create_or_open_run(Some(temp.path().join("primary"))).unwrap();
+    let included = create_or_open_run(Some(
+        primary.run_dir.join("included/target-local-governor-sweep"),
+    ))
+    .unwrap();
+    let mut included_store = EvidenceStore::open(std::slice::from_ref(&included.run_dir)).unwrap();
+    let included_pressure_ref =
+        write_pressure_artifact_v2(&mut included_store, &included.run_dir, pressure()).unwrap();
+
+    let reopened =
+        EvidenceStore::open(&[primary.run_dir.clone(), included.run_dir.clone()]).unwrap();
+    let pressure_refs = reopened
+        .iter(Kind::Pressure)
+        .map(|meta| meta.artifact_ref.clone())
+        .collect::<Vec<_>>();
+
+    assert_eq!(pressure_refs, vec![included_pressure_ref.clone()]);
+    assert!(
+        !pressure_refs[0].contains("/included/target-local-governor-sweep/"),
+        "nested include-run artifacts must not be indexed with a duplicated include-run path: {pressure_refs:?}"
+    );
+    let payload = reopened.evidence_ref_resolution_payload(
+        "RUN-SET-nested-include",
+        Vec::new(),
+        pressure_refs,
+    );
+    assert!(
+        payload.invalid_refs.is_empty(),
+        "nested include-run refs must resolve through the include-run root: {:?}",
+        payload.invalid_refs
+    );
+    assert!(
+        payload.resolutions.iter().all(|resolution| {
+            resolution.classification == EvidenceRefResolutionKind::Resolvable
+        }),
+        "nested include-run refs must remain resolvable: {:?}",
+        payload.resolutions
+    );
+}
+
+#[test]
 fn pressure_and_composite_v2_sidecars_keep_each_result_id() {
     let temp = tempfile::tempdir().unwrap();
     let mut store = EvidenceStore::open(&[temp.path().to_path_buf()]).unwrap();
