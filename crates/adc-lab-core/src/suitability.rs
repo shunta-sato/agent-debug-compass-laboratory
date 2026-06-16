@@ -3,10 +3,12 @@ use crate::contracts::{
     SuitabilityDimensionKind, SuitabilityPolicy, WorkloadDemandProfile,
 };
 use crate::evidence::{
-    claim, claim_definition, Artifact, Claim, DataQuality, DataQualityLevel, Decision, Kind, Status,
+    claim, claim_definition, Artifact, Claim, DataQuality, DataQualityLevel, Decision, Kind,
+    Status, ARTIFACT_SCHEMA_V2,
 };
 use crate::fsutil::read_json;
 use crate::ids::{new_id, now_unix_ms};
+use crate::probe::PressurePayload;
 use crate::rules::engine::{claim_for_evaluation, RuleEvaluation};
 use crate::rules::suitability::SuitabilityPayload;
 use crate::OperatingContractPayload;
@@ -111,7 +113,7 @@ pub fn decide_suitability_artifact_v2(
     context: SuitabilityArtifactContext,
 ) -> LabResult<Artifact<SuitabilityPayload>> {
     validate_policy(policy)?;
-    let target_evidence = collect_target_run_numeric_evidence(target_run_dir);
+    let target_evidence = collect_target_run_numeric_evidence(target_run_dir, &workload.target_id);
     let mut dimensions = Vec::new();
     let mut seen = BTreeSet::new();
     for dimension in policy
@@ -1019,7 +1021,10 @@ fn unknown_dimension(
     }
 }
 
-fn collect_target_run_numeric_evidence(run_dir: &Path) -> TargetRunNumericEvidence {
+fn collect_target_run_numeric_evidence(
+    run_dir: &Path,
+    expected_target_id: &str,
+) -> TargetRunNumericEvidence {
     let mut evidence = TargetRunNumericEvidence::default();
     if !run_dir.exists() {
         evidence.missing.push(format!(
@@ -1028,7 +1033,7 @@ fn collect_target_run_numeric_evidence(run_dir: &Path) -> TargetRunNumericEviden
         ));
         return evidence;
     }
-    collect_json_values(run_dir, run_dir, &mut evidence);
+    collect_json_values(run_dir, run_dir, expected_target_id, &mut evidence);
     if evidence.max_temp_c.is_none() {
         evidence
             .missing
@@ -1042,19 +1047,24 @@ fn collect_target_run_numeric_evidence(run_dir: &Path) -> TargetRunNumericEviden
     evidence
 }
 
-fn collect_json_values(root: &Path, path: &Path, evidence: &mut TargetRunNumericEvidence) {
+fn collect_json_values(
+    root: &Path,
+    path: &Path,
+    expected_target_id: &str,
+    evidence: &mut TargetRunNumericEvidence,
+) {
     let Ok(entries) = fs::read_dir(path) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            collect_json_values(root, &path, evidence);
+            collect_json_values(root, &path, expected_target_id, evidence);
         } else if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
             if let Ok(value) = read_json::<Value>(&path) {
                 if let Ok(relative) = path.strip_prefix(root) {
                     let artifact_ref = format!("target-run://{}", relative.display());
-                    harvest_pressure_value(&value, &artifact_ref, evidence);
+                    harvest_pressure_value(&value, &artifact_ref, expected_target_id, evidence);
                     evidence.evidence_refs.push(artifact_ref);
                 }
                 harvest_numeric_value(&value, evidence);
@@ -1066,52 +1076,62 @@ fn collect_json_values(root: &Path, path: &Path, evidence: &mut TargetRunNumeric
 fn harvest_pressure_value(
     value: &Value,
     artifact_ref: &str,
+    expected_target_id: &str,
     evidence: &mut TargetRunNumericEvidence,
 ) {
-    let Some(map) = value.as_object() else {
+    let Ok(artifact) = serde_json::from_value::<Artifact<PressurePayload>>(value.clone()) else {
         return;
     };
-    if map.get("kind").and_then(|value| value.as_str()) != Some("pressure") {
+    if artifact.schema != ARTIFACT_SCHEMA_V2 || artifact.kind != Kind::Pressure {
         return;
     }
-    let Some(payload) = map.get("payload").and_then(|value| value.as_object()) else {
+    if artifact.payload.source_schema_version != "lab.resource_pressure_result.v1" {
         return;
-    };
-    let Some(kind) = payload
-        .get("pressure_kind")
-        .and_then(|value| value.as_str())
-    else {
+    }
+    if !is_recognized_pressure_kind(&artifact.payload.pressure_kind) {
         return;
-    };
+    }
+    if artifact.target_id != expected_target_id {
+        evidence.missing.push(format!(
+            "ignored pressure artifact target_id mismatch: {artifact_ref} target_id={} expected={expected_target_id}",
+            artifact.target_id
+        ));
+        return;
+    }
     evidence.pressure.push(TargetRunPressureEvidence {
-        kind: kind.to_string(),
-        status_state: map
-            .get("status")
-            .and_then(|value| value.get("state"))
-            .and_then(|value| value.as_str())
-            .unwrap_or("unknown")
-            .to_string(),
-        evidence_class: payload
-            .get("evidence_class")
-            .and_then(|value| value.as_str())
-            .unwrap_or("unknown")
-            .to_string(),
-        effect_observed: payload
-            .get("effect_observed")
-            .and_then(|value| value.as_bool())
-            .unwrap_or(false),
-        network_mode: payload
-            .get("network_mode")
-            .and_then(|value| value.as_str())
-            .map(ToOwned::to_owned),
-        network_endpoint_available: payload
-            .get("network_endpoint_available")
-            .and_then(|value| value.as_bool()),
-        network_traffic_generated_bytes: payload
-            .get("network_traffic_generated_bytes")
-            .and_then(|value| value.as_u64()),
+        kind: artifact.payload.pressure_kind,
+        status_state: status_state(&artifact.status).to_string(),
+        evidence_class: artifact.payload.evidence_class,
+        effect_observed: artifact.payload.effect_observed,
+        network_mode: artifact.payload.network_mode,
+        network_endpoint_available: artifact.payload.network_endpoint_available,
+        network_traffic_generated_bytes: artifact.payload.network_traffic_generated_bytes,
         artifact_ref: artifact_ref.to_string(),
     });
+}
+
+fn status_state(status: &Status) -> &'static str {
+    match status {
+        Status::Measured => "measured",
+        Status::MeasuredPartial => "measured_partial",
+        Status::Insufficient => "insufficient",
+        Status::NotApplicable { .. } => "not_applicable",
+        Status::Refused { .. } => "refused",
+        Status::UnsafeBlocked { .. } => "unsafe_blocked",
+    }
+}
+
+fn is_recognized_pressure_kind(kind: &str) -> bool {
+    matches!(
+        kind,
+        "memory_pressure"
+            | "storage_io"
+            | "network_io"
+            | "latency_jitter"
+            | "cpu_pressure"
+            | "thermal_pressure"
+            | "observer_pressure"
+    )
 }
 
 fn harvest_numeric_value(value: &Value, evidence: &mut TargetRunNumericEvidence) {

@@ -668,6 +668,13 @@ Detailed acceptance criteria:
   - [x] Add PR6 workflow-contract review report.
   - [x] Run full verification.
   - [x] Commit, push, and open PR.
+  - [x] Address PR #69 review blocker: deserialize pressure evidence as typed
+        v2 `Artifact<PressurePayload>`.
+  - [x] Address PR #69 review blocker: require pressure artifact envelope
+        `target_id` to match the workload target.
+  - [x] Add negative regressions for pressure-like JSON, non-v2 pressure JSON,
+        mismatched target pressure artifacts, and typed `Status::NotApplicable`.
+  - [x] Run review-fix verification.
 - [ ] PR 7: Target-local executor ergonomics.
 - [ ] PR 8: Constraints self-check persistence and docs.
 - [ ] Final: Update Outcomes with artifact review criteria and v0.2.4
@@ -1268,6 +1275,10 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   override. Rationale: the new sufficiency matrix is integration-level public
   behavior coverage, and production `suitability.rs` must remain under the
   enforced 1500-line budget.
+- 2026-06-16: Tighten PR6 pressure harvesting to typed v2
+  `Artifact<PressurePayload>` with matching target identity. Rationale:
+  suitability is claim-producing, so pressure-like JSON, non-v2 envelopes, and
+  other-target artifacts must not make required dimensions non-unknown.
 
 ## Handoff
 
@@ -1288,22 +1299,24 @@ required latency remain unknown and block `selection_ready`. The resource
 sufficiency matrix is in `crates/adc-lab-core/tests/suitability.rs`, and
 production `suitability.rs` is back under the enforced file budget. Focused
 tests and full `make verify` passed locally. Draft PR #69 is open; CI should be
-checked on the latest pushed head before Ready for review.
+checked on the latest pushed head before Ready for review. PR #69 review
+requested typed v2 pressure artifact validation plus target_id matching; both
+review blockers are fixed locally, and review-fix `make verify` passed.
 
 Reviewed implementation commit:
 `9831b1b0de478efbaa00049d7465400ced4b113e`.
 
 Latest pushed commit:
-this status-only ExecPlan handoff update commit on
-`codex/v024-pr6-suitability-linkage`.
+pending review-fix push.
 
 Current PR:
 https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/69
 
 Next steps:
-1. Wait for PR #69 CI on the latest pushed head.
-2. Request review after CI is green.
-3. Merge after review approval and CI success.
+1. Commit and push the PR #69 review-fix commit.
+2. Wait for PR #69 CI on the latest pushed head.
+3. Request review after CI is green.
+4. Merge after review approval and CI success.
 
 Required process:
 every implementation PR must include
@@ -1594,3 +1607,33 @@ PR 6 quality gate:
 - Draft PR opened: #69
   (`https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/69`) at
   reviewed implementation head `9831b1b0de478efbaa00049d7465400ced4b113e`.
+
+PR #69 review-fix verification:
+
+- `cargo test -p adc-lab-core --test suitability -- --nocapture`: pass (9
+  tests, including typed v2 pressure artifact, pressure-like JSON rejection,
+  target_id mismatch rejection, and typed `Status::NotApplicable` counter-only
+  boundary evidence).
+- `cargo test -p adc-lab-core suitability_ -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli suitability_loop_consumes_tool_produced_v2_artifacts_end_to_end -- --nocapture`:
+  pass.
+- `cargo test -p adc-lab --test cli suitability_and_constraints_refs_resolve_across_included_run_set -- --nocapture`:
+  pass.
+- `python3 scripts/ci/check-file-budgets.py --enforce`: pass (`file budgets:
+  enforced checked=59 violations=0`).
+- First `make verify`: failed at schema ledger because a negative fixture used
+  `lab.artifact.v1`, which the ledger correctly detected as an undeclared
+  no-schema wire contract; fixed by using a non-contract legacy schema label.
+- `make schemas-check`: pass (`schema ledger: ok top_level=0 no_schema_wire=31
+  maintained_by_hand=0`).
+- `make verify`: pass (`file budgets: enforced checked=59 violations=0`; CLI
+  54 tests; safety invariant tests 9 + 19; suitability integration 9; schema
+  ledger ok; docs artifact heuristic guard ok; command smoke host fallback ok).
+
+PR #69 review-fix quality gate:
+
+- Decision: submit.
+- Findings addressed: pressure harvester now requires typed v2
+  `Artifact<PressurePayload>` semantics and matching target identity; negative
+  regressions cover malformed pressure-like JSON, non-v2 pressure JSON, and
+  mismatched target pressure artifacts.

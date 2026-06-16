@@ -166,7 +166,7 @@ fn suitability_links_storage_network_latency_pressure_refs() {
         temp.path(),
         "pressure/storage_io.v2.json",
         "storage_io",
-        "measured_partial",
+        Status::MeasuredPartial,
         "smoke",
         true,
         None,
@@ -177,7 +177,7 @@ fn suitability_links_storage_network_latency_pressure_refs() {
         temp.path(),
         "pressure/network_io.endpoint.v2.json",
         "network_io",
-        "measured_partial",
+        Status::MeasuredPartial,
         "boundary_probe",
         true,
         Some("bounded_transfer"),
@@ -188,7 +188,7 @@ fn suitability_links_storage_network_latency_pressure_refs() {
         temp.path(),
         "pressure/latency_jitter.v2.json",
         "latency_jitter",
-        "measured_partial",
+        Status::MeasuredPartial,
         "smoke",
         false,
         None,
@@ -240,7 +240,9 @@ fn suitability_counter_only_network_blocks_required_selection() {
         temp.path(),
         "pressure/network_io.counter_only.v2.json",
         "network_io",
-        "not_applicable",
+        Status::NotApplicable {
+            reason: "counter-only network evidence is not endpoint-backed".to_string(),
+        },
         "not_applicable",
         false,
         Some("counter_only"),
@@ -280,7 +282,7 @@ fn suitability_storage_smoke_cannot_become_device_meet() {
         temp.path(),
         "pressure/storage_io.v2.json",
         "storage_io",
-        "measured_partial",
+        Status::MeasuredPartial,
         "smoke",
         true,
         None,
@@ -307,6 +309,117 @@ fn suitability_storage_smoke_cannot_become_device_meet() {
         .as_deref()
         .unwrap_or_default()
         .contains("not a storage-device meet"));
+}
+
+#[test]
+fn suitability_ignores_pressure_like_json_without_typed_v2_envelope() {
+    let temp = tempfile::tempdir().unwrap();
+    write_pressure_like_json(
+        temp.path(),
+        "pressure/storage_like.json",
+        json!({
+            "kind": "pressure",
+            "payload": {
+                "pressure_kind": "storage_io",
+                "effect_observed": true
+            }
+        }),
+    );
+    write_pressure_like_json(
+        temp.path(),
+        "pressure/storage_non_v2.json",
+        json!({
+            "schema": "legacy-artifact-v1",
+            "kind": "pressure",
+            "id": "PRESSURE-storage_io",
+            "run_id": "run",
+            "target_id": "target55",
+            "status": {
+                "state": "measured_partial"
+            },
+            "bounds": null,
+            "factors": {
+                "controlled": [],
+                "observed": [],
+                "confounders": []
+            },
+            "metrics": [],
+            "claims": [],
+            "evidence_refs": [],
+            "data_quality": {
+                "level": "partial",
+                "notes": []
+            },
+            "payload": {
+                "source_schema_version": "lab.resource_pressure_result.v1",
+                "pressure_kind": "storage_io",
+                "evidence_class": "smoke",
+                "effect_observed": true,
+                "duration_ms": 1000,
+                "network_mode": null,
+                "network_endpoint_available": null,
+                "network_traffic_generated_bytes": null
+            },
+            "time_unix_ms": 1
+        }),
+    );
+    let policy = resource_policy(vec![SuitabilityDimensionKind::StorageIo]);
+    let workload = workload_profile(false, None, None, None);
+
+    let decision = decide_suitability_artifact_v2(
+        temp.path(),
+        &empty_contract(),
+        &workload,
+        &policy,
+        test_context(),
+    )
+    .unwrap();
+
+    let storage = dimension_decision(&decision, SuitabilityDimensionKind::StorageIo);
+    assert_eq!(storage.decision, SuitabilityDecisionValue::Unknown);
+    assert!(!storage
+        .evidence_refs
+        .iter()
+        .any(|evidence_ref| evidence_ref.starts_with("target-run://pressure/")));
+}
+
+#[test]
+fn suitability_ignores_pressure_artifacts_for_other_targets() {
+    let temp = tempfile::tempdir().unwrap();
+    write_pressure_artifact_for_target(
+        temp.path(),
+        "pressure/network_io.other-target.v2.json",
+        "other-target",
+        "network_io",
+        Status::MeasuredPartial,
+        "boundary_probe",
+        true,
+        Some("bounded_transfer"),
+        Some(true),
+        Some(4096),
+    );
+    let policy = resource_policy(vec![SuitabilityDimensionKind::NetworkIo]);
+    let workload = workload_profile(false, None, None, None);
+
+    let decision = decide_suitability_artifact_v2(
+        temp.path(),
+        &empty_contract(),
+        &workload,
+        &policy,
+        test_context(),
+    )
+    .unwrap();
+
+    let network = dimension_decision(&decision, SuitabilityDimensionKind::NetworkIo);
+    assert_eq!(network.decision, SuitabilityDecisionValue::Unknown);
+    assert!(!network
+        .evidence_refs
+        .contains(&"target-run://pressure/network_io.other-target.v2.json".to_string()));
+    assert!(decision.data_quality.notes.iter().any(|note| {
+        note.contains("target_id mismatch")
+            && note.contains("other-target")
+            && note.contains("target55")
+    }));
 }
 
 #[test]
@@ -428,7 +541,34 @@ fn write_pressure_artifact(
     run_dir: &Path,
     relative_path: &str,
     pressure_kind: &str,
-    status_state: &str,
+    status: Status,
+    evidence_class: &str,
+    effect_observed: bool,
+    network_mode: Option<&str>,
+    network_endpoint_available: Option<bool>,
+    network_traffic_generated_bytes: Option<u64>,
+) {
+    write_pressure_artifact_for_target(
+        run_dir,
+        relative_path,
+        "target55",
+        pressure_kind,
+        status,
+        evidence_class,
+        effect_observed,
+        network_mode,
+        network_endpoint_available,
+        network_traffic_generated_bytes,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn write_pressure_artifact_for_target(
+    run_dir: &Path,
+    relative_path: &str,
+    target_id: &str,
+    pressure_kind: &str,
+    status: Status,
     evidence_class: &str,
     effect_observed: bool,
     network_mode: Option<&str>,
@@ -437,41 +577,31 @@ fn write_pressure_artifact(
 ) {
     let path = run_dir.join(relative_path);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
-    let artifact = json!({
-        "schema": "lab.artifact.v2",
-        "kind": "pressure",
-        "id": format!("PRESSURE-{pressure_kind}"),
-        "run_id": "run",
-        "target_id": "target55",
-        "status": {
-            "state": status_state
+    let artifact = Artifact::new(
+        Kind::Pressure,
+        format!("PRESSURE-{pressure_kind}"),
+        "run",
+        target_id,
+        status,
+        PressurePayload {
+            source_schema_version: "lab.resource_pressure_result.v1".to_string(),
+            pressure_kind: pressure_kind.to_string(),
+            evidence_class: evidence_class.to_string(),
+            effect_observed,
+            duration_ms: 1000,
+            network_mode: network_mode.map(ToOwned::to_owned),
+            network_endpoint_available,
+            network_traffic_generated_bytes,
         },
-        "bounds": null,
-        "factors": {
-            "controlled": [],
-            "observed": [],
-            "confounders": []
-        },
-        "metrics": [],
-        "claims": [],
-        "evidence_refs": [],
-        "data_quality": {
-            "level": "partial",
-            "notes": []
-        },
-        "payload": {
-            "source_schema_version": "lab.resource_pressure_result.v1",
-            "pressure_kind": pressure_kind,
-            "evidence_class": evidence_class,
-            "effect_observed": effect_observed,
-            "duration_ms": 1000,
-            "network_mode": network_mode,
-            "network_endpoint_available": network_endpoint_available,
-            "network_traffic_generated_bytes": network_traffic_generated_bytes
-        },
-        "time_unix_ms": 1
-    });
+        1,
+    );
     fs::write(path, serde_json::to_vec_pretty(&artifact).unwrap()).unwrap();
+}
+
+fn write_pressure_like_json(run_dir: &Path, relative_path: &str, value: serde_json::Value) {
+    let path = run_dir.join(relative_path);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, serde_json::to_vec_pretty(&value).unwrap()).unwrap();
 }
 
 fn empty_contract() -> Artifact<OperatingContractPayload> {
