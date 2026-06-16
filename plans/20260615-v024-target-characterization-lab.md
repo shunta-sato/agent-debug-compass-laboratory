@@ -611,7 +611,7 @@ Detailed acceptance criteria:
         enforced file budgets.
   - [x] Add PR3 workflow-contract review report.
   - [x] Run full verification.
-  - [ ] Commit, push, and open PR.
+  - [x] Commit, push, and open PR.
 - [ ] PR 4: Deep CPU / thermal characterization profile.
 - [ ] PR 5: Pressure / composite / endpoint-backed network coverage.
 - [ ] PR 6: Suitability dimension linkage.
@@ -1062,16 +1062,18 @@ handling, effective profile metadata in workflow artifacts, validation/rules
 profile routing, generated schema updates, and focused CLI regressions.
 Focused workflow/collect/validate-run/operating-contract tests, core and CLI
 full tests, schema drift check, docs smoke, file-budget enforcement, and
-`make verify` have passed locally. Commit, push, and PR publication are still
-pending.
+`make verify` have passed locally. Draft PR #66 is open.
+
+Reviewed implementation commit:
+`778e3e33644bc417dc5f05df71c2861db94ddde7`.
 
 Current PR:
-not opened yet.
+https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/66
 
 Next steps:
-1. Commit the PR 3 implementation.
-2. Push `codex/v024-pr3-profile-split`.
-3. Open a draft PR for PR 3.
+1. Wait for PR #66 CI on the latest pushed head.
+2. Address review comments if any.
+3. Mark Ready for review after approval.
 
 Required process:
 every implementation PR must include
@@ -1204,3 +1206,6 @@ PR 3 quality gate:
 - Required artifacts present: ExecPlan updated, PR3 workflow-contract review
   report added, implementation-economy audit recorded, generated schemas
   updated, focused and full verification green.
+- Draft PR opened: #66
+  (`https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/66`) at
+  implementation head `778e3e33644bc417dc5f05df71c2861db94ddde7`.
