@@ -381,6 +381,7 @@ pub fn target_operating_contract_collect_plan(
     let suitability_path = format!("{reports_dir}/suitability.v2.json");
     let constraints_path = format!("{reports_dir}/constraints.v2.json");
     let constraints_markdown_path = format!("{reports_dir}/agent_constraints.md");
+    let constraints_check_path = format!("{reports_dir}/constraints_check.v2.json");
     let archive_path = format!("{}/{}.tgz", input.handoff_dir, input.run_id);
     let mut run_validation_argv = vec![
         "adc-lab".to_string(),
@@ -972,6 +973,8 @@ pub fn target_operating_contract_collect_plan(
                 &constraints_path,
                 "--path",
                 &constraints_markdown_path,
+                "--out",
+                &constraints_check_path,
                 "--json",
             ],
             "repository_root",
@@ -979,7 +982,7 @@ pub fn target_operating_contract_collect_plan(
             false,
             false,
             vec!["report.constraints_check"],
-            Vec::<String>::new(),
+            vec![constraints_check_path.clone()],
             "generated_constraints_are_negative_or_explanatory",
             vec![GovernorValidity::Measured, GovernorValidity::MeasuredPartial],
             vec![
@@ -1252,6 +1255,7 @@ pub fn target_operating_contract_collect_plan(
                 suitability_path,
                 constraints_path,
                 constraints_markdown_path,
+                constraints_check_path,
                 archive_path,
             ],
             packaging_is_target_evidence: false,

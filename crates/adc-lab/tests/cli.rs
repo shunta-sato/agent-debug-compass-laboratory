@@ -790,14 +790,31 @@ fn collect_plan_writes_v2_argv_steps_and_markdown() {
     let constraints_self_check_argv = constraints_self_check_step["command_argv"]
         .as_array()
         .unwrap();
+    let constraints_check_path = format!("{}/reports/constraints_check.v2.json", run_dir.display());
     assert!(constraints_self_check_argv
         .iter()
         .any(|arg| arg == "self-check"));
+    assert_eq!(
+        argv_values(constraints_self_check_argv, "--out"),
+        vec![constraints_check_path.clone()]
+    );
     assert!(constraints_self_check_step["expected_artifact_kinds"]
         .as_array()
         .unwrap()
         .iter()
         .any(|kind| kind == "report.constraints_check"));
+    assert!(
+        constraints_self_check_step["expected_artifact_paths_or_globs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|path| path.as_str() == Some(&constraints_check_path))
+    );
+    assert!(plan.payload["expected_final_artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|path| path.as_str() == Some(&constraints_check_path)));
 
     let archive_step = steps
         .iter()
@@ -2046,6 +2063,7 @@ fn constraints_self_check_allows_generated_blocked_claims_section() {
     let temp = tempfile::tempdir().unwrap();
     let pack_path = temp.path().join("constraints.json");
     let generated_md = temp.path().join("agent_constraints.md");
+    let check_out = temp.path().join("constraints_check.v2.json");
     write_minimal_constraints_pack(&pack_path);
     fs::write(
         &generated_md,
@@ -2076,6 +2094,8 @@ fn constraints_self_check_allows_generated_blocked_claims_section() {
             pack_path.to_str().unwrap(),
             "--path",
             generated_md.to_str().unwrap(),
+            "--out",
+            check_out.to_str().unwrap(),
             "--json",
         ])
         .assert()
@@ -2083,6 +2103,78 @@ fn constraints_self_check_allows_generated_blocked_claims_section() {
         .stdout(contains("\"kind\": \"report.constraints_check\""))
         .stdout(contains("\"mode\": \"generated_constraints\""))
         .stdout(contains("\"status\": \"pass\""));
+
+    let persisted: Artifact<serde_json::Value> =
+        serde_json::from_slice(&fs::read(&check_out).unwrap()).unwrap();
+    assert_eq!(persisted.kind, Kind::ReportConstraintsCheck);
+    assert_eq!(persisted.payload["mode"], "generated_constraints");
+    assert_eq!(persisted.payload["status"], "pass");
+    let checked_path = generated_md.display().to_string();
+    assert_eq!(
+        persisted.payload["checked_path"].as_str(),
+        Some(checked_path.as_str())
+    );
+}
+
+#[test]
+fn constraints_self_check_out_under_reports_writes_audit_event() {
+    let temp = tempfile::tempdir().unwrap();
+    let run_dir = temp.path().join("LAB-RUN-001");
+    let reports_dir = run_dir.join("reports");
+    fs::create_dir_all(&reports_dir).unwrap();
+    let pack_path = reports_dir.join("constraints.v2.json");
+    let generated_md = reports_dir.join("agent_constraints.md");
+    let check_out = reports_dir.join("constraints_check.v2.json");
+    write_minimal_constraints_pack(&pack_path);
+    fs::write(
+        &generated_md,
+        [
+            "# Target Constraints for target55 / workload-001",
+            "",
+            "Source:",
+            "- suitability_artifact: artifact://lab/runs/LAB-RUN-001/reports/suitability.v2.json",
+            "",
+            "## Must obey",
+            "",
+            "- Do not claim production readiness from this v2 workload suitability slice.",
+            "",
+            "## Blocked claims",
+            "",
+            "- `target.selection.production_ready`: \"production readiness\"",
+        ]
+        .join("\n"),
+    )
+    .unwrap();
+
+    Command::cargo_bin("adc-lab")
+        .unwrap()
+        .args([
+            "constraints",
+            "self-check",
+            "--constraints",
+            pack_path.to_str().unwrap(),
+            "--path",
+            generated_md.to_str().unwrap(),
+            "--out",
+            check_out.to_str().unwrap(),
+            "--json",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("\"kind\": \"report.constraints_check\""))
+        .stdout(contains("\"status\": \"pass\""));
+
+    let persisted: Artifact<serde_json::Value> =
+        serde_json::from_slice(&fs::read(&check_out).unwrap()).unwrap();
+    assert_eq!(persisted.kind, Kind::ReportConstraintsCheck);
+    assert_eq!(persisted.run_id, "LAB-RUN-001");
+    assert_eq!(persisted.target_id, "target55");
+
+    let audit = fs::read_to_string(run_dir.join("audit.jsonl")).unwrap();
+    assert!(audit.contains("\"run_id\":\"LAB-RUN-001\""));
+    assert!(audit.contains("\"operation\":\"constraints.self_check\""));
+    assert!(audit.contains("\"operation_id\":\"CONSTRAINT-CHECK"));
+    assert!(audit.contains("\"result\":\"pass\""));
 }
 
 #[test]

@@ -655,7 +655,7 @@ Detailed acceptance criteria:
   - [x] Run review-fix verification.
   - [x] Commit and push PR #68 review-fix commit.
   - [x] Merge PR #68.
-- [ ] PR 6: Suitability dimension linkage.
+- [x] PR 6: Suitability dimension linkage.
   - [x] Create fresh branch from `origin/main` after PR #68 merge.
   - [x] Inspect suitability policy shape and PR5 pressure artifact payload fields.
   - [x] Add target-run pressure evidence summary extraction for v2 pressure
@@ -677,6 +677,18 @@ Detailed acceptance criteria:
   - [x] Run review-fix verification.
 - [x] PR 7: Target-local executor ergonomics.
 - [ ] PR 8: Constraints self-check persistence and docs.
+  - [x] Create fresh branch from `origin/main` after PR #70 merge.
+  - [x] Add `constraints self-check --out` for persisted
+        `report.constraints_check` artifacts.
+  - [x] Audit persisted self-check results when `--out` is inside a run
+        `reports/` directory.
+  - [x] Update collect-plan `constraints_self_check` step to emit and expect
+        `reports/constraints_check.v2.json`.
+  - [x] Add focused CLI regressions for A-080 through A-083.
+  - [x] Update docs for persisted self-check handoff output.
+  - [x] Add PR8 workflow-contract review report.
+  - [x] Run focused tests and full verification.
+  - [x] Commit, push, and open PR.
 - [ ] Final: Update Outcomes with artifact review criteria and v0.2.4
       target55 rerun readiness.
 
@@ -1085,6 +1097,30 @@ Acceptance:
 
 - A-080 through A-083.
 
+PR 8 dev-workflow route:
+
+- Risk route: normal for this PR. It changes a public CLI output option and
+  generated collect-plan handoff expectations, but does not change constraint
+  check semantics or claim gates.
+- Definition of Done: `constraints self-check --out` writes a
+  `report.constraints_check` artifact; run-directory writes append an audit
+  event; collect plan records the expected persisted artifact path; generated
+  blocked-claim sections still pass self-check; downstream candidate-content
+  checks still fail on unsupported positive claims; `make verify` passes.
+- Test List: persisted self-check artifact shape; run reports audit event;
+  collect-plan argv/expected path; generated constraints self-check pass;
+  candidate-content blocked-claim failure.
+- Complexity Budget: changed production files <= 3; new modules = 0; new public
+  artifact kinds = 0; CLI option additive only; production diff target <= 80
+  lines.
+
+PR 8 implementation-economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `ConstraintsSelfCheckCommand` | Adds `--out` without changing `check-candidate` or compatibility alias arguments. | keep | CLI tests cover persisted output and existing modes. |
+| `command_constraints_check_mode_with_out` helper | Shares existing check logic and adds optional persistence/audit only for self-check. | keep | Candidate and alias behavior remain routed through the no-output wrapper. |
+
 ## Design -> WBS Coverage Check
 
 | Deliverable | WBS coverage |
@@ -1311,43 +1347,49 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   target-local ergonomics need schema-checked structure, but `workflow.rs` must
   stay under the enforced file budget and this split does not add an executor or
   remote shell framework.
+- 2026-06-16: Implement PR8 self-check persistence as
+  `constraints self-check --out`, not a `collect run` stdout-capture
+  convention. Rationale: v0.2.4 already has a public constraints self-check
+  surface and needs a simple, explicit handoff artifact path without adding an
+  executor.
+- 2026-06-16: Append an audit event for persisted constraints self-check only
+  when `--out` targets a run `reports/` directory. Rationale: run-directory
+  artifacts should preserve the no-claim-without-audit posture, while
+  stdout-only or ad hoc offline checks should remain lightweight.
 
 ## Handoff
 
 Base branch:
-`origin/main` after PR #69 is merged (`adad04545f3d`).
+`origin/main` after PR #70 is merged (`dfaa5eb`).
 
 Current implementation branch:
-`codex/v024-pr7-target-local-ergonomics`.
+`codex/v024-pr8-constraints-self-check`.
 
 Status:
-PR #69 is merged. PR7 is open as draft PR #70 from fresh branch
-`codex/v024-pr7-target-local-ergonomics` based on merge commit
-`adad04545f3d`. The implementation adds
-`workflow.collect_plan.payload.target_local_execution_guide` for SSH plans,
-renders that guide into generated collect-plan instructions, classifies SSH
-runner version-check failures with stable `failure_category` and
-`path_diagnostic` fields, and updates the generated collect-plan schema. Focused
-core/CLI/safety tests and full `make verify` passed locally. GitHub CI is
-success on latest reviewed head `fc60b6bf0b6167c271c72488b1fa4fd114dcc812`.
-PR #70 is still draft and mergeable; Draft解除 is the remaining merge-prep step.
+PR #70 is merged. PR8 is open as draft PR #71 from fresh branch
+`codex/v024-pr8-constraints-self-check` based on merge commit `dfaa5eb`. The
+implementation adds `constraints self-check --out`, records the persisted
+`report.constraints_check` path in generated collect plans, and keeps generated
+constraints self-check semantics separate from downstream candidate-content
+checks. Focused tests and full `make verify` passed locally. GitHub CI is
+pending on the latest pushed head.
 
 Reviewed implementation commit:
-`1c026bab50f901095f39b57c516bb6c892cef9d7`.
+`c7fbe644da487a0b514f35c25f1e028998db49d1`.
 
 Review-fix implementation commit:
 none.
 
 Latest pushed commit:
-this CI-status ExecPlan handoff update commit on PR #70.
+this ExecPlan handoff update commit on PR #71.
 
 Current PR:
-https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/70
+https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/71
 
 Next steps:
-1. Mark PR #70 Ready for review.
-2. Merge after final approval.
-3. Continue to PR8 constraints self-check persistence.
+1. Wait for GitHub CI.
+2. Address review comments if any.
+3. Mark PR #71 Ready for review when CI is green.
 
 Required process:
 every implementation PR must include
@@ -1668,3 +1710,35 @@ PR #69 review-fix quality gate:
   `Artifact<PressurePayload>` semantics and matching target identity; negative
   regressions cover malformed pressure-like JSON, non-v2 pressure JSON, and
   mismatched target pressure artifacts.
+
+PR 7 verification:
+
+- PR #70 review result: approved with no blocking issues.
+- GitHub CI success on reviewed head `fc60b6bf0b6167c271c72488b1fa4fd114dcc812`.
+- PR #70 merged before PR8 started.
+
+PR 8 focused verification:
+
+- `cargo test -p adc-lab --test cli constraints_self_check_allows_generated_blocked_claims_section -- --nocapture`:
+  pass.
+- `cargo test -p adc-lab --test cli constraints_self_check_out_under_reports_writes_audit_event -- --nocapture`:
+  pass.
+- `cargo test -p adc-lab --test cli collect_plan_writes_v2_argv_steps_and_markdown -- --nocapture`:
+  pass.
+- `cargo test -p adc-lab --test cli constraints_check_candidate_fails_on_blocked_claim_fixture -- --nocapture`:
+  pass.
+- `make schemas-check`: pass (`schema ledger: ok top_level=0 no_schema_wire=31
+  maintained_by_hand=0`).
+- `make docs-smoke`: pass (`docs artifact heuristic guard: ok`).
+- `make verify`: pass (`file budgets: enforced checked=60 violations=0`; CLI
+  55 tests; safety invariant tests 10 + 19; schema ledger ok; docs artifact
+  heuristic guard ok; command smoke host fallback ok).
+
+PR 8 quality gate:
+
+- Decision: submit.
+- Findings: 0 from workflow-contract review report
+  `reports/workflow-contract-review/v024-pr8-constraints-self-check.md`.
+- Required artifacts present: ExecPlan updated, PR8 workflow-contract review
+  report added, implementation-economy audit recorded, focused constraints /
+  collect-plan regressions and full verification green.
