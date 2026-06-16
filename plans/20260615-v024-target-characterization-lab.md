@@ -572,7 +572,7 @@ Detailed acceptance criteria:
 - [x] Phase 0: Rebase/start from `origin/main` after PR #62 merge and record
       baseline affected files/tests; decide profile compatibility and evidence
       ref categories.
-- [ ] PR 1: Evidence-ref resolution and operating-contract missing cleanup.
+- [x] PR 1: Evidence-ref resolution and operating-contract missing cleanup.
   - [x] Create fresh branch from `origin/main` after PR #63 merge.
   - [x] Inspect EvidenceStore, run validation, operating-contract gate, and
         suitability/constraints evidence-ref flow.
@@ -581,6 +581,21 @@ Detailed acceptance criteria:
   - [x] Add PR1 workflow-contract review report.
   - [x] Run focused tests and `make verify`.
 - [ ] PR 2: Target-local workload demand workflow.
+  - [x] Create fresh branch from `origin/main` after PR #64 merge.
+  - [x] Change SSH collect-plan workload demand to target-local argv with
+        deterministic retrieval path.
+  - [x] Ensure suitability consumes the retrieved workload demand path.
+  - [x] Keep missing/refused/degraded CPU and memory demand unknown.
+  - [x] Add focused workflow, CLI, and suitability regressions.
+  - [x] Add PR2 workflow-contract review report.
+  - [x] Move workflow unit tests to an integration test to keep `workflow.rs`
+        under the enforced file budget.
+  - [x] Run full local verification.
+  - [x] Commit, push, and open PR.
+  - [x] Address PR #65 review by adding explicit workload plan staging and
+        deterministic retrieval preparation steps.
+  - [x] Run review-fix verification.
+  - [x] Push review-fix commit.
 - [ ] PR 3: Profile split.
 - [ ] PR 4: Deep CPU / thermal characterization profile.
 - [ ] PR 5: Pressure / composite / endpoint-backed network coverage.
@@ -702,6 +717,47 @@ Scope:
 Acceptance:
 
 - A-001 through A-008.
+
+PR 2 dev-workflow route:
+
+- Risk route: normal for this PR. It changes generated workflow handoff argv
+  and suitability claim gating, but does not add a remote shell executor,
+  privileged path, schema, or new target-local runtime.
+- Definition of Done: A-001 through A-008 have focused tests; SSH collect plans
+  run workload demand as target-local `--target local`; suitability consumes
+  the retrieved deterministic include path; degraded/refused demand keeps
+  CPU/memory unknown and `selection_ready=false`; `make verify` passes.
+- Test List: SSH collect-plan workload step uses `execution_location =
+  target_local`, argv arrays, `--target local`, `--execution-mode
+  target-local`, and no `ssh://` target; workload plan staging is explicit;
+  retrieval parent creation and rerun cleanup are explicit; retrieved path is
+  deterministic and consumed by suitability; local collect plans do not emit
+  synthetic SSH handoff steps; missing CPU/RSS metrics remain unknown; degraded
+  workload demand remains unknown.
+- Complexity Budget: changed production files <= 2; new modules/classes = 0;
+  new helper functions in production = 0; initial new workflow step target <=
+  1, revised to <= 5 after PR #65 review required executable staging,
+  retrieval-parent, and rerun cleanup steps; production diff target <= 220
+  lines; tests may add fixtures/assertions as needed.
+
+PR 2 implementation-economy audit:
+
+| New abstraction | Justification | Decision | Evidence |
+|---|---|---|---|
+| `prepare_target_local_workload_plan_dir` collect-plan step | Makes target-local input directory creation executable instead of prose-only. | keep | CLI collect-plan test asserts step order, target-local execution location, and exact `mkdir -p` argv. |
+| `stage_target_local_workload_plan` collect-plan step | Prevents Agents from inventing scp staging harnesses for workload plans. | keep | CLI collect-plan test asserts exact controller source and target-local destination path. |
+| `retrieve_target_local_workload_demand` collect-plan step | Makes the target-local workload handoff path explicit so suitability can consume a deterministic path without filename discovery. | keep | CLI and core collect-plan tests assert the step and exact consumed path. |
+| `prepare_target_local_workload_retrieval_parent` and `reset_target_local_workload_retrieval_destination` collect-plan steps | Ensures retrieval parent exists and reruns cannot change `scp -r` destination layout. | keep | CLI collect-plan test asserts ordering, `mkdir -p`, scoped `rm -rf`, and rerun policy text. |
+| Additional local variables in `target_operating_contract_collect_plan` | Reuses the existing collect-plan generator and target-local convention instead of adding a new executor layer. | keep | No new module/schema; tests cover SSH and local paths. |
+| `crates/adc-lab-core/tests/workflow.rs` integration test target | Keeps workflow contract tests while returning `workflow.rs` below the enforced production file budget. | keep | File budget check reports `workflow.rs` at 1455/1500 after the PR #65 review fix. |
+
+Budget note:
+Production changes stay in `workflow.rs` and `suitability.rs`. The PR adds no
+new schema or public command; the larger line count is test evidence for the
+workflow handoff and conservative suitability semantics. Existing workflow unit
+tests moved to an integration test file because `workflow.rs` exceeded the
+1500-line production file budget after PR 2. PR #65 review added more workflow
+steps, but `workflow.rs` remains under budget at 1455/1500.
 
 ### PR 3: Profile Split
 
@@ -858,6 +914,21 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   suitability/constraints ref resolution against a single-run store. The
   review requires an included-run downstream regression or an explicit scope
   reduction.
+- 2026-06-15: PR #64 merged into `origin/main` as
+  `76f3e1f66ee80d9ff4af02f9b050d7b2694f27de`; PR 2 branch
+  `codex/v024-pr2-target-local-workload` was created from that updated
+  `origin/main`.
+- 2026-06-15: Suitability memory gating already used available-memory evidence
+  but did not require workload RSS. PR 2 tightens this so memory cannot become
+  `meet` without process RSS demand from a clean workload profile.
+- 2026-06-15: The first PR 2 implementation pushed `workflow.rs` to 1620 lines,
+  above the enforced 1500-line file budget. Moving workflow tests to
+  `crates/adc-lab-core/tests/workflow.rs` reduced production `workflow.rs` to
+  1344 lines without weakening coverage.
+- 2026-06-16: PR #65 review found two executable-handoff gaps: the SSH
+  workload run plan was only described in prose instead of staged by a collect
+  step, and workload retrieval did not create `<primary>/included` or define
+  rerun behavior when the destination already existed.
 
 ## Decision Log
 
@@ -901,28 +972,57 @@ A v0.2.4 target55 artifact is successful only if it can answer:
   regression instead of narrowing PR scope. Rationale: PR 1 is the auditability
   foundation, so it should prove operating-contract, suitability, and
   constraints refs resolve through the same primary + included run set.
+- 2026-06-15: Keep PR 2 as collect-plan plus suitability-gate work, not a new
+  target-local executor. Rationale: the existing collect-plan target-local
+  convention and `workload run --target local` are sufficient; `collect run`
+  remains deferred.
+- 2026-06-15: Model workload retrieval as an `operator_handoff` `scp` argv
+  step, not measurement evidence. Rationale: PR 2 needs a deterministic
+  retrieved path for suitability without adding a remote shell framework or
+  pretending file transfer is target evidence.
+- 2026-06-15: Move workflow tests out of `src/workflow.rs` instead of adding a
+  file-budget override. Rationale: the tests remain first-class integration
+  coverage and the production module stays within the existing budget.
+- 2026-06-16: Fix PR #65 with explicit argv steps instead of prose-only
+  instructions. Rationale: collect plan is the executable handoff contract, so
+  target-local input staging must be represented as `mkdir -p` plus `scp`
+  steps before `workload_demand`.
+- 2026-06-16: Use controller-side deterministic cleanup for workload retrieval
+  reruns. Rationale: `scp -r source dest` changes layout when `dest` already
+  exists; deleting only `<primary>/included/target-local-workload-demand`
+  before retrieval keeps the consumed suitability path stable without adding an
+  rsync dependency.
 
 ## Handoff
 
 Base branch:
-`origin/main` after PR #62 and agent-instructions-playbook PR #57 are merged.
+`origin/main` after PR #64 is merged.
 
 Current implementation branch:
-`codex/v024-pr1-evidence-ref-resolution`.
+`codex/v024-pr2-target-local-workload`.
 
 Status:
-PR #63 is merged. PR 1 branch is open locally from updated `origin/main`.
-Implementation is complete locally; resolver/report code, focused tests,
-schema generation, workflow-contract review report, and full verification were
-green before review. PR #64 review requested one small A-052 coverage fix; this
-branch now adds the included-run downstream suitability/constraints regression
-and documentation clarification. Local verification is green after the review
-fix; check PR #64 for latest-head CI before merge.
+PR #64 is merged. PR #65 is open as a draft for PR 2:
+SSH collect plans emit target-local workload demand argv, include an
+operator-handoff retrieval path, and feed that retrieved path into suitability.
+Suitability requires clean workload CPU/RSS demand before CPU/memory can meet.
+PR #65 review requested explicit workload plan staging and deterministic
+retrieval preparation. The review fix has been pushed to PR #65:
+target-local plan dir preparation, plan staging, controller retrieval parent
+creation, and scoped destination cleanup are now collect-plan argv steps.
+Focused tests, file budget enforcement, `make docs-smoke`, `make
+schemas-check`, and `make verify` are green after the review fix.
+
+Reviewed review-fix implementation commit:
+`faa1e13b12b86774b508fb34d88a5192300f02ef`.
+
+Current PR:
+https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/65
 
 Next steps:
-1. Push the PR #64 review-fix commit if it is not already on the remote branch.
-2. Check latest-head CI.
-3. Merge after final review approval and green CI.
+1. Wait for PR #65 CI on the latest pushed head.
+2. Request re-review after CI remains green.
+3. Mark Ready for review after approval.
 
 Required process:
 every implementation PR must include
@@ -986,3 +1086,46 @@ Quality gate:
   head `46d3757e05f4af4bd88fc024c4a7f89bba5f6fd1`.
 - PR #64 status-only handoff updates are plan-only; latest-head CI should be
   checked in the PR UI before Ready for review.
+
+PR 2 verification:
+
+- `cargo test -p adc-lab-core suitability_ -- --nocapture`: pass.
+- `cargo test -p adc-lab-core collect_plan_steps_are_argv_arrays_and_not_measurement_evidence -- --nocapture`: pass.
+- `cargo test -p adc-lab-core --test workflow -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli collect_plan -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli decide_suitability_refused_workload_demand_keeps_selection_not_ready -- --nocapture`: pass.
+- `git diff --check`: pass.
+- `make docs-smoke`: pass.
+- `make schemas-check`: pass (`schema ledger: ok top_level=0 no_schema_wire=31 maintained_by_hand=0`).
+- `make verify`: pass (`file budgets: enforced checked=55 violations=0`; CLI 49 tests, safety invariants 9 + 19 tests, and workspace tests green).
+
+PR 2 quality gate:
+
+- Decision: submit.
+- Findings: 0.
+- Required artifacts present: ExecPlan updated, PR2 workflow-contract review
+  report decision `submit`, implementation-economy audit recorded, workflow
+  tests moved to an integration test to keep production file budgets green.
+- Draft PR opened: #65
+  (`https://github.com/shunta-sato/agent-debug-compass-laboratory/pull/65`) at
+  initial implementation head `4069641ac34c56e48f132e034d32d229021f036a`.
+
+PR #65 review-fix verification:
+
+- `cargo fmt --all --check`: pass.
+- `cargo test -p adc-lab-core --test workflow -- --nocapture`: pass.
+- `cargo test -p adc-lab --test cli collect_plan -- --nocapture`: pass.
+- `python3 scripts/ci/check-file-budgets.py --enforce`: pass (`workflow.rs`
+  1455/1500; `file budgets: enforced checked=55 violations=0`).
+- `make docs-smoke`: pass.
+- `make schemas-check`: pass (`schema ledger: ok top_level=0 no_schema_wire=31 maintained_by_hand=0`).
+- `make verify`: pass.
+
+PR #65 review-fix quality gate:
+
+- Decision: submit.
+- Findings: 0.
+- Required artifacts present: ExecPlan updated, PR2 workflow-contract review
+  report updated with staging/retrieval preparation chain, implementation
+  economy audit updated for the added handoff steps, focused regression tests
+  and full verification green.

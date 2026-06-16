@@ -729,6 +729,15 @@ fn decide_memory(
             true,
         );
     }
+    let Some(rss_peak_kb) = workload.workload_demand.rss_peak_kb else {
+        return unknown_dimension(
+            SuitabilityDimensionKind::Memory,
+            "process RSS demand is unavailable".to_string(),
+            evidence_refs,
+            false,
+            true,
+        );
+    };
     let available_kb = workload
         .system_context
         .system_memory_available_min_kb
@@ -758,10 +767,7 @@ fn decide_memory(
             "system_memory_available_min_mb >= {}",
             memory_policy.min_memory_margin_mb
         ),
-        observed_demand: workload
-            .workload_demand
-            .rss_peak_kb
-            .map(|rss| format!("{:.1}MiB RSS peak", rss as f64 / 1024.0)),
+        observed_demand: Some(format!("{:.1}MiB RSS peak", rss_peak_kb as f64 / 1024.0)),
         target_envelope: Some(format!(
             "{available_mb:.1}MiB minimum available memory observed"
         )),
@@ -1090,9 +1096,9 @@ fn should_scan_file(path: &Path) -> bool {
 mod tests {
     use super::*;
     use crate::contracts::{
-        SuitabilityPolicyRules, ThermalSuitabilityPolicy, WorkloadDataQuality, WorkloadDemand,
-        WorkloadDemandScope, WorkloadExecutionMode, WorkloadSystemContext,
-        WorkloadTargetConditionedResponse,
+        CpuSuitabilityPolicy, MemorySuitabilityPolicy, SuitabilityPolicyRules,
+        ThermalSuitabilityPolicy, WorkloadDataQuality, WorkloadDemand, WorkloadDemandScope,
+        WorkloadExecutionMode, WorkloadSystemContext, WorkloadTargetConditionedResponse,
     };
 
     #[test]
@@ -1198,5 +1204,175 @@ mod tests {
             .payload
             .blocked_claims
             .contains(&claim::THERMAL_SUSTAINED_SOAK.to_string()));
+    }
+
+    #[test]
+    fn suitability_cpu_memory_require_process_metrics_before_meet() {
+        let temp = tempfile::tempdir().unwrap();
+        let policy = cpu_memory_policy();
+        let workload = workload_profile(false, None, None, Some(8 * 1024 * 1024));
+        let decision = decide_suitability_artifact_v2(
+            temp.path(),
+            &empty_contract(),
+            &workload,
+            &policy,
+            test_context(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            decision.payload.overall_decision,
+            Some(SuitabilityDecisionValue::Unknown)
+        );
+        assert!(!decision.payload.selection_ready);
+        assert_dimension_unknown(&decision, SuitabilityDimensionKind::Cpu);
+        assert_dimension_unknown(&decision, SuitabilityDimensionKind::Memory);
+        assert!(decision
+            .payload
+            .blocked_claims
+            .contains(&claim::SELECTION_READY.to_string()));
+    }
+
+    #[test]
+    fn suitability_degraded_workload_demand_cannot_support_selection_ready() {
+        let temp = tempfile::tempdir().unwrap();
+        let policy = cpu_memory_policy();
+        let workload = workload_profile(true, Some(5.0), Some(64 * 1024), Some(8 * 1024 * 1024));
+        let decision = decide_suitability_artifact_v2(
+            temp.path(),
+            &empty_contract(),
+            &workload,
+            &policy,
+            test_context(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            decision.payload.overall_decision,
+            Some(SuitabilityDecisionValue::Unknown)
+        );
+        assert!(!decision.payload.selection_ready);
+        assert_dimension_unknown(&decision, SuitabilityDimensionKind::Cpu);
+        assert_dimension_unknown(&decision, SuitabilityDimensionKind::Memory);
+        assert_eq!(decision.data_quality.level, DataQualityLevel::Degraded);
+    }
+
+    fn cpu_memory_policy() -> SuitabilityPolicy {
+        SuitabilityPolicy {
+            schema_version: "lab.suitability_policy.v1".to_string(),
+            policy_id: "test".to_string(),
+            required_dimensions: vec![
+                SuitabilityDimensionKind::Cpu,
+                SuitabilityDimensionKind::Memory,
+            ],
+            optional_dimensions: Vec::new(),
+            rules: SuitabilityPolicyRules {
+                unknown_required_dimension_blocks_selection: true,
+                unknown_never_becomes_meet: true,
+            },
+            thermal: None,
+            cpu: Some(CpuSuitabilityPolicy {
+                max_process_cpu_percent_avg: 80.0,
+            }),
+            memory: Some(MemorySuitabilityPolicy {
+                min_memory_margin_mb: 1024,
+            }),
+        }
+    }
+
+    fn workload_profile(
+        degraded: bool,
+        process_cpu_percent_avg: Option<f64>,
+        rss_peak_kb: Option<u64>,
+        system_memory_available_min_kb: Option<u64>,
+    ) -> WorkloadDemandProfile {
+        WorkloadDemandProfile {
+            schema_version: "lab.workload_demand_profile.v1".to_string(),
+            profile_id: "profile".to_string(),
+            run_id: "run".to_string(),
+            workload_id: "workload".to_string(),
+            target_id: "target55".to_string(),
+            execution_mode: WorkloadExecutionMode::TargetLocal,
+            demand_scope: WorkloadDemandScope::ProcessScoped,
+            workload_demand: WorkloadDemand {
+                process_cpu_utime_ticks: None,
+                process_cpu_stime_ticks: None,
+                process_cpu_time_ms: process_cpu_percent_avg,
+                process_cpu_percent_avg,
+                process_cpu_percent_peak: process_cpu_percent_avg,
+                rss_peak_kb,
+                vmhwm_peak_kb: rss_peak_kb,
+                read_bytes: None,
+                write_bytes: None,
+                cancelled_write_bytes: None,
+                voluntary_ctxt_switches: None,
+                nonvoluntary_ctxt_switches: None,
+                duty_cycle: "bounded_burst".to_string(),
+                child_process_accounting_status: "unsupported".to_string(),
+            },
+            target_conditioned_response: WorkloadTargetConditionedResponse {
+                portable_between_targets: false,
+                thermal_max_c: None,
+                thermal_margin_c: None,
+                freq_range_khz: None,
+                abort_reason: None,
+            },
+            system_context: WorkloadSystemContext {
+                system_cpu_percent_avg: None,
+                system_memory_available_min_kb,
+                background_activity_confounder: "measured_partial".to_string(),
+            },
+            data_quality: WorkloadDataQuality {
+                degraded,
+                missing: if degraded {
+                    vec!["workload run incomplete".to_string()]
+                } else {
+                    Vec::new()
+                },
+                notes: Vec::new(),
+            },
+            evidence_refs: Vec::new(),
+            time_unix_ms: 1,
+        }
+    }
+
+    fn empty_contract() -> Artifact<OperatingContractPayload> {
+        Artifact::new(
+            Kind::ReportOperatingContract,
+            "OPERATING-CONTRACT-001",
+            "run",
+            "target55",
+            Status::Insufficient,
+            OperatingContractPayload {
+                rule_set_id: "test.operating_contract".to_string(),
+                evaluations: Vec::new(),
+                blocked_claims: Vec::new(),
+                next_evidence: Vec::new(),
+            },
+            1,
+        )
+    }
+
+    fn test_context() -> SuitabilityArtifactContext {
+        SuitabilityArtifactContext {
+            target_contract_ref: "contract".to_string(),
+            workload_ref: "workload".to_string(),
+            policy_ref: "policy".to_string(),
+            run_id: "run".to_string(),
+        }
+    }
+
+    fn assert_dimension_unknown(
+        decision: &Artifact<SuitabilityPayload>,
+        dimension: SuitabilityDimensionKind,
+    ) {
+        let dimension = decision
+            .payload
+            .dimensions
+            .iter()
+            .find(|candidate| candidate.dimension == dimension)
+            .unwrap();
+        assert_eq!(dimension.decision, SuitabilityDecisionValue::Unknown);
+        assert!(dimension.unknown_reason.is_some());
     }
 }
