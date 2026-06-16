@@ -64,20 +64,24 @@ Out of scope:
 
 ## Assumptions / Base
 
-- Base branch: `origin/main` after PR #62 and agent-instructions-playbook PR
-  #57 are merged.
-- Current implementation branch: `codex/v024-pr1-evidence-ref-resolution`.
-- Phase 0 branch was created fresh from updated `origin/main`.
-- Release identity: v0.2.4 is a product release after v0.2.3.1; Cargo package
-  versions remain decoupled unless release tooling requires otherwise.
-- Existing surfaces available from v0.2.3.1:
+- Base branch for the final readiness PR: `origin/main` after PR #71 is merged.
+- Current implementation branch: `codex/v024-final-readiness`.
+- Series status: PR1 through PR8 are merged. This PR is final
+  release-readiness documentation / workflow-contract review only.
+- Release gate status: release binary creation, `SHA256SUMS` /
+  `release-manifest.json` verification, and target55 release-binary rerun are
+  post-merge release gates.
+- Release identity: v0.2.4 is ready to cut after this final readiness PR merges
+  and the post-merge release gates pass. Cargo package versions remain
+  decoupled unless release tooling requires otherwise.
+- Surfaces available from the completed v0.2.4 series:
   - `workflow recommend`
   - `agent instructions`
   - `collect plan`
   - multi-run `report validate-run --include-run`
   - `report operating-contract --validation --strict-fullset`
   - `constraints check-candidate`
-  - `constraints self-check`
+  - `constraints self-check --out`
   - generated schemas and schema ledger
   - docs heuristic guard
 - `collect run` remains deferred unless explicitly re-scoped by a later
@@ -190,44 +194,27 @@ visible in downstream claims.
 
 ### Profile Model
 
-Introduce explicit workflow depth labels:
+Final explicit workflow depth labels:
 
 - `target-operating-contract-smoke`: setup and workflow correctness profile.
   It includes runner preflight, read-only identity, short seed probes, and
   governor-validation smoke. Its generated text must state that it is not deep
   target characterization.
-- `target-characterization-full`: bounded deeper characterization profile. PR 4
-  makes the CPU/thermal slice executable: repeated observation, CPU ladder,
-  repeatability, sustained bounded load, cooldown, and safety caps. PR 5/6/8
-  still own pressure/composite coverage, endpoint-backed network, suitability
-  dimension linkage, constraints, and persisted self-check depth.
+- `target-characterization-full`: bounded deeper characterization profile.
+  PR4 through PR8 completed CPU/thermal, pressure/composite/network coverage,
+  suitability dimension linkage, target-local execution guide, and persisted
+  constraints self-check. Release-binary target55 execution remains a
+  post-merge release gate.
 - `suitability-focused`: optional later profile for a known workload and known
   evidence set. Defer unless the first two profiles need the distinction.
 
-Compatibility decision moved to Phase 0:
+Compatibility decision completed in Phase 0:
 
-- Whether the existing `target-operating-contract-fullset` remains as a
-  compatibility alias for smoke, is deprecated with warning text, or is mapped
-  to one of the new profile ids.
-
-Phase 0 compatibility decision must happen before PR 2:
-
-```text
-Option A:
-  target-operating-contract-fullset remains as compatibility alias to smoke.
-
-Option B:
-  target-operating-contract-fullset maps to target-characterization-full.
-
-Option C:
-  target-operating-contract-fullset remains accepted but emits deprecation
-  warning and requires explicit --profile-depth smoke|characterization-full.
-```
-
-Recommended decision: Option C. Rationale: v0.2.3.1 fullset is closer to a
-workflow/governor-validation smoke profile than v0.2.4 deep characterization.
-Keeping the name while changing depth would make old and new runs difficult to
-compare and would let Agents over-read the older profile.
+- Option C was adopted: `target-operating-contract-fullset` remains accepted
+  only when `--profile-depth smoke|characterization-full` disambiguates the
+  requested depth. Rationale: v0.2.3.1 fullset behavior was closer to
+  workflow/governor-validation smoke than v0.2.4 deep characterization, and
+  silently changing the meaning would let Agents over-read older runs.
 
 ### Included-Run Evidence Refs
 
@@ -1156,6 +1143,20 @@ Before tagging v0.2.4:
 - target55 characterization-full dry or bounded review, if duration permits
 - Artifact Review Criteria below recorded against the target55 run or marked
   blocked/deferred with reason
+
+Post-merge release gate checklist:
+
+- Cut v0.2.4 release binaries.
+- Verify `release-manifest.json` includes `adc-lab` and `adc-lab-target`.
+- Verify `SHA256SUMS`.
+- Install or select the controller release binary and verify its version.
+- Verify target55 `adc-lab`, `adc-lab-target`, and helper versions from the
+  release install path; keep controller and target versions separate if they
+  differ.
+- Run the smoke profile from release binaries.
+- Optionally run `target-characterization-full` with an explicit endpoint and
+  explicit duration/risk budget.
+- Package the archive and SHA-256 checksum for supervisor review.
 
 ## Artifact Review Criteria
 
