@@ -40,12 +40,40 @@ pub fn render_collect_plan_agent_instructions(
         out.push_str("The release installer installs user binaries under `~/.local/bin` by default; non-interactive SSH PATH may omit that directory.\n");
         out.push_str("Do not treat adc-lab or adc-lab-target as missing merely because command -v fails under the default non-interactive SSH PATH.\n\n");
     }
-    if payload
-        .steps
-        .iter()
-        .any(|step| step.execution_location == "target_local")
-    {
-        out.push_str("For target_local execution, run `export PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH\"` before executing target-local argv steps.\n\n");
+    if let Some(guide) = &payload.target_local_execution_guide {
+        out.push_str("## Target-Local Execution Guide\n\n");
+        out.push_str(&format!(
+            "- applies_to_execution_location: `{}`\n",
+            guide.applies_to_execution_location
+        ));
+        out.push_str(&format!(
+            "- working_directory_policy: `{}`\n",
+            guide.working_directory_policy
+        ));
+        out.push_str(&format!(
+            "- path_prepend: `{}`\n",
+            guide.path_prepend.join(":")
+        ));
+        for env in &guide.env {
+            out.push_str(&format!(
+                "- env `{}`: `{}` ({})\n",
+                env.name, env.value, env.required_when
+            ));
+        }
+        out.push_str(&format!("- argv_semantics: {}\n", guide.argv_semantics));
+        out.push_str(&format!(
+            "- ssh_invocation_template: `{}`\n",
+            serde_json::to_string(&guide.ssh_invocation_template)
+                .unwrap_or_else(|_| "[]".to_string())
+        ));
+        out.push_str("- failure_diagnostics:\n");
+        for diagnostic in &guide.failure_diagnostics {
+            out.push_str(&format!(
+                "  - `{}`: {}; action: {}\n",
+                diagnostic.category, diagnostic.signal, diagnostic.operator_action
+            ));
+        }
+        out.push('\n');
     }
     out.push_str("## Steps\n\n");
     for step in &payload.steps {
@@ -143,6 +171,7 @@ pub fn render_codex_agent_instructions(
         out.push_str("- The release installer installs `adc-lab-target` under `~/.local/bin`; non-interactive SSH PATH may omit that directory.\n");
         out.push_str("- Do not treat adc-lab or adc-lab-target as missing merely because command -v fails under the default non-interactive SSH PATH.\n");
         out.push_str("- For target_local execution, run `export PATH=\"$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin:$PATH\"` before executing target-local argv steps.\n\n");
+        out.push_str("- Diagnostics distinguish command_not_found, path_missing, permission_denied, helper_unavailable, and version_skew; preserve these as evidence boundaries instead of retrying with a hand-written shell harness.\n\n");
     }
 
     out.push_str("## Expected Outputs\n\n");

@@ -27,6 +27,7 @@ mod workflow_characterization;
 mod workflow_pressure;
 pub mod workflow_profile;
 pub mod workflow_render;
+pub mod workflow_target_local;
 pub mod workload;
 
 pub use audit::*;
@@ -55,4 +56,5 @@ pub use toolchain::*;
 pub use workflow::*;
 pub use workflow_profile::*;
 pub use workflow_render::*;
+pub use workflow_target_local::*;
 pub use workload::*;

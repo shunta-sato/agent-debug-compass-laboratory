@@ -115,7 +115,12 @@ pub fn target_runner_build_info(target: &TargetSpec) -> LabResult<BuildInfo> {
             if !output.status.success() {
                 return Err(LabError::Command(format!(
                     "ssh target runner version failed: {}",
-                    ssh_runner_failure_diagnostic(target, &runner, &output.stderr)
+                    ssh_runner_failure_diagnostic(
+                        target,
+                        &runner,
+                        output.status.code(),
+                        &output.stderr
+                    )
                 )));
             }
             let mut info: BuildInfo = serde_json::from_slice(&output.stdout)?;
@@ -125,13 +130,47 @@ pub fn target_runner_build_info(target: &TargetSpec) -> LabResult<BuildInfo> {
     }
 }
 
-fn ssh_runner_failure_diagnostic(target: &TargetSpec, runner: &str, stderr: &[u8]) -> String {
+fn ssh_runner_failure_diagnostic(
+    target: &TargetSpec,
+    runner: &str,
+    exit_code: Option<i32>,
+    stderr: &[u8],
+) -> String {
     let remote_user = ssh_endpoint_user(&target.endpoint).unwrap_or("<target-user>");
+    let stderr_text = String::from_utf8_lossy(stderr);
+    let failure_category = ssh_runner_failure_category(exit_code, &stderr_text);
+    let path_diagnostic = ssh_runner_path_diagnostic(runner, failure_category);
     format!(
-        "tried_runner={runner}; default_runner=adc-lab-target; remote_endpoint={}; remote_user={remote_user}; remote_path=unknown (non-interactive SSH PATH is not captured by this version check); suggested_ADC_LAB_TARGET_RUNNER=/home/{remote_user}/.local/bin/adc-lab-target; release installer default is ~/.local/bin/adc-lab-target, but non-interactive SSH PATH may omit ~/.local/bin; remote stderr: {}",
+        "failure_category={failure_category}; path_diagnostic={path_diagnostic}; exit_code={}; tried_runner={runner}; default_runner=adc-lab-target; remote_endpoint={}; remote_user={remote_user}; remote_path=unknown (non-interactive SSH PATH is not captured by this version check); suggested_ADC_LAB_TARGET_RUNNER=/home/{remote_user}/.local/bin/adc-lab-target; release installer default is ~/.local/bin/adc-lab-target, but non-interactive SSH PATH may omit ~/.local/bin; remote stderr: {}",
+        exit_code.map_or_else(|| "unknown".to_string(), |code| code.to_string()),
         target.endpoint,
-        String::from_utf8_lossy(stderr).trim()
+        stderr_text.trim()
     )
+}
+
+fn ssh_runner_failure_category(exit_code: Option<i32>, stderr: &str) -> &'static str {
+    let lower = stderr.to_ascii_lowercase();
+    if exit_code == Some(126) || lower.contains("permission denied") {
+        "permission_denied"
+    } else if exit_code == Some(127)
+        || lower.contains("not found")
+        || lower.contains("no such file")
+    {
+        "command_not_found"
+    } else {
+        "runner_version_failed"
+    }
+}
+
+fn ssh_runner_path_diagnostic(runner: &str, failure_category: &str) -> &'static str {
+    match (runner, failure_category) {
+        ("adc-lab-target", "command_not_found") => {
+            "non_interactive_path_missing_or_runner_not_installed"
+        }
+        (_, "command_not_found") => "configured_runner_missing",
+        (_, "permission_denied") => "runner_permission_or_ssh_access_denied",
+        _ => "not_path_lookup",
+    }
 }
 
 fn ssh_endpoint_user(endpoint: &str) -> Option<&str> {

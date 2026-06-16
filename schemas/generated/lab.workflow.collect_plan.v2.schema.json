@@ -514,6 +514,16 @@
         "target_id": {
           "type": "string"
         },
+        "target_local_execution_guide": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/WorkflowTargetLocalExecutionGuide"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "workflow_id": {
           "type": "string"
         },
@@ -651,6 +661,94 @@
         "offline_recommendation",
         "capability_checked_recommendation"
       ]
+    },
+    "WorkflowTargetLocalEnvRequirement": {
+      "type": "object",
+      "required": [
+        "name",
+        "required_when",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "required_when": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkflowTargetLocalExecutionGuide": {
+      "type": "object",
+      "required": [
+        "applies_to_execution_location",
+        "argv_semantics",
+        "env",
+        "failure_diagnostics",
+        "path_prepend",
+        "ssh_invocation_template",
+        "working_directory_policy"
+      ],
+      "properties": {
+        "applies_to_execution_location": {
+          "type": "string"
+        },
+        "argv_semantics": {
+          "type": "string"
+        },
+        "env": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkflowTargetLocalEnvRequirement"
+          }
+        },
+        "failure_diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkflowTargetLocalFailureDiagnostic"
+          }
+        },
+        "path_prepend": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ssh_invocation_template": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "working_directory_policy": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkflowTargetLocalFailureDiagnostic": {
+      "type": "object",
+      "required": [
+        "category",
+        "operator_action",
+        "signal"
+      ],
+      "properties": {
+        "category": {
+          "type": "string"
+        },
+        "operator_action": {
+          "type": "string"
+        },
+        "signal": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }
